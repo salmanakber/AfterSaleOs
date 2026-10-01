@@ -1,0 +1,5 @@
+# Shopify CLI extensions live here (theme blocks, customer-account UI, Flow, admin blocks).
+# Scaffold with: shopify app generate extension
+# Built in M2 (registration/lookup), M5 (Flow + admin blocks).
+
+# Placeholder so the folder is tracked.

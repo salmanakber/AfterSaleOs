@@ -1,0 +1,16 @@
+node_modules
+.turbo
+.next
+dist
+build
+.env
+.env.local
+*.log
+uploads
+.DS_Store
+coverage
+.vercel
+*.tsbuildinfo
+apps/web/.next
+apps/admin/.next
+packages/db/prisma/migrations/**/migration_lock.toml.bak

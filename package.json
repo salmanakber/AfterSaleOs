@@ -1,0 +1,36 @@
+{
+  "name": "aftersale-os",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev --parallel",
+    "dev:web": "npm run dev -w @aftersale/web",
+    "dev:worker": "npm run dev -w @aftersale/worker",
+    "dev:admin": "npm run dev -w @aftersale/admin",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "db:generate": "npm run generate -w @aftersale/db",
+    "db:push": "npm run push -w @aftersale/db",
+    "db:migrate": "npm run migrate -w @aftersale/db",
+    "db:migrate:deploy": "npm run migrate:deploy -w @aftersale/db",
+    "db:seed": "npm run seed -w @aftersale/db",
+    "typecheck": "turbo typecheck"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=20"
+  }
+}

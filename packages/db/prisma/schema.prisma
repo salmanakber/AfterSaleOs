@@ -1,0 +1,819 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Shopify OAuth sessions ──────────────────────────────────────────────────
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean   @default(false)
+  emailVerified       Boolean   @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+
+  @@index([shop])
+}
+
+// ─── Shop (tenant) ───────────────────────────────────────────────────────────
+
+model Shop {
+  id                    String         @id @default(cuid())
+  shopDomain            String         @unique @map("shop_domain")
+  shopName              String?        @map("shop_name")
+  shopifyShopId         String?        @map("shopify_shop_id")
+  email                 String?
+  currency              String         @default("USD")
+  timezone              String         @default("UTC")
+  planId                String?        @map("plan_id")
+  status                ShopStatus     @default(ACTIVE)
+  billingStatus         BillingStatus  @default(ACTIVE) @map("billing_status")
+  shopifySubscriptionId String?        @map("shopify_subscription_id")
+  billingBypass         Boolean        @default(false) @map("billing_bypass")
+  onboardingCompleted   Boolean        @default(false) @map("onboarding_completed")
+  brandingLogoUrl       String?        @map("branding_logo_url")
+  brandingAccentColor   String?        @map("branding_accent_color")
+  voidWarrantyOnRefund  Boolean        @default(true) @map("void_warranty_on_refund")
+  backfillLookbackMonths Int?          @map("backfill_lookback_months")
+  installedAt           DateTime       @default(now()) @map("installed_at")
+  uninstalledAt         DateTime?      @map("uninstalled_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+
+  plan                  Plan?          @relation(fields: [planId], references: [id])
+  billingCharges        BillingCharge[]
+  usageCounters         UsageCounter[]
+  webhookEvents         WebhookEvent[]
+  jobs                  Job[]
+  activityLogs          ActivityLog[]
+  staffMembers          StaffMember[]
+  warrantyRules         WarrantyRule[]
+  products              Product[]
+  customers             Customer[]
+  orders                Order[]
+  warranties            Warranty[]
+  warrantyUnits         WarrantyUnit[]
+  claims                Claim[]
+  registrations         Registration[]
+  attachments           Attachment[]
+  locations             Location[]
+  privacyRequests       PrivacyRequest[]
+  shopNotes             ShopNote[]
+
+  @@map("shops")
+}
+
+enum ShopStatus {
+  ACTIVE
+  SUSPENDED
+  UNINSTALLED
+}
+
+enum BillingStatus {
+  ACTIVE
+  PENDING_APPROVAL
+  DECLINED
+  FROZEN
+  CANCELLED
+}
+
+// ─── Plans ───────────────────────────────────────────────────────────────────
+
+model Plan {
+  id                      String   @id @default(cuid())
+  name                    String   @unique
+  slug                    String   @unique
+  priceMonthlyCents       Int      @map("price_monthly_cents")
+  isFree                  Boolean  @default(false) @map("is_free")
+  shopifyPlanName         String?  @map("shopify_plan_name")
+  warrantiesPerMonth      Int      @map("warranties_per_month")
+  claimsPerMonth          Int      @map("claims_per_month")
+  attachmentStorageMb     Int      @map("attachment_storage_mb")
+  staffSeats              Int      @map("staff_seats")
+  aiCreditsPerMonth       Int      @map("ai_credits_per_month")
+  warrantyRulesLimit      Int      @map("warranty_rules_limit")
+  locationsLimit          Int      @map("locations_limit")
+  technicianAccounts      Int      @default(0) @map("technician_accounts")
+  publicApiEnabled        Boolean  @default(false) @map("public_api_enabled")
+  customBranding          Boolean  @default(false) @map("custom_branding")
+  pdfCertificate          Boolean  @default(false) @map("pdf_certificate")
+  qrCodes                 Boolean  @default(false) @map("qr_codes")
+  csvExport               Boolean  @default(false) @map("csv_export")
+  backfillBeyond12Months  Boolean  @default(false) @map("backfill_beyond_12_months")
+  repairsEnabled          Boolean  @default(false) @map("repairs_enabled")
+  customWorkflows         Boolean  @default(false) @map("custom_workflows")
+  advancedAnalytics       Boolean  @default(false) @map("advanced_analytics")
+  flowEnabled             Boolean  @default(false) @map("flow_enabled")
+  expiryCampaigns         Boolean  @default(false) @map("expiry_campaigns")
+  bulkOperations          Boolean  @default(false) @map("bulk_operations")
+  supplierPortal          Boolean  @default(false) @map("supplier_portal")
+  technicianPortal        Boolean  @default(false) @map("technician_portal")
+  partsInventory          Boolean  @default(false) @map("parts_inventory")
+  multiLocation           Boolean  @default(false) @map("multi_location")
+  erpConnectors           Boolean  @default(false) @map("erp_connectors")
+  sortOrder               Int      @default(0) @map("sort_order")
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  shops                   Shop[]
+  billingCharges          BillingCharge[]
+
+  @@map("plans")
+}
+
+model BillingCharge {
+  id              String              @id @default(cuid())
+  shopId          String              @map("shop_id")
+  type            BillingChargeType
+  shopifyChargeId String              @map("shopify_charge_id")
+  status          BillingChargeStatus @default(PENDING)
+  amountCents     Int                 @map("amount_cents")
+  planId          String?             @map("plan_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  activatedAt     DateTime?           @map("activated_at")
+
+  shop            Shop                @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  plan            Plan?               @relation(fields: [planId], references: [id])
+
+  @@index([shopId, createdAt])
+  @@index([shopifyChargeId])
+  @@map("billing_charges")
+}
+
+enum BillingChargeType {
+  RECURRING
+  ONE_TIME
+}
+
+enum BillingChargeStatus {
+  PENDING
+  ACTIVE
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+// ─── Usage counters (plan limits) ────────────────────────────────────────────
+
+model UsageCounter {
+  id        String   @id @default(cuid())
+  shopId    String   @map("shop_id")
+  metric    String
+  periodKey String   @map("period_key") // e.g. 2026-10
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, metric, periodKey])
+  @@index([shopId, metric])
+  @@map("usage_counters")
+}
+
+// ─── Webhooks & jobs ─────────────────────────────────────────────────────────
+
+model WebhookEvent {
+  id          String              @id @default(cuid())
+  shopId      String?             @map("shop_id")
+  shopDomain  String              @map("shop_domain")
+  topic       String
+  eventId     String              @unique @map("event_id") // Shopify webhook-id (idempotency)
+  payload     Json
+  status      WebhookEventStatus  @default(PENDING)
+  attempts    Int                 @default(0)
+  lastError   String?             @map("last_error")
+  processedAt DateTime?           @map("processed_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  shop        Shop?               @relation(fields: [shopId], references: [id], onDelete: SetNull)
+
+  @@index([shopId, topic, createdAt])
+  @@index([status, createdAt])
+  @@map("webhook_events")
+}
+
+enum WebhookEventStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  DEAD
+}
+
+model Job {
+  id             String    @id @default(cuid())
+  shopId         String    @map("shop_id")
+  type           String
+  status         JobStatus @default(PENDING)
+  payload        Json?
+  progress       Int       @default(0)
+  total          Int       @default(0)
+  result         Json?
+  errorSummary   String?   @map("error_summary")
+  attempts       Int       @default(0)
+  startedAt      DateTime? @map("started_at")
+  finishedAt     DateTime? @map("finished_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  shop           Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  failures       JobFailure[]
+
+  @@index([shopId, type, createdAt])
+  @@index([status, createdAt])
+  @@map("jobs")
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model JobFailure {
+  id        String   @id @default(cuid())
+  jobId     String?  @map("job_id")
+  shopId    String?  @map("shop_id")
+  queue     String
+  error     String
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  job       Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([shopId, createdAt])
+  @@map("job_failures")
+}
+
+// ─── Staff & activity ────────────────────────────────────────────────────────
+
+model StaffMember {
+  id           String    @id @default(cuid())
+  shopId       String    @map("shop_id")
+  shopifyUserId String?  @map("shopify_user_id")
+  email        String
+  name         String?
+  role         StaffRole @default(SUPPORT_AGENT)
+  locationIds  String[]  @default([]) @map("location_ids")
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  shop         Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  assignedClaims Claim[] @relation("ClaimAssignee")
+
+  @@unique([shopId, email])
+  @@index([shopId])
+  @@map("staff_members")
+}
+
+enum StaffRole {
+  OWNER_ADMIN
+  SUPPORT_AGENT
+  ANALYST
+  TECHNICIAN
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  shopId     String   @map("shop_id")
+  actorType  String   @map("actor_type") // staff | system | customer | admin
+  actorId    String?  @map("actor_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  before     Json?
+  after      Json?
+  meta       Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  shop       Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, entityType, entityId, createdAt])
+  @@index([shopId, createdAt])
+  @@map("activity_logs")
+}
+
+// ─── Catalog sync stubs (M1+) ────────────────────────────────────────────────
+
+model Product {
+  id              String   @id @default(cuid())
+  shopId          String   @map("shop_id")
+  shopifyProductId String  @map("shopify_product_id")
+  title           String
+  handle          String?
+  status          String?
+  vendor          String?
+  productType     String?  @map("product_type")
+  imageUrl        String?  @map("image_url")
+  syncedAt        DateTime @default(now()) @map("synced_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  variants        ProductVariant[]
+
+  @@unique([shopId, shopifyProductId])
+  @@index([shopId])
+  @@map("products")
+}
+
+model ProductVariant {
+  id               String   @id @default(cuid())
+  shopId           String   @map("shop_id")
+  productId        String   @map("product_id")
+  shopifyVariantId String   @map("shopify_variant_id")
+  title            String
+  sku              String?
+  barcode          String?
+  priceCents       Int?     @map("price_cents")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderLineItems   OrderLineItem[]
+
+  @@unique([shopId, shopifyVariantId])
+  @@index([shopId, productId])
+  @@map("product_variants")
+}
+
+model Customer {
+  id                String   @id @default(cuid())
+  shopId            String   @map("shop_id")
+  shopifyCustomerId String?  @map("shopify_customer_id")
+  email             String?
+  firstName         String?  @map("first_name")
+  lastName          String?  @map("last_name")
+  phone             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  shop              Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  orders            Order[]
+  warranties        Warranty[]
+  claims            Claim[]
+  registrations     Registration[]
+
+  @@unique([shopId, shopifyCustomerId])
+  @@index([shopId, email])
+  @@map("customers")
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  shopId          String      @map("shop_id")
+  shopifyOrderId  String      @map("shopify_order_id")
+  orderNumber     String      @map("order_number")
+  customerId      String?     @map("customer_id")
+  email           String?
+  financialStatus String?     @map("financial_status")
+  fulfillmentStatus String?   @map("fulfillment_status")
+  processedAt     DateTime?   @map("processed_at")
+  cancelledAt     DateTime?   @map("cancelled_at")
+  currency        String      @default("USD")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  shop            Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  customer        Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lineItems       OrderLineItem[]
+
+  @@unique([shopId, shopifyOrderId])
+  @@index([shopId, orderNumber])
+  @@index([shopId, email])
+  @@map("orders")
+}
+
+model OrderLineItem {
+  id                   String   @id @default(cuid())
+  shopId               String   @map("shop_id")
+  orderId              String   @map("order_id")
+  shopifyLineItemId    String   @map("shopify_line_item_id")
+  productVariantId     String?  @map("product_variant_id")
+  shopifyProductId     String?  @map("shopify_product_id")
+  shopifyVariantId     String?  @map("shopify_variant_id")
+  title                String
+  sku                  String?
+  quantity             Int
+  priceCents           Int?     @map("price_cents")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  order                Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVariant       ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
+  warrantyUnits        WarrantyUnit[]
+
+  @@unique([shopId, shopifyLineItemId])
+  @@index([shopId, orderId])
+  @@map("order_line_items")
+}
+
+// ─── Warranty engine (M1) ────────────────────────────────────────────────────
+
+model WarrantyRule {
+  id              String   @id @default(cuid())
+  shopId          String   @map("shop_id")
+  name            String
+  priority        Int      @default(100)
+  active          Boolean  @default(true)
+  currentVersionId String? @map("current_version_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  versions        WarrantyRuleVersion[]
+  assignments     RuleAssignment[]
+
+  @@index([shopId, active, priority])
+  @@map("warranty_rules")
+}
+
+model WarrantyRuleVersion {
+  id                String          @id @default(cuid())
+  shopId            String          @map("shop_id")
+  ruleId            String          @map("rule_id")
+  version           Int
+  warrantyType      String          @map("warranty_type") // store | manufacturer | extended
+  durationMonths    Int?            @map("duration_months") // null = lifetime
+  startDateRule     StartDateRule   @map("start_date_rule")
+  serialMode        SerialMode      @map("serial_mode")
+  gracePeriodDays   Int             @default(0) @map("grace_period_days")
+  termsHtml         String?         @map("terms_html")
+  claimCategories   Json?           @map("claim_categories")
+  exclusions        Json?
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  rule              WarrantyRule    @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  warranties        Warranty[]
+
+  @@unique([ruleId, version])
+  @@index([shopId, ruleId])
+  @@map("warranty_rule_versions")
+}
+
+enum StartDateRule {
+  PURCHASE_DATE
+  FULFILLMENT_DATE
+  DELIVERY_DATE
+  REGISTRATION_DATE
+  FIXED_DATE
+}
+
+enum SerialMode {
+  NOT_REQUIRED
+  CUSTOMER_ENTERED_UNIQUE
+  VALIDATED_AGAINST_LIST
+  ASSIGNED_AT_FULFILLMENT
+}
+
+model RuleAssignment {
+  id         String   @id @default(cuid())
+  shopId     String   @map("shop_id")
+  ruleId     String   @map("rule_id")
+  targetType String   @map("target_type") // variant | product | collection | default
+  targetId   String?  @map("target_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  rule       WarrantyRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, targetType, targetId])
+  @@map("rule_assignments")
+}
+
+model WarrantyUnit {
+  id              String            @id @default(cuid())
+  shopId          String            @map("shop_id")
+  orderLineItemId String            @map("order_line_item_id")
+  unitIndex       Int               @map("unit_index")
+  serialNumber    String?           @map("serial_number")
+  status          WarrantyUnitStatus @default(ACTIVE)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  shop            Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  orderLineItem   OrderLineItem     @relation(fields: [orderLineItemId], references: [id], onDelete: Cascade)
+  warranties      Warranty[]
+  claims          Claim[]
+  registrations   Registration[]
+
+  @@unique([shopId, orderLineItemId, unitIndex])
+  @@index([shopId, serialNumber])
+  @@map("warranty_units")
+}
+
+enum WarrantyUnitStatus {
+  ACTIVE
+  VOID
+  TRANSFERRED
+}
+
+model Warranty {
+  id              String          @id @default(cuid())
+  shopId          String          @map("shop_id")
+  warrantyUnitId  String          @map("warranty_unit_id")
+  customerId      String?         @map("customer_id")
+  ruleVersionId   String          @map("rule_version_id")
+  source          WarrantySource  @default(ORDER)
+  status          WarrantyStatus  @default(PENDING_START)
+  startAt         DateTime?       @map("start_at")
+  endAt           DateTime?       @map("end_at")
+  timezone        String          @default("UTC")
+  certificateToken String         @unique @map("certificate_token")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  shop            Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  warrantyUnit    WarrantyUnit    @relation(fields: [warrantyUnitId], references: [id], onDelete: Cascade)
+  customer        Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  ruleVersion     WarrantyRuleVersion @relation(fields: [ruleVersionId], references: [id])
+  claims          Claim[]
+
+  @@index([shopId, status, endAt])
+  @@index([shopId, customerId])
+  @@map("warranties")
+}
+
+enum WarrantySource {
+  ORDER
+  MANUAL
+  REGISTRATION
+  BACKFILL
+}
+
+enum WarrantyStatus {
+  PENDING_START
+  ACTIVE
+  EXPIRING_SOON
+  EXPIRED
+  VOID
+  PENDING_VERIFICATION
+}
+
+model Registration {
+  id              String               @id @default(cuid())
+  shopId          String               @map("shop_id")
+  customerId      String?              @map("customer_id")
+  warrantyUnitId  String?              @map("warranty_unit_id")
+  serialNumber    String?              @map("serial_number")
+  purchaseDate    DateTime?            @map("purchase_date")
+  sellerName      String?              @map("seller_name")
+  proofUrl        String?              @map("proof_url")
+  status          RegistrationStatus   @default(PENDING_VERIFICATION)
+  source          String               @default("form")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  shop            Shop                 @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  customer        Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  warrantyUnit    WarrantyUnit?        @relation(fields: [warrantyUnitId], references: [id], onDelete: SetNull)
+
+  @@index([shopId, status, createdAt])
+  @@map("registrations")
+}
+
+enum RegistrationStatus {
+  PENDING_VERIFICATION
+  APPROVED
+  REJECTED
+  NEEDS_REVIEW
+}
+
+// ─── Claims (M3) ─────────────────────────────────────────────────────────────
+
+model Claim {
+  id                String        @id @default(cuid())
+  shopId            String        @map("shop_id")
+  claimNumber       String        @map("claim_number")
+  publicToken       String        @unique @map("public_token")
+  customerId        String?       @map("customer_id")
+  warrantyId        String?       @map("warranty_id")
+  warrantyUnitId    String?       @map("warranty_unit_id")
+  assigneeId        String?       @map("assignee_id")
+  locationId        String?       @map("location_id")
+  status            ClaimStatus   @default(OPEN)
+  systemState       ClaimSystemState @default(OPEN) @map("system_state")
+  priority          Int           @default(0)
+  issueCategory     String?       @map("issue_category")
+  issueSummary      String?       @map("issue_summary")
+  issueDetails      String?       @map("issue_details")
+  eligibilityResult String?       @map("eligibility_result")
+  eligibilityReasons Json?        @map("eligibility_reasons")
+  eligibilityOverride Boolean     @default(false) @map("eligibility_override")
+  slaDueAt          DateTime?     @map("sla_due_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  shop              Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  customer          Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  warranty          Warranty?     @relation(fields: [warrantyId], references: [id], onDelete: SetNull)
+  warrantyUnit      WarrantyUnit? @relation(fields: [warrantyUnitId], references: [id], onDelete: SetNull)
+  assignee          StaffMember?  @relation("ClaimAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  location          Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  attachments       Attachment[]
+
+  @@unique([shopId, claimNumber])
+  @@index([shopId, status, createdAt])
+  @@index([shopId, assigneeId])
+  @@map("claims")
+}
+
+enum ClaimStatus {
+  OPEN
+  WAITING_CUSTOMER
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  IN_RESOLUTION
+  COMPLETED
+  CANCELLED
+}
+
+enum ClaimSystemState {
+  OPEN
+  WAITING_CUSTOMER
+  APPROVED
+  REJECTED
+  IN_RESOLUTION
+  COMPLETED
+  CANCELLED
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  shopId       String   @map("shop_id")
+  claimId      String?  @map("claim_id")
+  storageKey   String   @map("storage_key")
+  fileName     String   @map("file_name")
+  contentType  String   @map("content_type")
+  sizeBytes    Int      @map("size_bytes")
+  scannedAt    DateTime? @map("scanned_at")
+  scanStatus   String   @default("pending") @map("scan_status")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  shop         Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  claim        Claim?   @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, claimId])
+  @@map("attachments")
+}
+
+model Location {
+  id            String   @id @default(cuid())
+  shopId        String   @map("shop_id")
+  name          String
+  address       Json?
+  shopifyLocationId String? @map("shopify_location_id")
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  shop          Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  claims        Claim[]
+
+  @@index([shopId])
+  @@map("locations")
+}
+
+// ─── Privacy / compliance ────────────────────────────────────────────────────
+
+model PrivacyRequest {
+  id          String               @id @default(cuid())
+  shopId      String?              @map("shop_id")
+  shopDomain  String               @map("shop_domain")
+  type        PrivacyRequestType
+  payload     Json
+  status      PrivacyRequestStatus @default(RECEIVED)
+  dueAt       DateTime?            @map("due_at")
+  completedAt DateTime?            @map("completed_at")
+  evidence    Json?
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  shop        Shop?                @relation(fields: [shopId], references: [id], onDelete: SetNull)
+
+  @@index([status, dueAt])
+  @@map("privacy_requests")
+}
+
+enum PrivacyRequestType {
+  CUSTOMERS_DATA_REQUEST
+  CUSTOMERS_REDACT
+  SHOP_REDACT
+}
+
+enum PrivacyRequestStatus {
+  RECEIVED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+// ─── Super Admin (platform-level, no shop_id on most) ────────────────────────
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String?
+  role         AdminRole @default(SUPPORT)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  auditLogs    AdminAuditLog[]
+  impersonations ImpersonationSession[]
+
+  @@map("admin_users")
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  SUPPORT
+  FINANCE
+  DEVELOPER
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminUserId String? @map("admin_user_id")
+  action     String
+  shopId     String?  @map("shop_id")
+  reason     String?
+  before     Json?
+  after      Json?
+  meta       Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  adminUser  AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([shopId, createdAt])
+  @@map("admin_audit_logs")
+}
+
+model ImpersonationSession {
+  id          String   @id @default(cuid())
+  adminUserId String   @map("admin_user_id")
+  shopId      String   @map("shop_id")
+  reason      String
+  expiresAt   DateTime @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, expiresAt])
+  @@map("impersonation_sessions")
+}
+
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String?
+  enabled     Boolean  @default(false)
+  percentage  Int      @default(0)
+  shopAllowlist String[] @default([]) @map("shop_allowlist")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("feature_flags")
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  active    Boolean  @default(true)
+  startsAt  DateTime? @map("starts_at")
+  endsAt    DateTime? @map("ends_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("announcements")
+}
+
+model ShopNote {
+  id        String   @id @default(cuid())
+  shopId    String   @map("shop_id")
+  body      String
+  authorId  String?  @map("author_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, createdAt])
+  @@map("shop_notes")
+}

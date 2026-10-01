@@ -1,0 +1,44 @@
+# Learn more: https://shopify.dev/docs/apps/tools/cli/configuration
+# Replace client_id and URLs after creating the Partner app.
+
+name = "AfterSale OS"
+client_id = "REPLACE_WITH_SHOPIFY_CLIENT_ID"
+application_url = "https://REPLACE_WITH_APP_URL"
+embedded = true
+
+[access_scopes]
+# Optional scopes (write_draft_orders, write_orders for refunds) requested when features enabled.
+scopes = "read_products,read_orders,read_customers,write_draft_orders"
+
+[auth]
+redirect_urls = [
+  "https://REPLACE_WITH_APP_URL/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2025-01"
+
+  [[webhooks.subscriptions]]
+  topics = [
+    "app/uninstalled",
+    "app_subscriptions/update",
+    "orders/create",
+    "orders/updated",
+    "orders/cancelled",
+    "refunds/create",
+    "products/update",
+    "customers/update"
+  ]
+  compliance_topics = [
+    "customers/data_request",
+    "customers/redact",
+    "shop/redact"
+  ]
+  uri = "/api/webhooks/shopify"
+
+[pos]
+embedded = false
+
+[access.admin]
+direct_api_mode = "online"
+embedded_app_direct_api_access = true
