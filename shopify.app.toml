@@ -21,24 +21,35 @@ prefix = "apps"
 [webhooks]
 api_version = "2025-01"
 
+  # Topics that do NOT require Protected Customer Data approval.
   [[webhooks.subscriptions]]
   topics = [
     "app/uninstalled",
     "app_subscriptions/update",
-    "orders/create",
-    "orders/updated",
-    "orders/cancelled",
-    "refunds/create",
-    "products/update",
     "products/create",
-    "customers/update"
+    "products/update"
   ]
+  uri = "/api/webhooks/shopify"
+
+  # Mandatory privacy webhooks (App Store). Keep these.
+  [[webhooks.subscriptions]]
   compliance_topics = [
     "customers/data_request",
     "customers/redact",
     "shop/redact"
   ]
   uri = "/api/webhooks/shopify"
+
+  # Re-enable AFTER Partners → App → API access → Protected customer data is approved:
+  # [[webhooks.subscriptions]]
+  # topics = [
+  #   "orders/create",
+  #   "orders/updated",
+  #   "orders/cancelled",
+  #   "refunds/create",
+  #   "customers/update"
+  # ]
+  # uri = "/api/webhooks/shopify"
 
 [pos]
 embedded = false
