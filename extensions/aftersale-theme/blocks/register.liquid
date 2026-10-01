@@ -1,0 +1,48 @@
+{% comment %}
+  AfterSale product registration block.
+  Renders a link/button to the app-proxy registration page.
+{% endcomment %}
+
+<div class="as-register-block" {{ block.shopify_attributes }}>
+  <a
+    class="as-register-block__btn"
+    href="/apps/aftersale/register?shop={{ shop.permanent_domain }}&product={{ product.title | url_encode }}&product_id={{ product.id }}{% if product.selected_or_first_available_variant %}&variant_id={{ product.selected_or_first_available_variant.id }}{% endif %}"
+  >
+    {{ block.settings.button_label | default: "Register for warranty" }}
+  </a>
+  {% if block.settings.show_lookup %}
+    <p class="as-register-block__lookup">
+      <a href="/apps/aftersale/portal?shop={{ shop.permanent_domain }}">
+        {{ block.settings.lookup_label | default: "Look up your warranty" }}
+      </a>
+    </p>
+  {% endif %}
+</div>
+
+{% schema %}
+{
+  "name": "AfterSale register",
+  "target": "section",
+  "stylesheet": "aftersale.css",
+  "settings": [
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button label",
+      "default": "Register for warranty"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_lookup",
+      "label": "Show warranty lookup link",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "lookup_label",
+      "label": "Lookup link label",
+      "default": "Look up your warranty"
+    }
+  ]
+}
+{% endschema %}

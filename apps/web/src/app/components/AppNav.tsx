@@ -9,6 +9,7 @@ export function AppNav() {
         Home
       </a>
       <a href="/warranties">Warranties</a>
+      <a href="/registrations">Registrations</a>
       <a href="/products-rules">Products &amp; Rules</a>
       <a href="/plans">Plans &amp; Usage</a>
     </NavMenu>

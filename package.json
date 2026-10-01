@@ -7,11 +7,12 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo dev --parallel",
+    "dev": "node server/dev.js",
     "dev:web": "npm run dev -w @aftersale/web",
     "dev:worker": "npm run dev -w @aftersale/worker",
     "dev:admin": "npm run dev -w @aftersale/admin",
     "build": "turbo build",
+    "start": "node server/start.js",
     "lint": "turbo lint",
     "test": "turbo test",
     "db:generate": "npm run generate -w @aftersale/db",

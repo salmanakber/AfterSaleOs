@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { adminApi } from "@/lib/base-path";
 
 type ShopRow = {
   id: string;
@@ -24,7 +25,7 @@ export default function ShopsPage() {
       router.replace("/");
       return;
     }
-    const url = q ? `/api/shops?q=${encodeURIComponent(q)}` : "/api/shops";
+    const url = q ? adminApi(`/api/shops?q=${encodeURIComponent(q)}`) : adminApi("/api/shops");
     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((json) => setShops(json.shops ?? []));

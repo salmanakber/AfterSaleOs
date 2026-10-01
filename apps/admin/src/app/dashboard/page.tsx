@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { adminApi } from "@/lib/base-path";
 
 type Overview = {
   shops: { total: number; active: number; uninstalled: number };
@@ -28,7 +29,7 @@ export default function DashboardPage() {
       router.replace("/");
       return;
     }
-    fetch("/api/overview", { headers: { Authorization: `Bearer ${token}` } })
+    fetch(adminApi("/api/overview"), { headers: { Authorization: `Bearer ${token}` } })
       .then(async (res) => {
         if (res.status === 401) {
           router.replace("/");

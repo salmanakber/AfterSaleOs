@@ -74,6 +74,9 @@ model Shop {
   locations             Location[]
   privacyRequests       PrivacyRequest[]
   shopNotes             ShopNote[]
+  guestAccessTokens     GuestAccessToken[]
+  qrLinks               QrLink[]
+  ownershipTransfers    OwnershipTransfer[]
 
   @@map("shops")
 }
@@ -603,12 +606,21 @@ model Registration {
   shopId          String               @map("shop_id")
   customerId      String?              @map("customer_id")
   warrantyUnitId  String?              @map("warranty_unit_id")
+  warrantyId      String?              @map("warranty_id")
+  email           String?
+  firstName       String?              @map("first_name")
+  lastName        String?              @map("last_name")
   serialNumber    String?              @map("serial_number")
   purchaseDate    DateTime?            @map("purchase_date")
   sellerName      String?              @map("seller_name")
   proofUrl        String?              @map("proof_url")
+  productTitle    String?              @map("product_title")
+  shopifyProductId String?             @map("shopify_product_id")
+  shopifyVariantId String?             @map("shopify_variant_id")
+  orderNumber     String?              @map("order_number")
   status          RegistrationStatus   @default(PENDING_VERIFICATION)
-  source          String               @default("form")
+  source          String               @default("form") // form | qr | manual | outside_shopify
+  reviewNote      String?              @map("review_note")
   createdAt       DateTime             @default(now()) @map("created_at")
   updatedAt       DateTime             @updatedAt @map("updated_at")
 
@@ -617,6 +629,8 @@ model Registration {
   warrantyUnit    WarrantyUnit?        @relation(fields: [warrantyUnitId], references: [id], onDelete: SetNull)
 
   @@index([shopId, status, createdAt])
+  @@index([shopId, email])
+  @@index([shopId, serialNumber])
   @@map("registrations")
 }
 
@@ -625,6 +639,71 @@ enum RegistrationStatus {
   APPROVED
   REJECTED
   NEEDS_REVIEW
+}
+
+model GuestAccessToken {
+  id          String    @id @default(cuid())
+  shopId      String    @map("shop_id")
+  email       String
+  orderNumber String?   @map("order_number")
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  shop        Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, email, createdAt])
+  @@map("guest_access_tokens")
+}
+
+model QrLink {
+  id               String   @id @default(cuid())
+  shopId           String   @map("shop_id")
+  code             String   @unique
+  targetType       String   @map("target_type") // product | variant | campaign | support
+  targetId         String?  @map("target_id")
+  label            String?
+  scanCount        Int      @default(0) @map("scan_count")
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  shop             Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  scans            QrScan[]
+
+  @@index([shopId, targetType, targetId])
+  @@map("qr_links")
+}
+
+model QrScan {
+  id        String   @id @default(cuid())
+  shopId    String   @map("shop_id")
+  qrLinkId  String   @map("qr_link_id")
+  userAgent String?  @map("user_agent")
+  referrer  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  qrLink    QrLink   @relation(fields: [qrLinkId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, qrLinkId, createdAt])
+  @@map("qr_scans")
+}
+
+model OwnershipTransfer {
+  id              String    @id @default(cuid())
+  shopId          String    @map("shop_id")
+  warrantyId      String    @map("warranty_id")
+  fromEmail       String    @map("from_email")
+  toEmail         String    @map("to_email")
+  status          String    @default("pending") // pending | approved | rejected
+  requestedAt     DateTime  @default(now()) @map("requested_at")
+  resolvedAt      DateTime? @map("resolved_at")
+  note            String?
+
+  shop            Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, status, requestedAt])
+  @@map("ownership_transfers")
 }
 
 // ─── Claims (M3) ─────────────────────────────────────────────────────────────

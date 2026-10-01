@@ -17,3 +17,13 @@ export {
   type RuleVersionInput,
   type AssignmentInput,
 } from "./rules";
+export {
+  validateSerial,
+  submitRegistration,
+  approveRegistration,
+  requestGuestMagicLink,
+  consumeGuestToken,
+  getPortalWarranties,
+  hashToken,
+  generateGuestToken,
+} from "./registration";

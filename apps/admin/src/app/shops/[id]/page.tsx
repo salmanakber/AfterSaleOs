@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { adminApi } from "@/lib/base-path";
 
 type ShopDetail = {
   id: string;
@@ -28,7 +29,7 @@ export default function ShopDetailPage() {
       router.replace("/");
       return;
     }
-    fetch(`/api/shops/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(adminApi(`/api/shops/${id}`), { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((json) => setShop(json.shop ?? null));
   }, [id, router]);

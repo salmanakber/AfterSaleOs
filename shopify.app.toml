@@ -1,19 +1,22 @@
 # Learn more: https://shopify.dev/docs/apps/tools/cli/configuration
-# Replace client_id and URLs after creating the Partner app.
 
 name = "AfterSale OS"
 client_id = "REPLACE_WITH_SHOPIFY_CLIENT_ID"
-application_url = "https://REPLACE_WITH_APP_URL"
+application_url = "https://aftersale.tidyflowapp.com"
 embedded = true
 
 [access_scopes]
-# Optional scopes (write_draft_orders, write_orders for refunds) requested when features enabled.
 scopes = "read_products,read_orders,read_customers,write_draft_orders"
 
 [auth]
 redirect_urls = [
-  "https://REPLACE_WITH_APP_URL/api/auth/callback"
+  "https://aftersale.tidyflowapp.com/api/auth/callback"
 ]
+
+[app_proxy]
+url = "https://aftersale.tidyflowapp.com/apps/aftersale"
+subpath = "aftersale"
+prefix = "apps"
 
 [webhooks]
 api_version = "2025-01"
@@ -27,6 +30,7 @@ api_version = "2025-01"
     "orders/cancelled",
     "refunds/create",
     "products/update",
+    "products/create",
     "customers/update"
   ]
   compliance_topics = [

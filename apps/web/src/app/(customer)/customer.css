@@ -1,0 +1,177 @@
+:root {
+  --as-primary: #4338ca;
+  --as-primary-hover: #3730a3;
+  --as-primary-tint: #eef2ff;
+  --as-accent: #f59e0b;
+  --as-ink: #0f172a;
+  --as-muted: #64748b;
+  --as-border: #e2e8f0;
+  --as-bg: #f8fafc;
+  --as-surface: #ffffff;
+  --as-status-active: #16a34a;
+  --as-status-expiring: #d97706;
+  --as-status-pending: #0284c7;
+  --as-status-expired: #64748b;
+  --as-status-rejected: #dc2626;
+}
+
+.as-body {
+  margin: 0;
+  font-family: "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: var(--as-bg);
+  color: var(--as-ink);
+  min-height: 100vh;
+}
+
+.as-shell {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.as-card {
+  background: var(--as-surface);
+  border: 1px solid var(--as-border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.as-brand {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--as-primary);
+  letter-spacing: -0.02em;
+}
+
+.as-muted {
+  color: var(--as-muted);
+  font-size: 0.95rem;
+}
+
+.as-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.as-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--as-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 1rem;
+  margin-bottom: 14px;
+  background: #fff;
+}
+
+.as-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--as-primary);
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  width: 100%;
+}
+
+.as-btn:hover {
+  background: var(--as-primary-hover);
+}
+
+.as-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.as-btn-secondary {
+  background: var(--as-primary-tint);
+  color: var(--as-primary);
+}
+
+.as-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.as-badge-active {
+  background: #dcfce7;
+  color: var(--as-status-active);
+}
+.as-badge-pending {
+  background: #e0f2fe;
+  color: var(--as-status-pending);
+}
+.as-badge-expired {
+  background: #f1f5f9;
+  color: var(--as-status-expired);
+}
+.as-badge-expiring {
+  background: #fef3c7;
+  color: var(--as-status-expiring);
+}
+.as-badge-void {
+  background: #fee2e2;
+  color: var(--as-status-rejected);
+}
+
+.as-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.as-link {
+  color: var(--as-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.as-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.as-tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--as-border);
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.as-tab[data-active="true"] {
+  background: var(--as-primary-tint);
+  border-color: var(--as-primary);
+  color: var(--as-primary);
+}
+
+.as-cert {
+  border: 2px solid var(--as-primary);
+  border-radius: 20px;
+  padding: 28px 20px;
+  background: linear-gradient(180deg, #fff 0%, var(--as-primary-tint) 100%);
+  text-align: center;
+}
+
+@media print {
+  .as-no-print {
+    display: none !important;
+  }
+  .as-body {
+    background: #fff;
+  }
+}

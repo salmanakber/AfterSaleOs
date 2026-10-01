@@ -8,6 +8,7 @@ import {
   updateRuleMeta,
   getWarrantyRule,
   createManualWarranty,
+  approveRegistration,
 } from "@aftersale/db";
 import {
   resolveMerchantContext,
@@ -144,6 +145,17 @@ const typeDefs = /* GraphQL */ `
     createdAt: String!
   }
 
+  type Registration {
+    id: ID!
+    status: String!
+    email: String
+    productTitle: String
+    serialNumber: String
+    source: String!
+    createdAt: String!
+    reviewNote: String
+  }
+
   input RuleVersionInput {
     warrantyType: String!
     durationMonths: Int
@@ -186,6 +198,7 @@ const typeDefs = /* GraphQL */ `
     warranty(id: ID!): Warranty
     products(limit: Int): [ProductCoverage!]!
     jobs(type: String, limit: Int): [JobStatus!]!
+    registrations(status: String, limit: Int): [Registration!]!
   }
 
   type Mutation {
@@ -198,6 +211,8 @@ const typeDefs = /* GraphQL */ `
     extendWarranty(id: ID!, extraMonths: Int!, reason: String!): Warranty!
     startBackfill(lookbackMonths: Int!): JobStatus!
     updateShopSettings(voidWarrantyOnRefund: Boolean, timezone: String): ShopSummary!
+    approveRegistration(id: ID!): Registration!
+    rejectRegistration(id: ID!, note: String): Registration!
   }
 `;
 
@@ -503,6 +518,31 @@ const yoga = createYoga({
             createdAt: j.createdAt.toISOString(),
           }));
         },
+        registrations: async (
+          _: unknown,
+          args: { status?: string; limit?: number },
+          ctx: { request: Request },
+        ) => {
+          const merchant = await resolveMerchantContext(ctx.request);
+          const regs = await prisma.registration.findMany({
+            where: {
+              shopId: merchant.shopId,
+              ...(args.status ? { status: args.status as never } : {}),
+            },
+            orderBy: { createdAt: "desc" },
+            take: args.limit ?? 50,
+          });
+          return regs.map((r) => ({
+            id: r.id,
+            status: r.status,
+            email: r.email,
+            productTitle: r.productTitle,
+            serialNumber: r.serialNumber,
+            source: r.source,
+            createdAt: r.createdAt.toISOString(),
+            reviewNote: r.reviewNote,
+          }));
+        },
       },
       Mutation: {
         completeOnboardingStep: async (
@@ -766,6 +806,65 @@ const yoga = createYoga({
             },
           });
           return shopSummary(merchant.shopId);
+        },
+        approveRegistration: async (
+          _: unknown,
+          args: { id: string },
+          ctx: { request: Request },
+        ) => {
+          const merchant = await resolveMerchantContext(ctx.request);
+          const reg = await approveRegistration({
+            shopId: merchant.shopId,
+            registrationId: args.id,
+          });
+          return {
+            id: reg.id,
+            status: reg.status,
+            email: reg.email,
+            productTitle: reg.productTitle,
+            serialNumber: reg.serialNumber,
+            source: reg.source,
+            createdAt: reg.createdAt.toISOString(),
+            reviewNote: reg.reviewNote,
+          };
+        },
+        rejectRegistration: async (
+          _: unknown,
+          args: { id: string; note?: string },
+          ctx: { request: Request },
+        ) => {
+          const merchant = await resolveMerchantContext(ctx.request);
+          const existing = await prisma.registration.findFirst({
+            where: { id: args.id, shopId: merchant.shopId },
+          });
+          if (!existing) throw new Error("Registration not found");
+          const reg = await prisma.registration.update({
+            where: { id: existing.id },
+            data: {
+              status: "REJECTED",
+              reviewNote: args.note ?? existing.reviewNote,
+            },
+          });
+          await prisma.activityLog.create({
+            data: {
+              shopId: merchant.shopId,
+              actorType: "staff",
+              action: "registration.rejected",
+              entityType: "registration",
+              entityId: reg.id,
+              after: { note: args.note },
+            },
+          });
+          return {
+            id: reg.id,
+            status: reg.status,
+            email: reg.email,
+            productTitle: reg.productTitle,
+            serialNumber: reg.serialNumber,
+            source: reg.source,
+            createdAt: reg.createdAt.toISOString(),
+            reviewNote: reg.reviewNote,
+          };
         },
       },
     },

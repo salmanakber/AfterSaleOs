@@ -16,8 +16,43 @@ Warranty registration and claims for Shopify — full-scope 1.0 (see `AfterSale_
 ## Prerequisites
 
 - Node 20+
-- Docker (Postgres 16 + Redis 7)
+- Postgres + Redis (Docker optional: `docker compose up -d`)
 - Shopify Partner app credentials
+
+## Shopify URLs (this project)
+
+| Purpose | URL |
+|---------|-----|
+| **Public app** | `https://aftersale.tidyflowapp.com` (Node listens on **PORT=4500**) |
+| Super Admin | `https://aftersale.tidyflowapp.com/admin` |
+| OAuth callback | `https://aftersale.tidyflowapp.com/api/auth/callback` |
+| Webhooks | `https://aftersale.tidyflowapp.com/api/webhooks/shopify` |
+| App proxy register | `https://{shop}.myshopify.com/apps/aftersale/register` |
+| Customer portal | `https://{shop}.myshopify.com/apps/aftersale/portal` |
+| Certificate | `https://aftersale.tidyflowapp.com/c/{token}` |
+
+One process exposes **port 4500**. Internally the gateway routes `/admin` → Admin Next and everything else → Web Next. Point nginx/Caddy at `127.0.0.1:4500`.
+
+```bash
+# .env
+APP_URL=https://aftersale.tidyflowapp.com
+PORT=4500
+
+npm run build
+npm start
+# Dev:
+npm run dev
+```
+
+## Prisma (important)
+
+```bash
+npm run db:generate
+npm run db:push      # NOT `prisma push`
+npm run db:seed
+```
+
+See `docs/PRISMA.md` if you see `No command registered for push`.
 
 ## Quick start
 

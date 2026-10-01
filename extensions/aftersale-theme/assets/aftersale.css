@@ -1,0 +1,22 @@
+.as-register-block {
+  margin: 1rem 0;
+}
+
+.as-register-block__btn {
+  display: inline-block;
+  padding: 0.75rem 1.25rem;
+  background: #4338ca;
+  color: #fff !important;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.as-register-block__lookup {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.as-register-block__lookup a {
+  color: #4338ca;
+}

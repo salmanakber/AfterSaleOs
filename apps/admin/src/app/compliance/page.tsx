@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { adminApi } from "@/lib/base-path";
 
 type PrivacyRow = {
   id: string;
@@ -23,7 +24,7 @@ export default function CompliancePage() {
       router.replace("/");
       return;
     }
-    fetch("/api/compliance", { headers: { Authorization: `Bearer ${token}` } })
+    fetch(adminApi("/api/compliance"), { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((json) => setRows(json.requests ?? []));
   }, [router]);

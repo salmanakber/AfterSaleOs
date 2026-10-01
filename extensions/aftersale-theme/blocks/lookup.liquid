@@ -1,0 +1,21 @@
+{% comment %} Warranty lookup entry block for footer / account pages {% endcomment %}
+<div class="as-lookup-block" {{ block.shopify_attributes }}>
+  <a href="/apps/aftersale/portal?shop={{ shop.permanent_domain }}">
+    {{ block.settings.label | default: "Check your warranty" }}
+  </a>
+</div>
+
+{% schema %}
+{
+  "name": "AfterSale lookup",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "label",
+      "label": "Link label",
+      "default": "Check your warranty"
+    }
+  ]
+}
+{% endschema %}
