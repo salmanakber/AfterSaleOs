@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/base-path";
+import { AdminShell, Panel, StatusPill } from "@/components/AdminShell";
 
 type OpsData = {
   webhookEvents: {
@@ -33,6 +33,13 @@ type OpsData = {
   }[];
 };
 
+function jobTone(status: string): "ok" | "warn" | "bad" | "info" | "neutral" {
+  if (status === "COMPLETED" || status === "SUCCESS") return "ok";
+  if (status === "FAILED" || status === "DEAD") return "bad";
+  if (status === "PENDING" || status === "RUNNING") return "info";
+  return "neutral";
+}
+
 export default function OpsPage() {
   const router = useRouter();
   const [data, setData] = useState<OpsData | null>(null);
@@ -55,106 +62,130 @@ export default function OpsPage() {
 
   if (error) {
     return (
-      <div className="shell">
-        <p style={{ color: "#f87171" }}>{error}</p>
-      </div>
+      <AdminShell title="Ops" lede="Jobs, queues, and webhook delivery.">
+        <div className="sa-alert sa-alert-bad">{error}</div>
+      </AdminShell>
     );
   }
 
   if (!data) {
     return (
-      <div className="shell">
-        <p className="muted">Loading…</p>
-      </div>
+      <AdminShell title="Ops" lede="Jobs, queues, and webhook delivery.">
+        <p className="sa-muted">Loading…</p>
+      </AdminShell>
     );
   }
 
   return (
-    <div className="shell">
-      <div className="nav">
-        <Link href="/dashboard">Overview</Link>
-        <Link href="/shops">Shops</Link>
-        <strong>Jobs &amp; Webhooks</strong>
-        <Link href="/compliance">Compliance</Link>
-      </div>
-
-      <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Recent jobs</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Shop</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Progress</th>
-              <th>Error</th>
-              <th>When</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.jobs.map((j) => (
-              <tr key={j.id}>
-                <td>{j.shopDomain ?? "—"}</td>
-                <td>{j.type}</td>
-                <td>{j.status}</td>
-                <td>{j.progress}</td>
-                <td>{j.errorSummary ?? "—"}</td>
-                <td>{new Date(j.createdAt).toLocaleString()}</td>
+    <AdminShell title="Ops" lede="Jobs, queues, and webhook delivery health.">
+      <Panel title="Recent jobs">
+        <div className="sa-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Shop</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Progress</th>
+                <th>Error</th>
+                <th>When</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {data.jobs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="sa-empty">
+                    No recent jobs
+                  </td>
+                </tr>
+              ) : (
+                data.jobs.map((j) => (
+                  <tr key={j.id}>
+                    <td>{j.shopDomain ?? "—"}</td>
+                    <td>{j.type}</td>
+                    <td>
+                      <StatusPill tone={jobTone(j.status)}>{j.status}</StatusPill>
+                    </td>
+                    <td>{j.progress}</td>
+                    <td>{j.errorSummary ?? "—"}</td>
+                    <td>{new Date(j.createdAt).toLocaleString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
 
-      <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Webhook failures / pending</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Shop</th>
-              <th>Topic</th>
-              <th>Status</th>
-              <th>Attempts</th>
-              <th>Error</th>
-              <th>When</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.webhookEvents.map((w) => (
-              <tr key={w.id}>
-                <td>{w.shopDomain}</td>
-                <td>{w.topic}</td>
-                <td>{w.status}</td>
-                <td>{w.attempts}</td>
-                <td>{w.lastError ?? "—"}</td>
-                <td>{new Date(w.createdAt).toLocaleString()}</td>
+      <Panel title="Webhook failures / pending">
+        <div className="sa-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Shop</th>
+                <th>Topic</th>
+                <th>Status</th>
+                <th>Attempts</th>
+                <th>Error</th>
+                <th>When</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {data.webhookEvents.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="sa-empty">
+                    Queue looks clean
+                  </td>
+                </tr>
+              ) : (
+                data.webhookEvents.map((w) => (
+                  <tr key={w.id}>
+                    <td>{w.shopDomain}</td>
+                    <td>{w.topic}</td>
+                    <td>
+                      <StatusPill tone={jobTone(w.status)}>{w.status}</StatusPill>
+                    </td>
+                    <td>{w.attempts}</td>
+                    <td>{w.lastError ?? "—"}</td>
+                    <td>{new Date(w.createdAt).toLocaleString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
 
-      <div className="card">
-        <h2 style={{ marginTop: 0 }}>Job failures</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Queue</th>
-              <th>Error</th>
-              <th>When</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.jobFailures.map((f) => (
-              <tr key={f.id}>
-                <td>{f.queue}</td>
-                <td>{f.error}</td>
-                <td>{new Date(f.createdAt).toLocaleString()}</td>
+      <Panel title="Job failures">
+        <div className="sa-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Queue</th>
+                <th>Error</th>
+                <th>When</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+            </thead>
+            <tbody>
+              {data.jobFailures.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="sa-empty">
+                    No failures logged
+                  </td>
+                </tr>
+              ) : (
+                data.jobFailures.map((f) => (
+                  <tr key={f.id}>
+                    <td>{f.queue}</td>
+                    <td>{f.error}</td>
+                    <td>{new Date(f.createdAt).toLocaleString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+    </AdminShell>
   );
 }

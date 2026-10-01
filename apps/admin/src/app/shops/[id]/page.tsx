@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { adminApi } from "@/lib/base-path";
+import { AdminShell, Panel, StatCard, StatusPill } from "@/components/AdminShell";
 
 type ShopDetail = {
   id: string;
@@ -17,6 +18,18 @@ type ShopDetail = {
   webhookFailures: number;
   privacyOpen: number;
 };
+
+function statusTone(status: string): "ok" | "warn" | "bad" | "neutral" {
+  if (status === "ACTIVE") return "ok";
+  if (status === "SUSPENDED") return "warn";
+  if (status === "UNINSTALLED") return "bad";
+  return "neutral";
+}
+
+function statTone(status: string): "ok" | "warn" | "bad" | undefined {
+  const t = statusTone(status);
+  return t === "neutral" ? undefined : t;
+}
 
 export default function ShopDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -36,51 +49,71 @@ export default function ShopDetailPage() {
 
   if (!shop) {
     return (
-      <div className="shell">
-        <p className="muted">Loading…</p>
-      </div>
+      <AdminShell title="Shop" lede="Loading merchant detail…">
+        <p className="sa-muted">Loading…</p>
+      </AdminShell>
     );
   }
 
   return (
-    <div className="shell">
-      <div className="nav">
-        <Link href="/shops">← Shops</Link>
+    <AdminShell
+      title={shop.shopDomain}
+      lede={shop.shopName ?? "Merchant workspace detail"}
+      actions={
+        <Link className="sa-btn sa-btn-ghost" href="/shops">
+          ← All shops
+        </Link>
+      }
+    >
+      <div className="sa-grid">
+        <StatCard label="Status" value={shop.status} tone={statTone(shop.status)} />
+        <StatCard label="Billing" value={shop.billingStatus} />
+        <StatCard label="Plan" value={shop.planName ?? "—"} />
+        <StatCard
+          label="Webhook failures"
+          value={shop.webhookFailures}
+          tone={shop.webhookFailures ? "bad" : "ok"}
+        />
+        <StatCard
+          label="Open privacy"
+          value={shop.privacyOpen}
+          tone={shop.privacyOpen ? "warn" : "ok"}
+        />
       </div>
-      <h1>{shop.shopDomain}</h1>
-      <p className="muted">{shop.shopName}</p>
-      <div className="grid" style={{ marginTop: 16 }}>
-        <div className="card">
-          <div className="muted">Status</div>
-          <strong>{shop.status}</strong>
-        </div>
-        <div className="card">
-          <div className="muted">Billing</div>
-          <strong>{shop.billingStatus}</strong>
-        </div>
-        <div className="card">
-          <div className="muted">Plan</div>
-          <strong>{shop.planName ?? "—"}</strong>
-        </div>
-        <div className="card">
-          <div className="muted">Webhook failures</div>
-          <strong>{shop.webhookFailures}</strong>
-        </div>
-        <div className="card">
-          <div className="muted">Open privacy</div>
-          <strong>{shop.privacyOpen}</strong>
-        </div>
-      </div>
-      <div className="card" style={{ marginTop: 16 }}>
-        <h3>Usage</h3>
-        <ul>
-          {shop.usage.map((u) => (
-            <li key={`${u.metric}-${u.periodKey}`}>
-              {u.metric}: {u.count} ({u.periodKey})
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
+
+      <Panel title="Usage meters">
+        {shop.usage.length === 0 ? (
+          <p className="sa-muted">No usage rows yet.</p>
+        ) : (
+          <div className="sa-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Count</th>
+                  <th>Period</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shop.usage.map((u) => (
+                  <tr key={`${u.metric}-${u.periodKey}`}>
+                    <td>{u.metric}</td>
+                    <td>{u.count}</td>
+                    <td>{u.periodKey}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="Install">
+        <p className="sa-muted" style={{ margin: 0 }}>
+          Installed {new Date(shop.installedAt).toLocaleString()} ·{" "}
+          <StatusPill tone={statusTone(shop.status)}>{shop.status}</StatusPill>
+        </p>
+      </Panel>
+    </AdminShell>
   );
 }
