@@ -6,7 +6,8 @@ import {
   Session,
   type Shopify,
 } from "@shopify/shopify-api";
-import { shopifySessionStorage, sessionRepository, prisma } from "@aftersale/db";
+import { shopifySessionStorage, sessionRepository, prisma, getShopifySessionStorage } from "@aftersale/db";
+
 import { normalizeShopDomain, offlineSessionId } from "@aftersale/shared";
 
 const appUrl = process.env.APP_URL ?? "http://localhost:3000";
@@ -25,6 +26,10 @@ export const shopify: Shopify = shopifyApi({
 });
 
 export const sessionStorage = shopifySessionStorage;
+
+// Prefer getShopifySessionStorage() for new call sites — avoids build-time DB polls.
+export { getShopifySessionStorage };
+
 
 export class SessionTokenStaleError extends Error {
   readonly code = "SESSION_TOKEN_STALE" as const;

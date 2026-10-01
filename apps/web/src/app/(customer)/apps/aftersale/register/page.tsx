@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { CustomerShell } from "../../../components/CustomerShell";
 
 function RegisterInner() {
   const params = useSearchParams();
@@ -25,6 +26,7 @@ function RegisterInner() {
   const [loading, setLoading] = useState(false);
 
   const query = useMemo(() => params.toString(), [params]);
+  const done = Boolean(cert || message);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -61,71 +63,145 @@ function RegisterInner() {
     }
   }
 
-  return (
-    <div className="as-shell">
-      <div className="as-brand">AfterSale</div>
-      <p className="as-muted">Register your product for warranty coverage</p>
-      {productTitle ? (
-        <p>
-          <strong>{productTitle}</strong>
-        </p>
-      ) : null}
+  if (done) {
+    return (
+      <CustomerShell
+        title="You're covered"
+        lede="Registration received. Your certificate is ready when coverage activates."
+        steps={["Details", "Submit", "Certificate"]}
+        activeStep={2}
+        footer={
+          <a className="as-link" href={`/apps/aftersale/portal?shop=${encodeURIComponent(shop)}`}>
+            Open warranty portal →
+          </a>
+        }
+      >
+        <div className="as-success-hero">
+          <div className="as-success-icon" aria-hidden>
+            ✓
+          </div>
+          {message ? <div className="as-alert as-alert-ok">{message}</div> : null}
+          {cert ? (
+            <div className="as-actions">
+              <a className="as-btn" href={`/c/${cert}`}>
+                View certificate
+              </a>
+            </div>
+          ) : null}
+        </div>
+      </CustomerShell>
+    );
+  }
 
+  return (
+    <CustomerShell
+      title="Register your product"
+      lede={
+        productTitle
+          ? `Activate coverage for ${productTitle}.`
+          : "Activate coverage in under a minute."
+      }
+      steps={["Details", "Submit", "Certificate"]}
+      activeStep={0}
+      footer={
+        <a className="as-link" href={`/apps/aftersale/portal?shop=${encodeURIComponent(shop)}`}>
+          Already registered? Open your portal →
+        </a>
+      }
+    >
       <div className="as-tabs as-no-print">
-        <button type="button" className="as-tab" data-active={mode === "shopify"} onClick={() => setMode("shopify")}>
+        <button
+          type="button"
+          className="as-tab"
+          data-active={mode === "shopify"}
+          onClick={() => setMode("shopify")}
+        >
           Bought here
         </button>
-        <button type="button" className="as-tab" data-active={mode === "outside"} onClick={() => setMode("outside")}>
+        <button
+          type="button"
+          className="as-tab"
+          data-active={mode === "outside"}
+          onClick={() => setMode("outside")}
+        >
           Bought elsewhere
         </button>
       </div>
 
-      <form className="as-card" onSubmit={onSubmit}>
+      <form onSubmit={onSubmit}>
         <label className="as-label">Email</label>
-        <input className="as-input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        <label className="as-label">First name</label>
-        <input className="as-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-        <label className="as-label">Last name</label>
-        <input className="as-input" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+        <input
+          className="as-input"
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+        />
+
+        <div className="as-field-grid">
+          <div>
+            <label className="as-label">First name</label>
+            <input className="as-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          </div>
+          <div>
+            <label className="as-label">Last name</label>
+            <input className="as-input" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          </div>
+        </div>
+
         <label className="as-label">Serial number</label>
-        <input className="as-input" value={serial} onChange={(e) => setSerial(e.target.value)} placeholder="If required" />
+        <input
+          className="as-input"
+          value={serial}
+          onChange={(e) => setSerial(e.target.value)}
+          placeholder="If your product requires one"
+        />
 
         {mode === "shopify" ? (
           <>
             <label className="as-label">Order number</label>
-            <input className="as-input" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} placeholder="#1001" />
+            <input
+              className="as-input"
+              value={orderNumber}
+              onChange={(e) => setOrderNumber(e.target.value)}
+              placeholder="#1001"
+            />
           </>
         ) : (
           <>
-            <label className="as-label">Purchase date</label>
-            <input className="as-input" type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
-            <label className="as-label">Seller / store name</label>
-            <input className="as-input" value={sellerName} onChange={(e) => setSellerName(e.target.value)} />
-            <p className="as-muted">Purchases outside Shopify need merchant verification.</p>
+            <div className="as-field-grid">
+              <div>
+                <label className="as-label">Purchase date</label>
+                <input
+                  className="as-input"
+                  type="date"
+                  value={purchaseDate}
+                  onChange={(e) => setPurchaseDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="as-label">Seller / store</label>
+                <input
+                  className="as-input"
+                  value={sellerName}
+                  onChange={(e) => setSellerName(e.target.value)}
+                />
+              </div>
+            </div>
+            <p className="as-muted" style={{ marginTop: -4 }}>
+              Outside purchases may need a quick merchant verification.
+            </p>
           </>
         )}
 
-        {error ? <p style={{ color: "var(--as-status-rejected)" }}>{error}</p> : null}
-        {message ? <p style={{ color: "var(--as-status-active)" }}>{message}</p> : null}
-        {cert ? (
-          <p>
-            <a className="as-link" href={`/c/${cert}`}>
-              View your warranty certificate
-            </a>
-          </p>
-        ) : null}
+        {error ? <div className="as-alert as-alert-error">{error}</div> : null}
 
         <button className="as-btn" type="submit" disabled={loading || !shop}>
           {loading ? "Submitting…" : "Register product"}
         </button>
       </form>
-
-      <p className="as-muted" style={{ marginTop: 16 }}>
-        <a className="as-link" href={`/apps/aftersale/portal?shop=${encodeURIComponent(shop)}`}>
-          View your warranties
-        </a>
-      </p>
-    </div>
+    </CustomerShell>
   );
 }
 

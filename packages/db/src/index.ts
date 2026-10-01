@@ -1,5 +1,5 @@
 export { prisma } from "./client";
-export { shopifySessionStorage } from "./session-storage";
+export { getShopifySessionStorage, shopifySessionStorage } from "./session-storage";
 export {
   createTenantClient,
   createAdminPrisma,

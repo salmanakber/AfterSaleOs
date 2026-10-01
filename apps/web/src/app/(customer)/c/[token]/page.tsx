@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { ThemeToggle } from "../../components/ThemeToggle";
 
 type Cert = {
   status: string;
@@ -45,7 +46,16 @@ function CertificateInner() {
   if (error) {
     return (
       <div className="as-shell">
-        <div className="as-card">{error}</div>
+        <div className="as-topbar as-no-print">
+          <div className="as-mark-lockup">
+            <span className="as-mark">A</span>
+            <span className="as-mark-text">AfterSale OS</span>
+          </div>
+          <ThemeToggle />
+        </div>
+        <div className="as-panel">
+          <div className="as-alert as-alert-error">{error}</div>
+        </div>
       </div>
     );
   }
@@ -58,66 +68,94 @@ function CertificateInner() {
     );
   }
 
+  const statusClass =
+    cert.status === "ACTIVE"
+      ? "as-badge as-badge-active"
+      : cert.status === "EXPIRED"
+        ? "as-badge as-badge-expired"
+        : cert.status === "EXPIRING_SOON"
+          ? "as-badge as-badge-expiring"
+          : "as-badge as-badge-pending";
+
   return (
     <div className="as-shell">
+      <div className="as-topbar as-no-print">
+        <div className="as-mark-lockup">
+          <span className="as-mark">A</span>
+          <span className="as-mark-text">Warranty certificate</span>
+        </div>
+        <ThemeToggle />
+      </div>
+
       <div className="as-cert">
+        <div className="as-cert-seal">SEAL</div>
         {cert.shop.brandingLogoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={cert.shop.brandingLogoUrl} alt="" style={{ maxHeight: 48, marginBottom: 12 }} />
+          <img className="as-cert-logo" src={cert.shop.brandingLogoUrl} alt="" />
         ) : (
-          <div className="as-brand">{cert.shop.shopName ?? "AfterSale"}</div>
+          <div
+            style={{
+              position: "relative",
+              fontFamily: "var(--as-font-display), Fraunces, Georgia, serif",
+              fontSize: "1.05rem",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              opacity: 0.92,
+            }}
+          >
+            {cert.shop.shopName ?? "AfterSale"}
+          </div>
         )}
-        <h1 style={{ margin: "8px 0 4px", fontSize: "1.6rem" }}>Warranty Certificate</h1>
-        <p className="as-muted">{cert.ruleName} · {cert.warrantyType}</p>
-        <h2 style={{ marginTop: 20 }}>{cert.productTitle}</h2>
+        <h1>Warranty Certificate</h1>
+        <p className="as-muted">
+          {cert.ruleName} · {cert.warrantyType}
+        </p>
+        <h2>{cert.productTitle}</h2>
         <p className="as-muted">
           Order {cert.orderNumber}
           {cert.serialNumber ? ` · Serial ${cert.serialNumber}` : ""}
         </p>
-        {cert.customerName ? <p>Registered to {cert.customerName}</p> : null}
-        <p style={{ marginTop: 16 }}>
-          <strong>
-            {cert.startAt ? new Date(cert.startAt).toLocaleDateString() : "Pending start"}
-          </strong>
-          {" — "}
-          <strong>
-            {cert.endAt
-              ? new Date(cert.endAt).toLocaleDateString()
-              : cert.durationMonths == null
-                ? "Lifetime"
-                : `${cert.durationMonths} months`}
-          </strong>
-        </p>
-        <p>
-          <span
-            className={
-              cert.status === "ACTIVE"
-                ? "as-badge as-badge-active"
-                : cert.status === "EXPIRED"
-                  ? "as-badge as-badge-expired"
-                  : "as-badge as-badge-pending"
-            }
-          >
-            {cert.status.replaceAll("_", " ")}
-          </span>
+        {cert.customerName ? (
+          <p style={{ position: "relative" }}>Registered to {cert.customerName}</p>
+        ) : null}
+
+        <div className="as-cert-dates">
+          <div>
+            <small>Coverage starts</small>
+            <strong>{cert.startAt ? new Date(cert.startAt).toLocaleDateString() : "Pending"}</strong>
+          </div>
+          <div>
+            <small>Coverage ends</small>
+            <strong>
+              {cert.endAt
+                ? new Date(cert.endAt).toLocaleDateString()
+                : cert.durationMonths == null
+                  ? "Lifetime"
+                  : `${cert.durationMonths} months`}
+            </strong>
+          </div>
+        </div>
+
+        <p style={{ position: "relative", marginTop: 18 }}>
+          <span className={statusClass}>{cert.status.replaceAll("_", " ")}</span>
         </p>
       </div>
 
       {cert.termsHtml ? (
         <div
-          className="as-card"
+          className="as-panel"
+          style={{ marginTop: 16 }}
           dangerouslySetInnerHTML={{ __html: cert.termsHtml }}
         />
       ) : null}
 
-      <div className="as-no-print" style={{ marginTop: 16, display: "grid", gap: 10 }}>
+      <div className="as-actions as-no-print">
         <button className="as-btn" type="button" onClick={() => window.print()}>
           Print / Save PDF
         </button>
         <a
           className="as-btn as-btn-secondary"
           href={`/apps/aftersale/portal?shop=${encodeURIComponent(cert.shop.shopDomain)}`}
-          style={{ textAlign: "center", textDecoration: "none" }}
         >
           Back to portal
         </a>

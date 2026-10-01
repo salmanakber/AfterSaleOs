@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { CustomerShell } from "../../../components/CustomerShell";
 
 function ClaimFormInner() {
   const params = useSearchParams();
@@ -78,38 +79,77 @@ function ClaimFormInner() {
 
   if (result) {
     return (
-      <div className="as-shell">
-        <div className="as-brand">AfterSale</div>
-        <div className="as-card">
-          <h2>Claim submitted</h2>
-          <p>
-            Reference <strong>{result.claimNumber}</strong>
-          </p>
+      <CustomerShell
+        title="Claim received"
+        lede="We’ve logged it and started review."
+        steps={["Describe", "Evidence", "Submitted"]}
+        activeStep={2}
+      >
+        <div className="as-success-hero">
+          <div className="as-success-icon" aria-hidden>
+            ✓
+          </div>
+          <strong style={{ fontSize: "1.5rem", fontFamily: "var(--as-font-display), Fraunces, Georgia, serif" }}>
+            {result.claimNumber}
+          </strong>
           <p className="as-muted">{result.message}</p>
           <p className="as-muted">Eligibility guide: {result.eligibility.replaceAll("_", " ")}</p>
-          <p>
-            <a className="as-link" href={result.trackingUrl}>
-              Track your claim
+          <div className="as-actions">
+            <a className="as-btn" href={result.trackingUrl}>
+              Track this claim
             </a>
-          </p>
+          </div>
         </div>
-      </div>
+      </CustomerShell>
     );
   }
 
   return (
-    <div className="as-shell">
-      <div className="as-brand">AfterSale</div>
-      <p className="as-muted">Submit a warranty claim</p>
-      <form className="as-card" onSubmit={onSubmit}>
-        <label className="as-label">Email</label>
-        <input className="as-input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        <label className="as-label">Name</label>
-        <input className="as-input" value={name} onChange={(e) => setName(e.target.value)} />
-        <label className="as-label">Order number</label>
-        <input className="as-input" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} placeholder="#1001" />
-        <label className="as-label">Serial number</label>
-        <input className="as-input" value={serial} onChange={(e) => setSerial(e.target.value)} />
+    <CustomerShell
+      title="Submit a claim"
+      lede="Tell us what happened. Photos help us resolve faster."
+      steps={["Describe", "Evidence", "Submitted"]}
+      activeStep={summary.trim() ? 1 : 0}
+    >
+      <form onSubmit={onSubmit}>
+        <p className="as-section-title">Contact & product</p>
+        <div className="as-field-grid">
+          <div>
+            <label className="as-label">Email</label>
+            <input
+              className="as-input"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+            />
+          </div>
+          <div>
+            <label className="as-label">Name</label>
+            <input className="as-input" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="as-field-grid">
+          <div>
+            <label className="as-label">Order number</label>
+            <input
+              className="as-input"
+              value={orderNumber}
+              onChange={(e) => setOrderNumber(e.target.value)}
+              placeholder="#1001"
+            />
+          </div>
+          <div>
+            <label className="as-label">Serial number</label>
+            <input className="as-input" value={serial} onChange={(e) => setSerial(e.target.value)} />
+          </div>
+        </div>
+
+        <hr className="as-divider" />
+        <p className="as-section-title">What happened</p>
+
         <label className="as-label">Issue category</label>
         <select className="as-input" value={category} onChange={(e) => setCategory(e.target.value)}>
           <option value="defect">Product defect</option>
@@ -118,16 +158,26 @@ function ClaimFormInner() {
           <option value="performance">Performance</option>
           <option value="other">Other</option>
         </select>
+
         <label className="as-label">Summary</label>
-        <input className="as-input" required value={summary} onChange={(e) => setSummary(e.target.value)} />
+        <input
+          className="as-input"
+          required
+          value={summary}
+          onChange={(e) => setSummary(e.target.value)}
+          placeholder="Short description of the issue"
+        />
+
         <label className="as-label">Details</label>
         <textarea
           className="as-input"
           rows={4}
           value={details}
           onChange={(e) => setDetails(e.target.value)}
-          style={{ resize: "vertical" }}
+          style={{ resize: "vertical", minHeight: 110 }}
+          placeholder="When it started, what you tried, and anything else we should know"
         />
+
         <label className="as-label">Photos / files (max 5)</label>
         <input
           className="as-input"
@@ -136,13 +186,17 @@ function ClaimFormInner() {
           multiple
           onChange={(e) => setFiles(e.target.files)}
         />
-        {certificateToken ? <p className="as-muted">Linked to certificate {certificateToken.slice(0, 8)}…</p> : null}
-        {error ? <p style={{ color: "var(--as-status-rejected)" }}>{error}</p> : null}
+
+        {certificateToken ? (
+          <p className="as-muted">Linked to your warranty certificate.</p>
+        ) : null}
+        {error ? <div className="as-alert as-alert-error">{error}</div> : null}
+
         <button className="as-btn" type="submit" disabled={loading || !shop}>
           {loading ? "Submitting…" : "Submit claim"}
         </button>
       </form>
-    </div>
+    </CustomerShell>
   );
 }
 

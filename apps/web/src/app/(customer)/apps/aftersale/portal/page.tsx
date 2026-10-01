@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { CustomerShell } from "../../../components/CustomerShell";
 
 function PortalInner() {
   const params = useSearchParams();
@@ -78,46 +79,79 @@ function PortalInner() {
   }
 
   return (
-    <div className="as-shell">
-      <div className="as-brand">AfterSale</div>
-      <p className="as-muted">Your warranties</p>
-
+    <CustomerShell
+      title="Your warranties"
+      lede="Certificates, coverage dates, and claim entry in one calm place."
+      steps={warranties ? ["Verify", "Open portal", "Manage"] : ["Verify", "Email link", "Open portal"]}
+      activeStep={warranties ? 2 : 0}
+      footer={
+        <a className="as-link" href={`/apps/aftersale/register?shop=${encodeURIComponent(shop)}`}>
+          Register another product →
+        </a>
+      }
+    >
       {warranties ? (
         <div className="as-stack">
           {warranties.length === 0 ? (
-            <div className="as-card">
-              <p className="as-muted">No warranties found for this order.</p>
+            <div className="as-empty">
+              <strong>No warranties yet</strong>
+              <p className="as-muted">This order doesn’t have active coverage on file.</p>
             </div>
           ) : (
             warranties.map((w) => (
-              <div className="as-card" key={w.id}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <strong>{w.productTitle}</strong>
+              <article className="as-card" key={w.id}>
+                <div className="as-warranty-row">
+                  <h2 className="as-warranty-title">{w.productTitle}</h2>
                   <span className={badgeClass(w.status)}>{w.status.replaceAll("_", " ")}</span>
                 </div>
-                <p className="as-muted" style={{ margin: "8px 0" }}>
-                  Order {w.orderNumber}
-                  {w.serialNumber ? ` · Serial ${w.serialNumber}` : ""} · {w.ruleName}
-                </p>
-                <p className="as-muted" style={{ margin: "0 0 12px" }}>
-                  {w.startAt ? new Date(w.startAt).toLocaleDateString() : "Pending start"}
-                  {" → "}
-                  {w.endAt ? new Date(w.endAt).toLocaleDateString() : "Lifetime"}
-                </p>
-                <a className="as-link" href={`/c/${w.certificateToken}`}>
-                  View certificate
-                </a>
-              </div>
+                <div className="as-meta">
+                  <span>
+                    Order <strong>{w.orderNumber}</strong>
+                  </span>
+                  {w.serialNumber ? (
+                    <span>
+                      Serial <strong>{w.serialNumber}</strong>
+                    </span>
+                  ) : null}
+                  <span>{w.ruleName}</span>
+                </div>
+                <div className="as-meta">
+                  <span>
+                    {w.startAt ? new Date(w.startAt).toLocaleDateString() : "Pending start"}
+                    {" → "}
+                    {w.endAt ? new Date(w.endAt).toLocaleDateString() : "Lifetime"}
+                  </span>
+                </div>
+                <div className="as-actions" style={{ marginTop: 8 }}>
+                  <a className="as-btn as-btn-secondary" href={`/c/${w.certificateToken}`}>
+                    View certificate
+                  </a>
+                  <a
+                    className="as-btn as-btn-ghost"
+                    href={`/apps/aftersale/claim?shop=${encodeURIComponent(shop)}&certificate=${encodeURIComponent(w.certificateToken)}`}
+                  >
+                    Start a claim
+                  </a>
+                </div>
+              </article>
             ))
           )}
         </div>
       ) : (
-        <form className="as-card" onSubmit={requestLink}>
-          <p className="as-muted">
-            Enter the email and order number from your purchase. We will email a one-time link.
+        <form onSubmit={requestLink}>
+          <p className="as-muted" style={{ marginTop: 0 }}>
+            Enter the email and order number from your purchase. We’ll send a one-time secure link —
+            no password needed.
           </p>
           <label className="as-label">Email</label>
-          <input className="as-input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input
+            className="as-input"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+          />
           <label className="as-label">Order number</label>
           <input
             className="as-input"
@@ -126,20 +160,19 @@ function PortalInner() {
             onChange={(e) => setOrderNumber(e.target.value)}
             placeholder="#1001"
           />
-          {message ? <p className="as-muted">{message}</p> : null}
-          {loading ? <p className="as-muted">Working…</p> : null}
+          {message ? <div className="as-alert as-alert-ok">{message}</div> : null}
           <button className="as-btn" disabled={loading || !shop} type="submit">
             {loading ? "Sending…" : "Email me a link"}
           </button>
         </form>
       )}
-    </div>
+    </CustomerShell>
   );
 }
 
 export default function PortalPage() {
   return (
-    <Suspense fallback={<div className="as-shell">Loading…</div>}>
+    <Suspense fallback={<div className="as-shell">Loading portal…</div>}>
       <PortalInner />
     </Suspense>
   );
