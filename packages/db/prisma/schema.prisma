@@ -77,6 +77,13 @@ model Shop {
   guestAccessTokens     GuestAccessToken[]
   qrLinks               QrLink[]
   ownershipTransfers    OwnershipTransfer[]
+  repairs               Repair[]
+  replacements          Replacement[]
+  resolutions           Resolution[]
+  suppliers             Supplier[]
+  productSuppliers      ProductSupplier[]
+  supplierClaims        SupplierClaim[]
+  workflowDefinitions   WorkflowDefinition[]
 
   @@map("shops")
 }
@@ -280,6 +287,7 @@ model StaffMember {
 
   shop         Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
   assignedClaims Claim[] @relation("ClaimAssignee")
+  repairs      Repair[]
 
   @@unique([shopId, email])
   @@index([shopId])
@@ -714,6 +722,8 @@ model Claim {
   claimNumber       String        @map("claim_number")
   publicToken       String        @unique @map("public_token")
   customerId        String?       @map("customer_id")
+  customerEmail     String?       @map("customer_email")
+  customerName      String?       @map("customer_name")
   warrantyId        String?       @map("warranty_id")
   warrantyUnitId    String?       @map("warranty_unit_id")
   assigneeId        String?       @map("assignee_id")
@@ -738,10 +748,17 @@ model Claim {
   assignee          StaffMember?  @relation("ClaimAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   location          Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
   attachments       Attachment[]
+  notes             ClaimNote[]
+  repairs           Repair[]
+  replacements      Replacement[]
+  resolutions       Resolution[]
+  supplierClaims    SupplierClaim[]
+  workflowStatusKey String?       @map("workflow_status_key")
 
   @@unique([shopId, claimNumber])
   @@index([shopId, status, createdAt])
   @@index([shopId, assigneeId])
+  @@index([shopId, customerEmail])
   @@map("claims")
 }
 
@@ -783,6 +800,253 @@ model Attachment {
 
   @@index([shopId, claimId])
   @@map("attachments")
+}
+
+model ClaimNote {
+  id         String   @id @default(cuid())
+  shopId     String   @map("shop_id")
+  claimId    String   @map("claim_id")
+  authorType String   @map("author_type") // staff | customer | system
+  authorId   String?  @map("author_id")
+  authorName String?  @map("author_name")
+  body       String
+  isInternal Boolean  @default(false) @map("is_internal")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  claim      Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, claimId, createdAt])
+  @@map("claim_notes")
+}
+
+model NotificationTemplate {
+  id        String   @id @default(cuid())
+  shopId    String?  @map("shop_id") // null = platform default
+  key       String
+  channel   String   @default("email") // email | sms | whatsapp | in_app
+  subject   String?
+  bodyHtml  String   @map("body_html")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([shopId, key, channel])
+  @@index([shopId, key])
+  @@map("notification_templates")
+}
+
+// ─── Resolutions (M4) ────────────────────────────────────────────────────────
+
+enum RepairStatus {
+  REPAIR_REQUIRED
+  PRODUCT_RECEIVED
+  DIAGNOSIS
+  REPAIRING
+  QUALITY_CHECK
+  READY
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+model Repair {
+  id              String       @id @default(cuid())
+  shopId          String       @map("shop_id")
+  repairNumber    String       @map("repair_number")
+  claimId         String       @map("claim_id")
+  warrantyUnitId  String?      @map("warranty_unit_id")
+  technicianId    String?      @map("technician_id")
+  locationId      String?      @map("location_id")
+  status          RepairStatus @default(REPAIR_REQUIRED)
+  diagnosis       String?
+  notes           String?
+  repairCostCents Int?         @map("repair_cost_cents")
+  currency        String       @default("USD")
+  shippingIn      String?      @map("shipping_in")
+  shippingOut     String?      @map("shipping_out")
+  completedAt     DateTime?    @map("completed_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  shop            Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  claim           Claim        @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  technician      StaffMember? @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+
+  @@unique([shopId, repairNumber])
+  @@index([shopId, status, createdAt])
+  @@index([shopId, claimId])
+  @@map("repairs")
+}
+
+enum ReplacementWarrantyMode {
+  INHERIT_REMAINING
+  RESTART
+}
+
+model Replacement {
+  id                    String                   @id @default(cuid())
+  shopId                String                   @map("shop_id")
+  claimId               String                   @map("claim_id")
+  shopifyDraftOrderId   String?                  @map("shopify_draft_order_id")
+  shopifyDraftOrderName String?                  @map("shopify_draft_order_name")
+  shopifyOrderId        String?                  @map("shopify_order_id")
+  status                String                   @default("draft_created") // draft_created | completed | fulfilled | cancelled
+  variantId             String?                  @map("variant_id")
+  productTitle          String?                  @map("product_title")
+  warrantyMode          ReplacementWarrantyMode  @default(INHERIT_REMAINING) @map("warranty_mode")
+  newWarrantyId         String?                  @map("new_warranty_id")
+  adminOrderUrl         String?                  @map("admin_order_url")
+  createdAt             DateTime                 @default(now()) @map("created_at")
+  updatedAt             DateTime                 @updatedAt @map("updated_at")
+
+  shop                  Shop                     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  claim                 Claim                    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, claimId])
+  @@index([shopId, shopifyDraftOrderId])
+  @@map("replacements")
+}
+
+enum ResolutionType {
+  REPAIR
+  REPLACEMENT
+  REFUND
+  OTHER
+}
+
+model Resolution {
+  id              String         @id @default(cuid())
+  shopId          String         @map("shop_id")
+  claimId         String         @map("claim_id")
+  type            ResolutionType
+  amountCents     Int?           @map("amount_cents")
+  currency        String         @default("USD")
+  reason          String?
+  shopifyRefundId String?        @map("shopify_refund_id")
+  shopifyOrderId  String?        @map("shopify_order_id")
+  adminDeepLink   String?        @map("admin_deep_link")
+  issuedInShopify Boolean        @default(false) @map("issued_in_shopify")
+  meta            Json?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  shop            Shop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  claim           Claim          @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, claimId, createdAt])
+  @@map("resolutions")
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  shopId    String   @map("shop_id")
+  name      String
+  email     String?
+  phone     String?
+  notes     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  products  ProductSupplier[]
+  claims    SupplierClaim[]
+
+  @@index([shopId, name])
+  @@map("suppliers")
+}
+
+model ProductSupplier {
+  id                   String  @id @default(cuid())
+  shopId               String  @map("shop_id")
+  supplierId           String  @map("supplier_id")
+  shopifyProductId     String  @map("shopify_product_id")
+  supplierWarrantyMonths Int?  @map("supplier_warranty_months")
+
+  shop                 Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  supplier             Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, shopifyProductId, supplierId])
+  @@index([shopId, supplierId])
+  @@map("product_suppliers")
+}
+
+enum SupplierClaimStatus {
+  NOT_FILED
+  FILED
+  ACCEPTED
+  REJECTED
+  REIMBURSED
+}
+
+model SupplierClaim {
+  id              String              @id @default(cuid())
+  shopId          String              @map("shop_id")
+  claimId         String              @map("claim_id")
+  supplierId      String              @map("supplier_id")
+  recoverable     Boolean             @default(true)
+  amountCents     Int?                @map("amount_cents")
+  currency        String              @default("USD")
+  status          SupplierClaimStatus @default(NOT_FILED)
+  notes           String?
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  shop            Shop                @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  claim           Claim               @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  supplier        Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, supplierId, status])
+  @@index([shopId, claimId])
+  @@map("supplier_claims")
+}
+
+model WorkflowDefinition {
+  id          String   @id @default(cuid())
+  shopId      String   @map("shop_id")
+  name        String
+  isDefault   Boolean  @default(false) @map("is_default")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  statuses    WorkflowStatus[]
+  transitions WorkflowTransition[]
+
+  @@index([shopId, active])
+  @@map("workflow_definitions")
+}
+
+model WorkflowStatus {
+  id             String @id @default(cuid())
+  shopId         String @map("shop_id")
+  workflowId     String @map("workflow_id")
+  key            String
+  label          String
+  systemState    ClaimSystemState @map("system_state")
+  sortOrder      Int    @default(0) @map("sort_order")
+  emailTemplateKey String? @map("email_template_key")
+
+  workflow       WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, key])
+  @@index([shopId, workflowId])
+  @@map("workflow_statuses")
+}
+
+model WorkflowTransition {
+  id         String @id @default(cuid())
+  shopId     String @map("shop_id")
+  workflowId String @map("workflow_id")
+  fromKey    String @map("from_key")
+  toKey      String @map("to_key")
+
+  workflow   WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, fromKey, toKey])
+  @@index([shopId, workflowId])
+  @@map("workflow_transitions")
 }
 
 model Location {

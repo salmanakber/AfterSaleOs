@@ -15,6 +15,14 @@ import {
   SessionTokenStaleError,
 } from "@/lib/auth/merchant";
 import { enqueueBackfill } from "@/lib/queue";
+import {
+  claimsTypeDefs,
+  claimsResolvers,
+} from "@/lib/graphql/claims";
+import {
+  resolutionsTypeDefs,
+  resolutionsResolvers,
+} from "@/lib/graphql/resolutions";
 
 export const runtime = "nodejs";
 
@@ -321,9 +329,11 @@ const warrantyInclude = {
 
 const yoga = createYoga({
   schema: createSchema({
-    typeDefs,
+    typeDefs: [typeDefs, claimsTypeDefs, resolutionsTypeDefs],
     resolvers: {
       Query: {
+        ...claimsResolvers.Query,
+        ...resolutionsResolvers.Query,
         health: () => "ok",
         home: async (_: unknown, __: unknown, ctx: { request: Request }) => {
           const merchant = await resolveMerchantContext(ctx.request);
@@ -545,6 +555,8 @@ const yoga = createYoga({
         },
       },
       Mutation: {
+        ...claimsResolvers.Mutation,
+        ...resolutionsResolvers.Mutation,
         completeOnboardingStep: async (
           _: unknown,
           args: { step: string },

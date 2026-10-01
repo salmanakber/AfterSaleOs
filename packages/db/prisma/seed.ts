@@ -138,7 +138,53 @@ async function main() {
     update: {},
   });
 
-  console.log("Seeded plans, admin user, and feature flags.");
+  const templates = [
+    {
+      key: "claim_created",
+      subject: "We received your warranty claim",
+      bodyHtml: "<p>Your claim {{claimNumber}} was submitted. <a href=\"{{trackingUrl}}\">Track it here</a>.</p>",
+    },
+    {
+      key: "claim_status_approved",
+      subject: "Your claim was approved",
+      bodyHtml: "<p>Claim {{claimNumber}} is approved. <a href=\"{{trackingUrl}}\">View status</a>.</p>",
+    },
+    {
+      key: "claim_status_rejected",
+      subject: "Update on your claim",
+      bodyHtml: "<p>Claim {{claimNumber}} was updated. <a href=\"{{trackingUrl}}\">View details</a>.</p>",
+    },
+    {
+      key: "claim_status_waiting_customer",
+      subject: "We need more information",
+      bodyHtml: "<p>Please reply with more details for claim {{claimNumber}}. <a href=\"{{trackingUrl}}\">Open claim</a>.</p>",
+    },
+  ] as const;
+
+  for (const t of templates) {
+    const existing = await prisma.notificationTemplate.findFirst({
+      where: { shopId: null, key: t.key, channel: "email" },
+    });
+    if (existing) {
+      await prisma.notificationTemplate.update({
+        where: { id: existing.id },
+        data: { subject: t.subject, bodyHtml: t.bodyHtml, active: true },
+      });
+    } else {
+      await prisma.notificationTemplate.create({
+        data: {
+          shopId: null,
+          key: t.key,
+          channel: "email",
+          subject: t.subject,
+          bodyHtml: t.bodyHtml,
+          active: true,
+        },
+      });
+    }
+  }
+
+  console.log("Seeded plans, admin user, feature flags, and notification templates.");
   console.log(`Admin login: ${email} / ${password}`);
 }
 

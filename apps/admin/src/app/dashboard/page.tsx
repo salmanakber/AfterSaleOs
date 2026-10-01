@@ -66,6 +66,7 @@ export default function DashboardPage() {
         <strong>Super Admin</strong>
         <Link href="/dashboard">Overview</Link>
         <Link href="/shops">Shops</Link>
+        <Link href="/ops">Jobs &amp; Webhooks</Link>
         <Link href="/compliance">Compliance</Link>
         <button
           className="btn"

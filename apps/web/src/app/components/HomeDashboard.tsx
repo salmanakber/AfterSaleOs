@@ -103,6 +103,7 @@ export function HomeDashboard() {
         data.shop.plan ? <Badge tone="info">{data.shop.plan.name}</Badge> : undefined
       }
       secondaryActions={[
+        { content: "Claims", url: "/claims" },
         { content: "Warranties", url: "/warranties" },
         { content: "Products & Rules", url: "/products-rules" },
         { content: "Plans & Usage", url: "/plans" },

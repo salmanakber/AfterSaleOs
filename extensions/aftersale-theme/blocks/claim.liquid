@@ -1,0 +1,25 @@
+{% comment %} AfterSale claim entry block {% endcomment %}
+<div class="as-claim-block" {{ block.shopify_attributes }}>
+  <a
+    class="as-register-block__btn"
+    href="/apps/aftersale/claim?shop={{ shop.permanent_domain }}{% if product %}&product={{ product.title | url_encode }}&product_id={{ product.id }}{% endif %}"
+  >
+    {{ block.settings.button_label | default: "File a warranty claim" }}
+  </a>
+</div>
+
+{% schema %}
+{
+  "name": "AfterSale claim",
+  "target": "section",
+  "stylesheet": "aftersale.css",
+  "settings": [
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button label",
+      "default": "File a warranty claim"
+    }
+  ]
+}
+{% endschema %}

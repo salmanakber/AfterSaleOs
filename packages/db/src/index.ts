@@ -9,3 +9,5 @@ export {
 } from "./tenant";
 export { shopRepository, sessionRepository, usageRepository } from "./repositories";
 export * from "./warranty";
+export * from "./claims";
+export * from "./resolutions";
