@@ -8,3 +8,4 @@ export {
   type AdminPrisma,
 } from "./tenant";
 export { shopRepository, sessionRepository, usageRepository } from "./repositories";
+export * from "./warranty";

@@ -19,4 +19,17 @@ export {
   type EligibilityInput,
   type EligibilityOutcome,
 } from "./eligibility";
+export {
+  buildWarrantyDates,
+  computeWarrantyStatus,
+  matchingRulesForProduct,
+  randomCertificateToken,
+  resolveStartDate,
+  selectRulesByType,
+  unitsToVoidOnRefund,
+  type ComputedWarrantyStatus,
+  type MatchableRule,
+  type ProductMatchContext,
+  type StartDateRuleKind,
+} from "./warranty-engine";
 export { QUEUE_NAMES, normalizeShopDomain, offlineSessionId, type QueueName } from "./queues";

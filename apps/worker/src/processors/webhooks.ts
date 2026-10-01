@@ -1,10 +1,6 @@
-import { prisma, shopRepository } from "@aftersale/db";
+import { prisma, shopRepository, syncOrderFromWebhook, syncProductFromWebhook, voidWarrantiesOnRefund } from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
 
-/**
- * Background webhook processor.
- * Order/product sync and warranty creation expand in M1.
- */
 export async function processWebhookEvent(webhookEventId: string) {
   const event = await prisma.webhookEvent.findUnique({ where: { id: webhookEventId } });
   if (!event) return;
@@ -27,13 +23,17 @@ export async function processWebhookEvent(webhookEventId: string) {
       case "orders/create":
       case "orders/updated":
       case "orders/cancelled":
+        if (shop) await syncOrderFromWebhook(shop.id, event.payload);
+        break;
       case "refunds/create":
+        if (shop) await handleRefund(shop.id, event.payload);
+        break;
       case "products/update":
+      case "products/create":
+        if (shop) await syncProductFromWebhook(shop.id, event.payload);
+        break;
       case "customers/update":
-        // M1: sync + warranty engine
-        console.log(`[webhook] queued domain sync for ${event.topic}`, {
-          shop: event.shopDomain,
-        });
+        if (shop) await handleCustomerUpdate(shop.id, event.payload);
         break;
       default:
         console.log(`[webhook] unhandled topic ${event.topic}`);
@@ -55,10 +55,60 @@ export async function processWebhookEvent(webhookEventId: string) {
   }
 }
 
+async function handleRefund(shopId: string, payload: unknown) {
+  const refund = payload as {
+    order_id?: number | string;
+    refund_line_items?: Array<{
+      line_item_id?: number | string;
+      quantity?: number;
+      line_item?: { id?: number | string };
+    }>;
+  };
+  if (!refund.order_id) return;
+
+  await voidWarrantiesOnRefund({
+    shopId,
+    shopifyOrderId: String(refund.order_id),
+    refundLineItems: (refund.refund_line_items ?? []).map((r) => ({
+      shopifyLineItemId: String(r.line_item_id ?? r.line_item?.id ?? ""),
+      quantity: r.quantity ?? 0,
+    })).filter((r) => r.shopifyLineItemId && r.quantity > 0),
+    reason: "refund",
+  });
+}
+
+async function handleCustomerUpdate(shopId: string, payload: unknown) {
+  const c = payload as {
+    id?: number | string;
+    email?: string;
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+  };
+  if (!c.id) return;
+  await prisma.customer.upsert({
+    where: { shopId_shopifyCustomerId: { shopId, shopifyCustomerId: String(c.id) } },
+    create: {
+      shopId,
+      shopifyCustomerId: String(c.id),
+      email: c.email?.toLowerCase(),
+      firstName: c.first_name,
+      lastName: c.last_name,
+      phone: c.phone,
+    },
+    update: {
+      email: c.email?.toLowerCase(),
+      firstName: c.first_name,
+      lastName: c.last_name,
+      phone: c.phone,
+    },
+  });
+}
+
 async function handleSubscriptionUpdate(shopId: string | undefined, payload: unknown) {
   if (!shopId) return;
   const p = payload as {
-    app_subscription?: { admin_graphql_api_id?: string; status?: string; name?: string };
+    app_subscription?: { admin_graphql_api_id?: string; status?: string };
   };
   const sub = p.app_subscription;
   if (!sub?.admin_graphql_api_id) return;

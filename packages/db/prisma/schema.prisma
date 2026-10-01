@@ -322,6 +322,7 @@ model Product {
   vendor          String?
   productType     String?  @map("product_type")
   imageUrl        String?  @map("image_url")
+  collectionIds   String[] @default([]) @map("collection_ids")
   syncedAt        DateTime @default(now()) @map("synced_at")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -386,6 +387,8 @@ model Order {
   financialStatus String?     @map("financial_status")
   fulfillmentStatus String?   @map("fulfillment_status")
   processedAt     DateTime?   @map("processed_at")
+  fulfilledAt     DateTime?   @map("fulfilled_at")
+  deliveredAt     DateTime?   @map("delivered_at")
   cancelledAt     DateTime?   @map("cancelled_at")
   currency        String      @default("USD")
   createdAt       DateTime    @default(now()) @map("created_at")
@@ -535,6 +538,7 @@ model Warranty {
   endAt           DateTime?       @map("end_at")
   timezone        String          @default("UTC")
   certificateToken String         @unique @map("certificate_token")
+  voidReason      String?         @map("void_reason")
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
 
@@ -547,6 +551,35 @@ model Warranty {
   @@index([shopId, status, endAt])
   @@index([shopId, customerId])
   @@map("warranties")
+}
+
+model SerialList {
+  id        String   @id @default(cuid())
+  shopId    String   @map("shop_id")
+  name      String
+  ruleId    String?  @map("rule_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  entries   SerialNumber[]
+
+  @@index([shopId])
+  @@map("serial_lists")
+}
+
+model SerialNumber {
+  id           String   @id @default(cuid())
+  shopId       String   @map("shop_id")
+  serialListId String   @map("serial_list_id")
+  serial       String
+  claimedAt    DateTime? @map("claimed_at")
+  warrantyUnitId String? @map("warranty_unit_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  list         SerialList @relation(fields: [serialListId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, serial])
+  @@index([shopId, serialListId])
+  @@map("serial_numbers")
 }
 
 enum WarrantySource {

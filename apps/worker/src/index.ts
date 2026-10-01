@@ -4,6 +4,7 @@ import { prisma } from "@aftersale/db";
 import { QUEUE_NAMES } from "@aftersale/shared";
 import { processWebhookEvent } from "./processors/webhooks";
 import { processEmailJob } from "./processors/email";
+import { runBackfillJob } from "./processors/backfill";
 
 const connection = new IORedis(process.env.REDIS_URL ?? "redis://127.0.0.1:6379", {
   maxRetriesPerRequest: null,
@@ -57,7 +58,20 @@ emailWorker.on("failed", async (job, err) => {
   await recordFailure(QUEUE_NAMES.EMAILS, err, job?.data, job?.data?.shopId);
 });
 
-// Ensure queues exist for observability
+const backfillWorker = new Worker(
+  QUEUE_NAMES.BACKFILL,
+  async (job) => {
+    const { jobId } = job.data as { jobId: string };
+    await runBackfillJob(jobId);
+  },
+  { connection, concurrency: 1 },
+);
+
+backfillWorker.on("failed", async (job, err) => {
+  console.error("[backfill] failed", job?.id, err);
+  await recordFailure(QUEUE_NAMES.BACKFILL, err, job?.data, undefined);
+});
+
 void new Queue(QUEUE_NAMES.WEBHOOKS, { connection });
 void new Queue(QUEUE_NAMES.EMAILS, { connection });
 void new Queue(QUEUE_NAMES.BACKFILL, { connection });
@@ -68,8 +82,7 @@ console.log("AfterSale worker started", {
 });
 
 async function shutdown() {
-  await webhookWorker.close();
-  await emailWorker.close();
+  await Promise.all([webhookWorker.close(), emailWorker.close(), backfillWorker.close()]);
   await connection.quit();
   process.exit(0);
 }

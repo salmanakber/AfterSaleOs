@@ -102,7 +102,11 @@ export function HomeDashboard() {
       titleMetadata={
         data.shop.plan ? <Badge tone="info">{data.shop.plan.name}</Badge> : undefined
       }
-      secondaryActions={[{ content: "Plans & Usage", url: "/plans" }]}
+      secondaryActions={[
+        { content: "Warranties", url: "/warranties" },
+        { content: "Products & Rules", url: "/products-rules" },
+        { content: "Plans & Usage", url: "/plans" },
+      ]}
     >
       <Layout>
         {data.setupChecklist.length > 0 ? (

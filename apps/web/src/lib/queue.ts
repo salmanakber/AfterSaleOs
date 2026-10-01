@@ -48,3 +48,16 @@ export async function enqueueEmail(payload: {
     backoff: { type: "exponential", delay: 3000 },
   });
 }
+
+export async function enqueueBackfill(jobId: string) {
+  await getQueue(QUEUE_NAMES.BACKFILL).add(
+    "backfill",
+    { jobId },
+    {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 5000 },
+      removeOnComplete: 100,
+      removeOnFail: 500,
+    },
+  );
+}
