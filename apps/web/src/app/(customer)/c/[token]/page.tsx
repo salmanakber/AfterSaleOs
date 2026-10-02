@@ -150,8 +150,11 @@ function CertificateInner() {
       ) : null}
 
       <div className="as-actions as-no-print">
-        <button className="as-btn" type="button" onClick={() => window.print()}>
-          Print / Save PDF
+        <a className="as-btn" href={`/api/public/certificate/${token}/pdf`} download>
+          Download PDF
+        </a>
+        <button className="as-btn as-btn-secondary" type="button" onClick={() => window.print()}>
+          Print
         </button>
         <a
           className="as-btn as-btn-secondary"

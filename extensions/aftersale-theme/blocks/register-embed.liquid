@@ -1,0 +1,39 @@
+{% comment %}
+  Embeds product registration (iframe). Passes product context when block is on a product template.
+{% endcomment %}
+
+<div class="as-embed-block" {{ block.shopify_attributes }}>
+  <iframe
+    class="as-embed-block__frame"
+    title="{{ block.settings.title | default: 'Register warranty' }}"
+    src="/apps/aftersale/register?shop={{ shop.permanent_domain }}&embed=1{% if product %}&product={{ product.title | url_encode }}&product_id={{ product.id }}{% if product.selected_or_first_available_variant %}&variant_id={{ product.selected_or_first_available_variant.id }}{% endif %}{% endif %}"
+    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:12px;"
+    loading="lazy"
+    allow="clipboard-write"
+  ></iframe>
+</div>
+
+{% schema %}
+{
+  "name": "AfterSale register (embed)",
+  "target": "section",
+  "stylesheet": "aftersale.css",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Iframe title (accessibility)",
+      "default": "Register warranty"
+    },
+    {
+      "type": "range",
+      "id": "min_height",
+      "label": "Minimum height (px)",
+      "min": 400,
+      "max": 1200,
+      "step": 40,
+      "default": 720
+    }
+  ]
+}
+{% endschema %}

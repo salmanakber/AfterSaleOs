@@ -17,6 +17,8 @@ const NAV: NavItem[] = [
   { href: "/registrations", label: "Registrations", group: "Coverage" },
   { href: "/products-rules", label: "Products & Rules", group: "Coverage" },
   { href: "/automations", label: "Automations", group: "Setup" },
+  { href: "/qr-codes", label: "QR codes", group: "Setup" },
+  { href: "/team", label: "Team", group: "Setup" },
   { href: "/settings", label: "Customer pages", group: "Setup" },
   { href: "/plans", label: "Plans & Usage", group: "Setup" },
 ];

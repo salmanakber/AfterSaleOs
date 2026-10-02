@@ -52,3 +52,43 @@ server {
 ```
 
 Shopify Partner App URL and redirect must be `https://aftersale.tidyflowapp.com` and `https://aftersale.tidyflowapp.com/api/auth/callback`.
+
+## Optional integrations
+
+```env
+# Logo upload (Settings → Branding)
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+
+# Transactional email (worker)
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=notifications@yourdomain.com
+RESEND_FROM_NAME=AfterSale OS
+
+# Redis (worker queues — required in production)
+REDIS_URL=redis://127.0.0.1:6379
+```
+
+## Shopify CLI
+
+After code changes that touch the theme extension or app config:
+
+```bash
+shopify app deploy
+```
+
+New theme blocks: **AfterSale portal/register/claim (embed)** — add in the theme editor under Apps.
+
+## Protected customer data (orders / refunds)
+
+Order and refund webhooks stay disabled in `shopify.app.toml` until Partners approves PCD. Steps: [PCD_WEBHOOKS.md](./PCD_WEBHOOKS.md).
+
+## Build order (monorepo)
+
+```bash
+npm run build -w @aftersale/db   # merchant-ops exports land in dist/
+npm run build                    # web, worker, admin
+```
+
+Restart **web** and **worker** after deploy so GraphQL, email templates, and webhooks pick up changes.

@@ -78,6 +78,12 @@ const VOID = `#graphql
   }
 `;
 
+const EXTEND = `#graphql
+  mutation Extend($id: ID!, $extraMonths: Int!, $reason: String!) {
+    extendWarranty(id: $id, extraMonths: $extraMonths, reason: $reason) { id endAt status }
+  }
+`;
+
 function statusTone(status: string): "success" | "attention" | "info" | "critical" | undefined {
   switch (status) {
     case "ACTIVE":
@@ -178,6 +184,18 @@ export function WarrantiesPage() {
     }
   }
 
+  async function extendOne(id: string) {
+    const months = window.prompt("Extend by how many months?", "3");
+    if (!months) return;
+    const reason = window.prompt("Reason for extension?", "Goodwill extension") ?? "Extended";
+    try {
+      await gqlRequest(EXTEND, { id, extraMonths: Number(months), reason });
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Extend failed");
+    }
+  }
+
   const rows = nodes.map((w) => [
     w.orderNumber,
     w.productTitle,
@@ -189,9 +207,14 @@ export function WarrantiesPage() {
     w.ruleName,
     w.startAt ? new Date(w.startAt).toLocaleDateString() : "—",
     w.endAt ? new Date(w.endAt).toLocaleDateString() : "Lifetime",
-    <Button key={`v-${w.id}`} tone="critical" variant="plain" onClick={() => voidOne(w.id)}>
-      Void
-    </Button>,
+    <InlineStack key={`a-${w.id}`} gap="100">
+      <Button variant="plain" onClick={() => extendOne(w.id)}>
+        Extend
+      </Button>
+      <Button tone="critical" variant="plain" onClick={() => voidOne(w.id)}>
+        Void
+      </Button>
+    </InlineStack>,
   ]);
 
   const latestJob = jobs[0];

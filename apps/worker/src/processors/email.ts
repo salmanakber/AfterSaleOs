@@ -1,13 +1,26 @@
 /**
- * Transactional email — Resend when configured; otherwise logs preview.
+ * Transactional email — Resend when configured; merchant templates from DB when present.
  */
+import { getNotificationTemplateForSend } from "@aftersale/db";
+
 export async function processEmailJob(data: {
   shopId: string;
   to: string;
   template: string;
   data: Record<string, unknown>;
 }) {
-  const { subject, html } = renderTemplate(data.template, data.data);
+  const custom = await getNotificationTemplateForSend(data.shopId, data.template);
+  let subject: string;
+  let html: string;
+
+  if (custom?.subject && custom.bodyHtml) {
+    subject = interpolate(custom.subject, data.data);
+    html = interpolate(custom.bodyHtml, data.data);
+  } else {
+    const rendered = renderTemplate(data.template, data.data);
+    subject = rendered.subject;
+    html = rendered.html;
+  }
 
   if (!process.env.RESEND_API_KEY) {
     console.log("[email] skipped (no RESEND_API_KEY)", {
@@ -36,6 +49,10 @@ export async function processEmailJob(data: {
   if (!res.ok) {
     throw new Error(`Resend failed: ${await res.text()}`);
   }
+}
+
+function interpolate(template: string, data: Record<string, unknown>) {
+  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => esc(data[key]));
 }
 
 function renderTemplate(template: string, data: Record<string, unknown>) {

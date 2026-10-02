@@ -126,11 +126,24 @@ export async function submitRegistration(params: {
       rule.versions[0]);
 
   const serialMode = version?.serialMode ?? "NOT_REQUIRED";
-  const serialCheck = await validateSerial({
-    shopId: params.shopId,
-    serial: params.serialNumber,
-    serialMode,
-  });
+  const serialList =
+    rule && serialMode === "VALIDATED_AGAINST_LIST"
+      ? await prisma.serialList.findFirst({
+          where: { shopId: params.shopId, ruleId: rule.id },
+        })
+      : null;
+
+  let serialCheck: SerialValidationResult;
+  if (serialMode === "VALIDATED_AGAINST_LIST" && !serialList) {
+    serialCheck = { ok: false, code: "NOT_IN_LIST", needsReview: true };
+  } else {
+    serialCheck = await validateSerial({
+      shopId: params.shopId,
+      serial: params.serialNumber,
+      serialMode,
+      serialListId: serialList?.id,
+    });
+  }
 
   let status: "PENDING_VERIFICATION" | "APPROVED" | "NEEDS_REVIEW" = "PENDING_VERIFICATION";
   if (params.outsideShopify) {

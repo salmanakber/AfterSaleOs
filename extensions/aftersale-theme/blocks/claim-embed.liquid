@@ -1,0 +1,37 @@
+{% comment %} Embeds warranty claim flow (iframe). {% endcomment %}
+
+<div class="as-embed-block" {{ block.shopify_attributes }}>
+  <iframe
+    class="as-embed-block__frame"
+    title="{{ block.settings.title | default: 'File a claim' }}"
+    src="/apps/aftersale/claim?shop={{ shop.permanent_domain }}&embed=1{% if product %}&product={{ product.title | url_encode }}&product_id={{ product.id }}{% endif %}"
+    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:12px;"
+    loading="lazy"
+    allow="clipboard-write"
+  ></iframe>
+</div>
+
+{% schema %}
+{
+  "name": "AfterSale claim (embed)",
+  "target": "section",
+  "stylesheet": "aftersale.css",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Iframe title (accessibility)",
+      "default": "File a warranty claim"
+    },
+    {
+      "type": "range",
+      "id": "min_height",
+      "label": "Minimum height (px)",
+      "min": 400,
+      "max": 1200,
+      "step": 40,
+      "default": 720
+    }
+  ]
+}
+{% endschema %}

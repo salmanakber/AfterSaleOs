@@ -23,6 +23,10 @@ import {
   resolutionsTypeDefs,
   resolutionsResolvers,
 } from "@/lib/graphql/resolutions";
+import {
+  merchantOpsTypeDefs,
+  merchantOpsResolvers,
+} from "@/lib/graphql/merchant-ops";
 
 export const runtime = "nodejs";
 
@@ -340,11 +344,12 @@ const warrantyInclude = {
 
 const yoga = createYoga({
   schema: createSchema({
-    typeDefs: [typeDefs, claimsTypeDefs, resolutionsTypeDefs],
+    typeDefs: [typeDefs, claimsTypeDefs, resolutionsTypeDefs, merchantOpsTypeDefs],
     resolvers: {
       Query: {
         ...claimsResolvers.Query,
         ...resolutionsResolvers.Query,
+        ...merchantOpsResolvers.Query,
         health: () => "ok",
         home: async (_: unknown, __: unknown, ctx: { request: Request }) => {
           const merchant = await resolveMerchantContext(ctx.request);
@@ -568,6 +573,7 @@ const yoga = createYoga({
       Mutation: {
         ...claimsResolvers.Mutation,
         ...resolutionsResolvers.Mutation,
+        ...merchantOpsResolvers.Mutation,
         completeOnboardingStep: async (
           _: unknown,
           args: { step: string },

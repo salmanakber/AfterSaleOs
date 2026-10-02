@@ -1,0 +1,39 @@
+{% comment %}
+  Embeds the AfterSale warranty portal (iframe). Uses app proxy /apps/aftersale/portal.
+{% endcomment %}
+
+<div class="as-embed-block" {{ block.shopify_attributes }}>
+  <iframe
+    class="as-embed-block__frame"
+    title="{{ block.settings.title | default: 'Warranty portal' }}"
+    src="/apps/aftersale/portal?shop={{ shop.permanent_domain }}&embed=1"
+    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:12px;"
+    loading="lazy"
+    allow="clipboard-write"
+  ></iframe>
+</div>
+
+{% schema %}
+{
+  "name": "AfterSale portal (embed)",
+  "target": "section",
+  "stylesheet": "aftersale.css",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Iframe title (accessibility)",
+      "default": "Warranty portal"
+    },
+    {
+      "type": "range",
+      "id": "min_height",
+      "label": "Minimum height (px)",
+      "min": 400,
+      "max": 1200,
+      "step": 40,
+      "default": 720
+    }
+  ]
+}
+{% endschema %}

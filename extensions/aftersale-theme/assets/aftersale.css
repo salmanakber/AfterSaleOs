@@ -20,3 +20,14 @@
 .as-register-block__lookup a {
   color: #4338ca;
 }
+
+.as-embed-block {
+  margin: 1rem 0;
+  width: 100%;
+}
+
+.as-embed-block__frame {
+  display: block;
+  width: 100%;
+  background: #f8fafc;
+}

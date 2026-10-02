@@ -17,3 +17,4 @@ export {
 export * from "./warranty";
 export * from "./claims";
 export * from "./resolutions";
+export * from "./merchant-ops";
