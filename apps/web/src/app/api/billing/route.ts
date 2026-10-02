@@ -1,25 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@aftersale/db";
+import { prisma, isShopifyBillingTestMode } from "@aftersale/db";
 import { getOfflineSession, shopify } from "@/lib/shopify/client";
 import { resolveMerchantContext } from "@/lib/auth/merchant";
+import { syncShopifySubscriptionStatus } from "@/lib/billing-sync";
 
 /**
- * Billing skeleton: create a Shopify app subscription for a paid plan.
- * Free plan is modeled as no active charge.
+ * Billing: create a Shopify app subscription for a paid plan.
+ * Free plan is modeled as no active charge. Test mode comes from Super Admin
+ * (platform setting) with env SHOPIFY_BILLING_TEST as fallback.
  */
 export async function GET(request: NextRequest) {
   try {
     const merchant = await resolveMerchantContext(request);
+    const sync = request.nextUrl.searchParams.get("sync") === "1";
+
+    if (sync) {
+      try {
+        await syncShopifySubscriptionStatus(merchant.shopId, merchant.shopDomain);
+      } catch (err) {
+        console.warn("[billing] sync failed", err);
+      }
+    }
+
     const shop = await prisma.shop.findUniqueOrThrow({
       where: { id: merchant.shopId },
       include: { plan: true, billingCharges: { orderBy: { createdAt: "desc" }, take: 5 } },
     });
+
+    // Auto-heal pending approvals even without explicit sync flag.
+    if (shop.billingStatus === "PENDING_APPROVAL") {
+      try {
+        await syncShopifySubscriptionStatus(merchant.shopId, merchant.shopDomain);
+      } catch (err) {
+        console.warn("[billing] auto-sync failed", err);
+      }
+    }
+
+    const fresh = await prisma.shop.findUniqueOrThrow({
+      where: { id: merchant.shopId },
+      include: { plan: true, billingCharges: { orderBy: { createdAt: "desc" }, take: 5 } },
+    });
     const plans = await prisma.plan.findMany({ orderBy: { sortOrder: "asc" } });
+    const billingTestMode = await isShopifyBillingTestMode();
     return NextResponse.json({
-      current: shop.plan,
-      billingStatus: shop.billingStatus,
-      charges: shop.billingCharges,
+      current: fresh.plan,
+      billingStatus: fresh.billingStatus,
+      needsPlanSelection: !fresh.planId && !fresh.billingBypass,
+      charges: fresh.billingCharges,
       plans,
+      billingTestMode,
     });
   } catch (err) {
     return NextResponse.json(
@@ -41,6 +70,11 @@ export async function POST(request: NextRequest) {
     if (!plan) return NextResponse.json({ error: "Unknown plan" }, { status: 404 });
 
     if (plan.isFree) {
+      // Cancel any pending local charges when moving to free.
+      await prisma.billingCharge.updateMany({
+        where: { shopId: merchant.shopId, status: { in: ["PENDING", "ACTIVE"] } },
+        data: { status: "CANCELLED" },
+      });
       await prisma.shop.update({
         where: { id: merchant.shopId },
         data: {
@@ -49,7 +83,7 @@ export async function POST(request: NextRequest) {
           shopifySubscriptionId: null,
         },
       });
-      return NextResponse.json({ ok: true, plan, confirmationUrl: null });
+      return NextResponse.json({ ok: true, plan, confirmationUrl: null, needsPlanSelection: false });
     }
 
     const session = await getOfflineSession(merchant.shopDomain);
@@ -57,8 +91,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Reconnect required" }, { status: 401 });
     }
 
-    const returnUrl = `${process.env.APP_URL}/?shop=${merchant.shopDomain}&billing=return`;
-    const test = process.env.SHOPIFY_BILLING_TEST === "true";
+    const returnUrl = `${process.env.APP_URL}/plans?shop=${merchant.shopDomain}&billing=return&welcome=1`;
+    const test = await isShopifyBillingTestMode();
     const client = new shopify.clients.Graphql({ session });
 
     const result = await client.request(
@@ -104,7 +138,10 @@ export async function POST(request: NextRequest) {
     ).appSubscriptionCreate;
 
     if (payload.userErrors?.length) {
-      return NextResponse.json({ error: payload.userErrors.map((e) => e.message).join(", ") }, { status: 400 });
+      return NextResponse.json(
+        { error: payload.userErrors.map((e) => e.message).join(", ") },
+        { status: 400 },
+      );
     }
 
     if (payload.appSubscription) {
@@ -123,6 +160,7 @@ export async function POST(request: NextRequest) {
         data: {
           billingStatus: "PENDING_APPROVAL",
           shopifySubscriptionId: payload.appSubscription.id,
+          // Do not set planId until Shopify confirms ACTIVE via webhook / sync
         },
       });
     }
@@ -131,6 +169,7 @@ export async function POST(request: NextRequest) {
       ok: true,
       confirmationUrl: payload.confirmationUrl,
       subscriptionId: payload.appSubscription?.id,
+      billingTestMode: test,
     });
   } catch (err) {
     return NextResponse.json(

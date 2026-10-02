@@ -1,19 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import {
-  Badge,
-  Banner,
-  BlockStack,
-  Button,
-  Card,
-  InlineGrid,
-  InlineStack,
-  Layout,
-  Page,
-  ProgressBar,
-  Text,
-} from "@shopify/polaris";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Badge, Banner, Button, Layout, Page, Text } from "@shopify/polaris";
 import { getSessionToken, clearSessionTokenCache } from "@/lib/session-token";
 import { gqlRequest } from "@/lib/graphql";
 
@@ -31,6 +20,8 @@ type Plan = {
 type BillingPayload = {
   current: Plan | null;
   billingStatus: string;
+  needsPlanSelection?: boolean;
+  billingTestMode?: boolean;
   charges: { id: string; status: string; amountCents: number }[];
   plans: Plan[];
   error?: string;
@@ -38,7 +29,7 @@ type BillingPayload = {
 
 type UsageMeter = { metric: string; used: number; limit: number };
 
-async function billingFetch(init?: RequestInit): Promise<Response> {
+async function billingFetch(init?: RequestInit & { sync?: boolean }): Promise<Response> {
   async function once(): Promise<Response> {
     const token = await getSessionToken();
     const headers: Record<string, string> = {
@@ -48,7 +39,9 @@ async function billingFetch(init?: RequestInit): Promise<Response> {
     if (token) headers.Authorization = `Bearer ${token}`;
     const shop = new URLSearchParams(window.location.search).get("shop");
     if (shop) headers["x-aftersale-shop"] = shop;
-    return fetch("/api/billing", { ...init, headers });
+    const qs = init?.sync ? "?sync=1" : "";
+    const { sync: _s, ...rest } = init ?? {};
+    return fetch(`/api/billing${qs}`, { ...rest, headers });
   }
 
   let res = await once();
@@ -60,20 +53,32 @@ async function billingFetch(init?: RequestInit): Promise<Response> {
 }
 
 export function PlansPage() {
+  const router = useRouter();
+  const search = useSearchParams();
+  const welcome = search.get("welcome") === "1";
+  const billingReturn = search.get("billing") === "return";
+
   const [data, setData] = useState<BillingPayload | null>(null);
   const [usage, setUsage] = useState<UsageMeter[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busySlug, setBusySlug] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { sync?: boolean }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await billingFetch();
+      const res = await billingFetch({ sync: opts?.sync || billingReturn });
       const json = (await res.json()) as BillingPayload;
       if (!res.ok) throw new Error(json.error ?? "Failed to load billing");
       setData(json);
+
+      if (billingReturn && (json.current?.slug || json.billingStatus === "ACTIVE")) {
+        const shop = new URLSearchParams(window.location.search).get("shop");
+        router.replace(shop ? `/?shop=${encodeURIComponent(shop)}` : "/");
+        return;
+      }
+
       try {
         const home = await gqlRequest<{ home: { shop: { usage: UsageMeter[] } } }>(
           `#graphql
@@ -91,11 +96,29 @@ export function PlansPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [billingReturn, router]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void load({ sync: billingReturn });
+  }, [load, billingReturn]);
+
+  // Poll briefly after returning from Shopify charge approval.
+  useEffect(() => {
+    if (!billingReturn || data?.current?.slug) return;
+    const id = window.setInterval(() => {
+      void load({ sync: true });
+    }, 2500);
+    const stop = window.setTimeout(() => window.clearInterval(id), 20000);
+    return () => {
+      window.clearInterval(id);
+      window.clearTimeout(stop);
+    };
+  }, [billingReturn, data?.current?.slug, load]);
+
+  const featuredSlug = useMemo(() => {
+    const growth = data?.plans.find((p) => p.slug === "growth");
+    return growth?.slug ?? data?.plans.find((p) => !p.isFree)?.slug ?? null;
+  }, [data?.plans]);
 
   async function selectPlan(planSlug: string) {
     setBusySlug(planSlug);
@@ -116,6 +139,10 @@ export function PlansPage() {
         return;
       }
       await load();
+      if (welcome) {
+        const shop = new URLSearchParams(window.location.search).get("shop");
+        router.replace(shop ? `/?shop=${encodeURIComponent(shop)}` : "/");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Billing error");
     } finally {
@@ -123,10 +150,17 @@ export function PlansPage() {
     }
   }
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <Page title="Plans & Usage">
-        <Text as="p">Loading plans…</Text>
+        <div className="as-m-skeleton">
+          <div className="as-m-skel as-m-skel-hero" />
+          <div className="as-m-skel-row">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="as-m-skel as-m-skel-kpi" style={{ height: 220 }} />
+            ))}
+          </div>
+        </div>
       </Page>
     );
   }
@@ -136,38 +170,78 @@ export function PlansPage() {
       <Page title="Plans & Usage">
         <Banner tone="critical" title="Could not load plans">
           <p>{error}</p>
-          <p>Open with ?shop=your-store.myshopify.com after OAuth.</p>
         </Banner>
       </Page>
     );
   }
 
   const current = data?.current ?? null;
+  const forcePick = welcome || data?.needsPlanSelection;
 
   return (
     <Page
-      title="Plans & Usage"
-      subtitle={current ? `Current: ${current.name}` : "No plan assigned"}
+      title={forcePick ? "Choose your plan" : "Plans & Usage"}
+      subtitle={
+        forcePick
+          ? "Pick a plan to unlock the dashboard. You can change later."
+          : current
+            ? `Current: ${current.name}`
+            : "No plan assigned"
+      }
       titleMetadata={
         data?.billingStatus ? <Badge tone="info">{data.billingStatus}</Badge> : undefined
       }
     >
-      <Layout>
-        {error ? (
-          <Layout.Section>
-            <Banner tone="critical" title="Billing error" onDismiss={() => setError(null)}>
-              <p>{error}</p>
-            </Banner>
-          </Layout.Section>
-        ) : null}
+      <div className={forcePick ? "as-m-welcome" : undefined}>
+        <Layout>
+          {forcePick ? (
+            <Layout.Section>
+              <div className="as-m-hero">
+                <div className="as-m-hero-grid" aria-hidden />
+                <div className="as-m-hero-kicker">
+                  <span className="as-m-hero-dot" />
+                  Welcome to AfterSale OS
+                </div>
+                <h2>Start with the plan that fits your volume</h2>
+                <p>
+                  Free works for getting started. Upgrade anytime for repairs, replacements, and
+                  deeper automation. Customer claims are never blocked by limits.
+                </p>
+              </div>
+            </Layout.Section>
+          ) : null}
 
-        {current ? (
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Usage this month
-                </Text>
+          {billingReturn && !current ? (
+            <Layout.Section>
+              <Banner tone="info" title="Confirming your subscription…">
+                <p>Shopify approved the charge — we are syncing your plan now.</p>
+              </Banner>
+            </Layout.Section>
+          ) : null}
+
+          {error ? (
+            <Layout.Section>
+              <Banner tone="critical" title="Billing error" onDismiss={() => setError(null)}>
+                <p>{error}</p>
+              </Banner>
+            </Layout.Section>
+          ) : null}
+
+          {data?.billingTestMode ? (
+            <Layout.Section>
+              <Banner tone="warning" title="Shopify billing test mode is on">
+                <p>Subscriptions are created as test charges for App Review / sandbox.</p>
+              </Banner>
+            </Layout.Section>
+          ) : null}
+
+          {current && !forcePick ? (
+            <Layout.Section>
+              <div className="as-m-panel">
+                <div className="as-m-panel-title">
+                  <h3>Usage this month</h3>
+                  <Badge tone="success">{current.name}</Badge>
+                </div>
                 <Meter
                   label="Warranties"
                   used={usage.find((u) => u.metric === "warranties_created")?.used ?? 0}
@@ -183,53 +257,68 @@ export function PlansPage() {
                   used={usage.find((u) => u.metric === "ai_credits")?.used ?? 0}
                   limit={current.aiCreditsPerMonth}
                 />
-                <Text as="p" tone="subdued">
-                  Customer claim and registration submissions are never blocked by plan limits.
-                </Text>
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-        ) : null}
+              </div>
+            </Layout.Section>
+          ) : null}
 
-        <Layout.Section>
-          <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="400">
-            {(data?.plans ?? []).map((plan) => {
-              const isCurrent = current?.slug === plan.slug;
-              const price =
-                plan.priceMonthlyCents === 0
-                  ? "Free"
-                  : `$${(plan.priceMonthlyCents / 100).toFixed(0)}/mo`;
-              return (
-                <Card key={plan.id}>
-                  <BlockStack gap="300">
-                    <InlineStack align="space-between" blockAlign="center">
-                      <Text as="h3" variant="headingMd">
-                        {plan.name}
-                      </Text>
+          <Layout.Section>
+            <div className="as-m-plan-grid">
+              {(data?.plans ?? []).map((plan, index) => {
+                const isCurrent = current?.slug === plan.slug;
+                const featured = plan.slug === featuredSlug;
+                const price =
+                  plan.priceMonthlyCents === 0
+                    ? "Free"
+                    : `$${(plan.priceMonthlyCents / 100).toFixed(0)}`;
+                return (
+                  <div
+                    key={plan.id}
+                    className="as-m-plan"
+                    data-featured={featured ? "true" : "false"}
+                    style={{ animationDelay: `${index * 0.07}s` }}
+                  >
+                    {featured ? <span className="as-m-plan-badge">Popular</span> : null}
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                      <h3 className="as-m-plan-name">{plan.name}</h3>
                       {isCurrent ? <Badge tone="success">Current</Badge> : null}
-                    </InlineStack>
-                    <Text as="p" variant="headingLg" fontWeight="bold">
+                    </div>
+                    <div className="as-m-plan-price">
                       {price}
-                    </Text>
+                      {plan.priceMonthlyCents > 0 ? <span> /mo</span> : null}
+                    </div>
                     <Text as="p" tone="subdued">
-                      {plan.warrantiesPerMonth} warranties · {plan.claimsPerMonth} claims ·{" "}
-                      {plan.aiCreditsPerMonth} AI credits
+                      Built for {plan.warrantiesPerMonth.toLocaleString()} warranties / month
                     </Text>
+                    <ul className="as-m-plan-features">
+                      <li>{plan.warrantiesPerMonth.toLocaleString()} warranties / mo</li>
+                      <li>{plan.claimsPerMonth.toLocaleString()} claims / mo</li>
+                      <li>{plan.aiCreditsPerMonth.toLocaleString()} AI credits / mo</li>
+                      <li>{plan.isFree ? "Core aftercare toolkit" : "Repairs & replacements"}</li>
+                    </ul>
                     <Button
+                      fullWidth
                       variant={isCurrent ? "secondary" : "primary"}
                       disabled={isCurrent || busySlug !== null}
                       loading={busySlug === plan.slug}
                       onClick={() => void selectPlan(plan.slug)}
                     >
-                      {isCurrent ? "Selected" : plan.isFree ? "Downgrade to Free" : "Select plan"}
+                      {isCurrent
+                        ? "Selected"
+                        : plan.isFree
+                          ? forcePick
+                            ? "Start on Free"
+                            : "Downgrade to Free"
+                          : forcePick
+                            ? "Continue with this plan"
+                            : "Select plan"}
                     </Button>
-                  </BlockStack>
-                </Card>
-              );
-            })}
-          </InlineGrid>
-        </Layout.Section>
-      </Layout>
+                  </div>
+                );
+              })}
+            </div>
+          </Layout.Section>
+        </Layout>
+      </div>
     </Page>
   );
 }
@@ -237,14 +326,20 @@ export function PlansPage() {
 function Meter({ label, used, limit }: { label: string; used: number; limit: number }) {
   const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
   return (
-    <BlockStack gap="100">
-      <InlineStack align="space-between">
-        <Text as="span">{label}</Text>
-        <Text as="span" tone="subdued">
+    <div className="as-m-meter">
+      <div className="as-m-meter-head">
+        <span>{label}</span>
+        <span>
           {used} / {limit}
-        </Text>
-      </InlineStack>
-      <ProgressBar progress={pct} size="small" tone={pct >= 90 ? "critical" : "primary"} />
-    </BlockStack>
+        </span>
+      </div>
+      <div className="as-m-meter-track">
+        <div
+          className="as-m-meter-fill"
+          data-critical={pct >= 90 ? "true" : "false"}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
   );
 }

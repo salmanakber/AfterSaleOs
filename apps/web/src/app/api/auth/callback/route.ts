@@ -84,11 +84,15 @@ export async function GET(request: NextRequest) {
     console.warn("Shop bootstrap GraphQL failed", err);
   }
 
+  const fresh = await prisma.shop.findUniqueOrThrow({ where: { id: shopRow.id } });
   const host = url.searchParams.get("host");
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";
-  const redirectTo = host
-    ? `${appUrl}/?shop=${shopDomain}&host=${encodeURIComponent(host)}`
-    : `${appUrl}/?shop=${shopDomain}`;
+  const needsPlan = !fresh.planId && !fresh.billingBypass;
+  const path = needsPlan ? "/plans" : "/";
+  const qs = new URLSearchParams({ shop: shopDomain });
+  if (host) qs.set("host", host);
+  if (needsPlan) qs.set("welcome", "1");
+  const redirectTo = `${appUrl}${path}?${qs.toString()}`;
 
   const response = NextResponse.redirect(redirectTo);
   response.cookies.delete("shopify_oauth_state");

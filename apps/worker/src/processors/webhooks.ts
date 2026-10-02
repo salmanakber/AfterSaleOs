@@ -146,7 +146,11 @@ async function handleSubscriptionUpdate(shopId: string | undefined, payload: unk
   } else if (chargeStatus === "DECLINED" || chargeStatus === "CANCELLED") {
     await prisma.shop.update({
       where: { id: shopId },
-      data: { billingStatus: chargeStatus === "DECLINED" ? "DECLINED" : "CANCELLED" },
+      data: {
+        billingStatus: chargeStatus === "DECLINED" ? "DECLINED" : "CANCELLED",
+        planId: null,
+        shopifySubscriptionId: null,
+      },
     });
   }
 }

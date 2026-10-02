@@ -1,20 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Badge,
-  Banner,
-  BlockStack,
-  Card,
-  InlineGrid,
-  InlineStack,
-  Layout,
-  Link,
-  Page,
-  ProgressBar,
-  Text,
-} from "@shopify/polaris";
-import { theme } from "@aftersale/shared";
+import { Badge, Banner, Layout, Page, Text } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 
 type HomeData = {
@@ -23,6 +10,7 @@ type HomeData = {
       shopName: string | null;
       shopDomain: string;
       onboardingCompleted: boolean;
+      needsPlanSelection: boolean;
       plan: { name: string; slug: string; warrantiesPerMonth: number; claimsPerMonth: number } | null;
       usage: { metric: string; used: number; limit: number }[];
     };
@@ -45,6 +33,7 @@ const HOME_QUERY = `#graphql
         shopName
         shopDomain
         onboardingCompleted
+        needsPlanSelection
         plan { name slug warrantiesPerMonth claimsPerMonth }
         usage { metric used limit }
       }
@@ -76,7 +65,14 @@ export function HomeDashboard() {
   if (loading) {
     return (
       <Page title="AfterSale OS">
-        <Text as="p">Loading dashboard…</Text>
+        <div className="as-m-skeleton">
+          <div className="as-m-skel as-m-skel-hero" />
+          <div className="as-m-skel-row">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="as-m-skel as-m-skel-kpi" />
+            ))}
+          </div>
+        </div>
       </Page>
     );
   }
@@ -86,7 +82,6 @@ export function HomeDashboard() {
       <Page title="AfterSale OS">
         <Banner tone="critical" title="Could not load dashboard">
           <p>{error ?? "Unknown error"}</p>
-          <p>If you are not embedded yet, open with ?shop=your-store.myshopify.com after OAuth.</p>
         </Banner>
       </Page>
     );
@@ -94,116 +89,205 @@ export function HomeDashboard() {
 
   const warrantyUsage = data.shop.usage.find((u) => u.metric === "warranties_created");
   const claimUsage = data.shop.usage.find((u) => u.metric === "claims_created");
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const shopLabel = data.shop.shopName ?? data.shop.shopDomain;
 
   return (
     <Page
-      title={data.shop.shopName ?? "AfterSale OS"}
-      subtitle={data.shop.shopDomain}
+      title={shopLabel}
+      subtitle="AfterSale OS command center"
       titleMetadata={
-        data.shop.plan ? <Badge tone="info">{data.shop.plan.name}</Badge> : undefined
+        data.shop.plan ? (
+          <Badge tone="info">{data.shop.plan.name}</Badge>
+        ) : (
+          <Badge>Choose a plan</Badge>
+        )
       }
       secondaryActions={[
         { content: "Claims", url: "/claims" },
         { content: "Warranties", url: "/warranties" },
-        { content: "Products & Rules", url: "/products-rules" },
-        { content: "Plans & Usage", url: "/plans" },
+        { content: "Customer pages", url: "/settings" },
+        { content: "Plans", url: "/plans" },
       ]}
     >
       <Layout>
+        <Layout.Section>
+          <div className="as-m-hero">
+            <div className="as-m-hero-grid" aria-hidden />
+            <div className="as-m-hero-kicker">
+              <span className="as-m-hero-dot" />
+              Live operations
+            </div>
+            <h2>
+              {greeting}
+              {data.shop.shopName ? `, ${data.shop.shopName}` : ""}
+            </h2>
+            <p>
+              Warranties, claims, and resolutions in one premium workspace. Customer submissions are
+              never blocked by plan limits — you stay in control of capacity and SLA.
+            </p>
+            <div className="as-m-hero-actions">
+              <a className="as-m-chip as-m-chip-accent" href="/claims/new">
+                New claim
+              </a>
+              <a className="as-m-chip" href="/warranties">
+                Warranties
+              </a>
+              <a className="as-m-chip" href="/settings">
+                Brand customer pages
+              </a>
+              <a className="as-m-chip" href="/plans">
+                {data.shop.plan ? data.shop.plan.name : "Choose plan"}
+              </a>
+            </div>
+          </div>
+        </Layout.Section>
+
         {data.setupChecklist.length > 0 ? (
           <Layout.Section>
-            <Banner title="Setup checklist" tone="info">
-              <BlockStack gap="200">
-                {data.setupChecklist.map((item) => (
-                  <Text as="p" key={item.id}>
-                    {item.href ? <Link url={item.href}>{item.title}</Link> : item.title}
-                  </Text>
+            <div className="as-m-panel" style={{ animationDelay: "0.05s" }}>
+              <div className="as-m-panel-title">
+                <h3>Finish setup</h3>
+                <Badge tone="attention">{`${data.setupChecklist.length} left`}</Badge>
+              </div>
+              <div className="as-m-list">
+                {data.setupChecklist.map((item, i) => (
+                  <a
+                    key={item.id}
+                    className="as-m-list-item"
+                    href={item.href ?? "#"}
+                    style={{ animationDelay: `${0.08 + i * 0.04}s` }}
+                  >
+                    <span className="as-m-list-icon">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="as-m-list-body">
+                      <strong>{item.title}</strong>
+                      <span>Recommended to go live cleanly</span>
+                    </span>
+                  </a>
                 ))}
-              </BlockStack>
-            </Banner>
+              </div>
+            </div>
           </Layout.Section>
         ) : null}
 
         <Layout.Section>
-          <InlineGrid columns={{ xs: 1, sm: 2, md: 3, lg: 5 }} gap="400">
-            <KpiCard label="Open claims" value={String(data.kpis.openClaims)} />
-            <KpiCard label="Awaiting action" value={String(data.kpis.awaitingAction)} />
-            <KpiCard label="Active warranties" value={String(data.kpis.activeWarranties)} />
-            <KpiCard label="Expiring this month" value={String(data.kpis.expiringThisMonth)} accent />
-            <KpiCard label="Claim rate (30d)" value={`${data.kpis.claimRate30d.toFixed(1)}%`} />
-          </InlineGrid>
+          <div className="as-m-kpi-grid">
+            <Kpi label="Open claims" value={data.kpis.openClaims} hint="In workflow" />
+            <Kpi label="Awaiting action" value={data.kpis.awaitingAction} hint="Needs your team" />
+            <Kpi label="Active warranties" value={data.kpis.activeWarranties} hint="Coverage live" />
+            <Kpi
+              label="Expiring soon"
+              value={data.kpis.expiringThisMonth}
+              accent
+              hint="This month"
+            />
+            <Kpi
+              label="Claim rate 30d"
+              value={`${data.kpis.claimRate30d.toFixed(1)}%`}
+              hint="Rolling window"
+            />
+          </div>
         </Layout.Section>
 
         <Layout.Section variant="oneHalf">
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Needs attention
-              </Text>
-              {data.needsAttention.length === 0 ? (
-                <Text as="p" tone="subdued">
-                  Nothing waiting right now. You are caught up.
-                </Text>
-              ) : (
-                data.needsAttention.map((item) => (
-                  <Text as="p" key={item.id}>
-                    {item.href ? <Link url={item.href}>{item.title}</Link> : item.title}
-                  </Text>
-                ))
-              )}
-            </BlockStack>
-          </Card>
+          <div className="as-m-panel" style={{ animationDelay: "0.12s" }}>
+            <div className="as-m-panel-title">
+              <h3>Needs attention</h3>
+              <Badge>{String(data.needsAttention.length)}</Badge>
+            </div>
+            {data.needsAttention.length === 0 ? (
+              <div className="as-m-empty">Nothing waiting. You are caught up.</div>
+            ) : (
+              <div className="as-m-list">
+                {data.needsAttention.map((item) => (
+                  <a key={item.id} className="as-m-list-item" href={item.href ?? "#"}>
+                    <span className="as-m-list-icon" data-tone="warn">
+                      !
+                    </span>
+                    <span className="as-m-list-body">
+                      <strong>{item.title}</strong>
+                      <span>Open item</span>
+                    </span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         </Layout.Section>
 
         <Layout.Section variant="oneHalf">
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
-                Plan usage
-              </Text>
-              {warrantyUsage ? (
-                <Meter label="Warranties this month" used={warrantyUsage.used} limit={warrantyUsage.limit} />
-              ) : null}
-              {claimUsage ? (
-                <Meter label="Claims this month" used={claimUsage.used} limit={claimUsage.limit} />
-              ) : null}
+          <div className="as-m-panel" style={{ animationDelay: "0.16s" }}>
+            <div className="as-m-panel-title">
+              <h3>Plan usage</h3>
+              <a className="as-m-chip" href="/plans" style={{ color: "inherit", background: "#eef2ff" }}>
+                Manage
+              </a>
+            </div>
+            {warrantyUsage ? (
+              <Meter label="Warranties this month" used={warrantyUsage.used} limit={warrantyUsage.limit} />
+            ) : (
               <Text as="p" tone="subdued">
-                Customer claim and registration submissions are never blocked by plan limits.
+                No warranty usage yet this period.
               </Text>
-            </BlockStack>
-          </Card>
+            )}
+            {claimUsage ? (
+              <Meter label="Claims this month" used={claimUsage.used} limit={claimUsage.limit} />
+            ) : null}
+            <div className="as-m-hero-actions" style={{ marginTop: 8 }}>
+              <a className="as-m-chip" href="/settings" style={{ color: "inherit", background: "#f8fafc" }}>
+                Customize customer pages
+              </a>
+              <a className="as-m-chip" href="/automations" style={{ color: "inherit", background: "#f8fafc" }}>
+                Automations
+              </a>
+            </div>
+          </div>
         </Layout.Section>
       </Layout>
     </Page>
   );
 }
 
-function KpiCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Kpi({
+  label,
+  value,
+  accent,
+  hint,
+}: {
+  label: string;
+  value: string | number;
+  accent?: boolean;
+  hint?: string;
+}) {
   return (
-    <Card>
-      <BlockStack gap="100">
-        <Text as="p" tone="subdued" variant="bodySm">
-          {label}
-        </Text>
-        <Text as="p" variant="headingLg" fontWeight="bold">
-          <span style={accent ? { color: theme.status.expiring } : undefined}>{value}</span>
-        </Text>
-      </BlockStack>
-    </Card>
+    <div className="as-m-kpi">
+      <div className="as-m-kpi-label">{label}</div>
+      <div className="as-m-kpi-value" data-accent={accent ? "true" : "false"}>
+        {value}
+      </div>
+      {hint ? <div className="as-m-kpi-hint">{hint}</div> : null}
+    </div>
   );
 }
 
 function Meter({ label, used, limit }: { label: string; used: number; limit: number }) {
   const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
   return (
-    <BlockStack gap="150">
-      <InlineStack align="space-between">
-        <Text as="span">{label}</Text>
-        <Text as="span" tone="subdued">
+    <div className="as-m-meter">
+      <div className="as-m-meter-head">
+        <span>{label}</span>
+        <span>
           {used} / {limit}
-        </Text>
-      </InlineStack>
-      <ProgressBar progress={pct} size="small" tone={pct >= 90 ? "critical" : "primary"} />
-    </BlockStack>
+        </span>
+      </div>
+      <div className="as-m-meter-track">
+        <div
+          className="as-m-meter-fill"
+          data-critical={pct >= 90 ? "true" : "false"}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
   );
 }

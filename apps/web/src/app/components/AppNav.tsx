@@ -16,6 +16,7 @@ export function AppNav() {
       <a href="/registrations">Registrations</a>
       <a href="/products-rules">Products &amp; Rules</a>
       <a href="/automations">Automations</a>
+      <a href="/settings">Customer pages</a>
       <a href="/plans">Plans &amp; Usage</a>
     </NavMenu>
   );

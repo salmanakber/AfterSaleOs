@@ -5,10 +5,18 @@ export const shopRepository = {
     return prisma.shop.findUnique({ where: { shopDomain } });
   },
 
-  async ensureShop(shopDomain: string, data?: { shopName?: string; email?: string; timezone?: string; currency?: string }) {
+  async ensureShop(
+    shopDomain: string,
+    data?: { shopName?: string; email?: string; timezone?: string; currency?: string },
+  ) {
     const existing = await prisma.shop.findUnique({ where: { shopDomain } });
     if (existing) {
       if (existing.status === "UNINSTALLED") {
+        // Re-install: never restore prior subscription/plan — merchant must pick again.
+        await prisma.billingCharge.updateMany({
+          where: { shopId: existing.id, status: { in: ["PENDING", "ACTIVE"] } },
+          data: { status: "CANCELLED" },
+        });
         return prisma.shop.update({
           where: { id: existing.id },
           data: {
@@ -19,13 +27,17 @@ export const shopRepository = {
             email: data?.email ?? existing.email,
             timezone: data?.timezone ?? existing.timezone,
             currency: data?.currency ?? existing.currency,
+            planId: null,
+            shopifySubscriptionId: null,
+            billingStatus: "CANCELLED",
+            onboardingCompleted: false,
           },
         });
       }
       return existing;
     }
 
-    const freePlan = await prisma.plan.findUnique({ where: { slug: "free" } });
+    // First install: no plan until merchant explicitly chooses one.
     return prisma.shop.create({
       data: {
         shopDomain,
@@ -33,7 +45,8 @@ export const shopRepository = {
         email: data?.email,
         timezone: data?.timezone ?? "UTC",
         currency: data?.currency ?? "USD",
-        planId: freePlan?.id,
+        planId: null,
+        billingStatus: "CANCELLED",
         status: "ACTIVE",
       },
     });
@@ -42,9 +55,19 @@ export const shopRepository = {
   async markUninstalled(shopDomain: string) {
     const shop = await prisma.shop.findUnique({ where: { shopDomain } });
     if (!shop) return null;
+    await prisma.billingCharge.updateMany({
+      where: { shopId: shop.id, status: { in: ["PENDING", "ACTIVE"] } },
+      data: { status: "CANCELLED" },
+    });
     return prisma.shop.update({
       where: { id: shop.id },
-      data: { status: "UNINSTALLED", uninstalledAt: new Date() },
+      data: {
+        status: "UNINSTALLED",
+        uninstalledAt: new Date(),
+        planId: null,
+        shopifySubscriptionId: null,
+        billingStatus: "CANCELLED",
+      },
     });
   },
 };

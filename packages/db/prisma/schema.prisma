@@ -1193,3 +1193,13 @@ model ShopNote {
   @@index([shopId, createdAt])
   @@map("shop_notes")
 }
+
+// ─── Platform config (super-admin) ───────────────────────────────────────────
+
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}

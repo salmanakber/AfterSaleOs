@@ -49,8 +49,11 @@ const typeDefs = /* GraphQL */ `
     shopName: String
     status: String!
     onboardingCompleted: Boolean!
+    needsPlanSelection: Boolean!
     voidWarrantyOnRefund: Boolean!
     timezone: String!
+    brandingLogoUrl: String
+    brandingAccentColor: String
     plan: Plan
     usage: [UsageMeter!]!
   }
@@ -218,7 +221,12 @@ const typeDefs = /* GraphQL */ `
     voidWarranty(id: ID!, reason: String!): Warranty!
     extendWarranty(id: ID!, extraMonths: Int!, reason: String!): Warranty!
     startBackfill(lookbackMonths: Int!): JobStatus!
-    updateShopSettings(voidWarrantyOnRefund: Boolean, timezone: String): ShopSummary!
+    updateShopSettings(
+      voidWarrantyOnRefund: Boolean
+      timezone: String
+      brandingLogoUrl: String
+      brandingAccentColor: String
+    ): ShopSummary!
     approveRegistration(id: ID!): Registration!
     rejectRegistration(id: ID!, note: String): Registration!
   }
@@ -247,8 +255,11 @@ async function shopSummary(shopId: string) {
     shopName: shop.shopName,
     status: shop.status,
     onboardingCompleted: shop.onboardingCompleted,
+    needsPlanSelection: !shop.planId && !shop.billingBypass,
     voidWarrantyOnRefund: shop.voidWarrantyOnRefund,
     timezone: shop.timezone,
+    brandingLogoUrl: shop.brandingLogoUrl,
+    brandingAccentColor: shop.brandingAccentColor,
     plan: plan
       ? {
           id: plan.id,
@@ -806,7 +817,12 @@ const yoga = createYoga({
         },
         updateShopSettings: async (
           _: unknown,
-          args: { voidWarrantyOnRefund?: boolean; timezone?: string },
+          args: {
+            voidWarrantyOnRefund?: boolean;
+            timezone?: string;
+            brandingLogoUrl?: string | null;
+            brandingAccentColor?: string | null;
+          },
           ctx: { request: Request },
         ) => {
           const merchant = await resolveMerchantContext(ctx.request);
@@ -815,8 +831,17 @@ const yoga = createYoga({
             data: {
               voidWarrantyOnRefund: args.voidWarrantyOnRefund,
               timezone: args.timezone,
+              brandingLogoUrl: args.brandingLogoUrl === undefined ? undefined : args.brandingLogoUrl,
+              brandingAccentColor:
+                args.brandingAccentColor === undefined ? undefined : args.brandingAccentColor,
             },
           });
+          if (args.brandingLogoUrl !== undefined || args.brandingAccentColor !== undefined) {
+            await prisma.shop.update({
+              where: { id: merchant.shopId },
+              data: { onboardingCompleted: true },
+            });
+          }
           return shopSummary(merchant.shopId);
         },
         approveRegistration: async (
