@@ -66,7 +66,7 @@ const DETAIL = `#graphql
       technician { id name email }
       completedAt updatedAt
     }
-    staffMembers { id name email }
+    staffMembers { id name email active }
   }
 `;
 
@@ -159,7 +159,7 @@ export function RepairsListPage() {
 export function RepairDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [repair, setRepair] = useState<Repair | null>(null);
-  const [staff, setStaff] = useState<{ id: string; name: string | null; email: string }[]>([]);
+  const [staff, setStaff] = useState<{ id: string; name: string | null; email: string; active?: boolean }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -263,7 +263,9 @@ export function RepairDetailPage() {
                 label="Technician"
                 options={[
                   { label: "Unassigned", value: "" },
-                  ...staff.map((s) => ({
+                  ...staff
+                    .filter((s) => s.active !== false)
+                    .map((s) => ({
                     label: s.name ? `${s.name} (${s.email})` : s.email,
                     value: s.id,
                   })),

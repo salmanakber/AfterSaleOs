@@ -215,7 +215,14 @@ function mapRepair(
     completedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
-    technician: { id: string; name: string | null; email: string } | null;
+    technician: {
+      id: string;
+      name: string | null;
+      email: string;
+      role: string;
+      active: boolean;
+      createdAt: Date;
+    } | null;
     claim?: { claimNumber: string } | null;
   },
 ) {
@@ -232,7 +239,14 @@ function mapRepair(
     shippingIn: r.shippingIn,
     shippingOut: r.shippingOut,
     technician: r.technician
-      ? { id: r.technician.id, name: r.technician.name, email: r.technician.email }
+      ? {
+          id: r.technician.id,
+          name: r.technician.name,
+          email: r.technician.email,
+          role: r.technician.role,
+          active: r.technician.active,
+          createdAt: r.technician.createdAt.toISOString(),
+        }
       : null,
     completedAt: r.completedAt?.toISOString() ?? null,
     createdAt: r.createdAt.toISOString(),

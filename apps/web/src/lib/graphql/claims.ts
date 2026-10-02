@@ -36,6 +36,9 @@ export const claimsTypeDefs = /* GraphQL */ `
     id: ID!
     name: String
     email: String!
+    role: String!
+    active: Boolean!
+    createdAt: String!
   }
 
   type ClaimItem {
@@ -141,7 +144,14 @@ export async function mapClaim(claimId: string, shopId: string, shopDomain: stri
     serialNumber: c.warrantyUnit?.serialNumber ?? null,
     certificateToken: c.warranty?.certificateToken ?? null,
     assignee: c.assignee
-      ? { id: c.assignee.id, name: c.assignee.name, email: c.assignee.email }
+      ? {
+          id: c.assignee.id,
+          name: c.assignee.name,
+          email: c.assignee.email,
+          role: c.assignee.role,
+          active: c.assignee.active,
+          createdAt: c.assignee.createdAt.toISOString(),
+        }
       : null,
     workflowStatusKey: c.workflowStatusKey,
     slaDueAt: c.slaDueAt?.toISOString() ?? null,
@@ -234,10 +244,17 @@ export const claimsResolvers = {
     staffMembers: async (_: unknown, __: unknown, ctx: { request: Request }) => {
       const merchant = await resolveMerchantContext(ctx.request);
       const staff = await prisma.staffMember.findMany({
-        where: { shopId: merchant.shopId, active: true },
-        orderBy: { email: "asc" },
+        where: { shopId: merchant.shopId },
+        orderBy: [{ active: "desc" }, { email: "asc" }],
       });
-      return staff.map((s) => ({ id: s.id, name: s.name, email: s.email }));
+      return staff.map((s) => ({
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        role: s.role,
+        active: s.active,
+        createdAt: s.createdAt.toISOString(),
+      }));
     },
   },
   Mutation: {

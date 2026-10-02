@@ -56,7 +56,7 @@ const DETAIL = `#graphql
       notes { id body isInternal authorType createdAt }
       attachments { id fileName downloadUrl scanStatus }
     }
-    staffMembers { id name email }
+    staffMembers { id name email active }
     claimWorkflow { statuses { key label } }
     suppliers { id name }
   }
@@ -65,7 +65,7 @@ const DETAIL = `#graphql
 export function ClaimDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [claim, setClaim] = useState<ClaimDetail | null>(null);
-  const [staff, setStaff] = useState<{ id: string; name: string | null; email: string }[]>([]);
+  const [staff, setStaff] = useState<{ id: string; name: string | null; email: string; active?: boolean }[]>([]);
   const [workflowStatuses, setWorkflowStatuses] = useState<WorkflowStatus[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -456,7 +456,9 @@ export function ClaimDetailPage() {
                   label="Assignee"
                   options={[
                     { label: "Unassigned", value: "" },
-                    ...staff.map((s) => ({
+                    ...staff
+                      .filter((s) => s.active !== false)
+                      .map((s) => ({
                       label: s.name ? `${s.name} (${s.email})` : s.email,
                       value: s.id,
                     })),

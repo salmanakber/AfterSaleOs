@@ -6,7 +6,6 @@ import {
   listNotificationTemplates,
   listQrLinks,
   listSerialLists,
-  listStaffMembers,
   qrPublicUrl,
   setQrLinkActive,
   shopPlanFeatures,
@@ -26,15 +25,6 @@ export const merchantOpsTypeDefs = /* GraphQL */ `
     targetId: String
     label: String
     scanCount: Int!
-    active: Boolean!
-    createdAt: String!
-  }
-
-  type StaffMemberItem {
-    id: ID!
-    email: String!
-    name: String
-    role: String!
     active: Boolean!
     createdAt: String!
   }
@@ -63,7 +53,6 @@ export const merchantOpsTypeDefs = /* GraphQL */ `
 
   extend type Query {
     qrLinks: [QrLinkItem!]!
-    staffMembers: [StaffMemberItem!]!
     staffQuota: StaffQuota!
     serialLists: [SerialListItem!]!
     notificationTemplates: [NotificationTemplateItem!]!
@@ -78,7 +67,7 @@ export const merchantOpsTypeDefs = /* GraphQL */ `
       name: String
       role: String
       active: Boolean
-    ): StaffMemberItem!
+    ): ClaimStaff!
     createSerialList(name: String!, ruleId: ID): SerialListItem!
     addSerialNumbers(serialListId: ID!, serials: [String!]!): AddSerialsResult!
     linkSerialListToRule(serialListId: ID!, ruleId: ID): SerialListItem!
@@ -104,18 +93,6 @@ export const merchantOpsResolvers = {
       return rows.map((r) => ({
         ...r,
         url: qrPublicUrl(r.code),
-        createdAt: r.createdAt.toISOString(),
-      }));
-    },
-    staffMembers: async (_: unknown, __: unknown, ctx: { request: Request }) => {
-      const m = await merchant(ctx);
-      const rows = await listStaffMembers(m.shopId);
-      return rows.map((r) => ({
-        id: r.id,
-        email: r.email,
-        name: r.name,
-        role: r.role,
-        active: r.active,
         createdAt: r.createdAt.toISOString(),
       }));
     },
