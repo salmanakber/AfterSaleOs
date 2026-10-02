@@ -1,19 +1,11 @@
-import { clearSessionTokenCache, getSessionToken } from "./session-token";
+import { clearSessionTokenCache, merchantAuthHeaders } from "./session-token";
 
 export async function gqlRequest<T>(
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<T> {
   async function once(): Promise<Response> {
-    const token = await getSessionToken();
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const params = new URLSearchParams(window.location.search);
-    const shop = params.get("shop");
-    if (shop) headers["x-aftersale-shop"] = shop;
-
+    const headers = await merchantAuthHeaders();
     return fetch("/api/graphql", {
       method: "POST",
       headers,
@@ -29,7 +21,17 @@ export async function gqlRequest<T>(
 
   const json = await res.json();
   if (json.errors?.length) {
-    throw new Error(json.errors[0].message ?? "GraphQL error");
+    const msg = String(json.errors[0].message ?? "GraphQL error");
+    if (msg.includes("UNAUTHORIZED") || msg.includes("SESSION_TOKEN")) {
+      clearSessionTokenCache();
+      const retry = await once();
+      const retryJson = await retry.json();
+      if (retryJson.errors?.length) {
+        throw new Error(retryJson.errors[0].message ?? "GraphQL error");
+      }
+      return retryJson.data as T;
+    }
+    throw new Error(msg);
   }
   return json.data as T;
 }

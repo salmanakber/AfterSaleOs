@@ -4,7 +4,8 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AppProvider, Banner, Frame, Spinner } from "@shopify/polaris";
 import enTranslations from "@shopify/polaris/locales/en.json";
-import { getSessionToken, clearSessionTokenCache } from "@/lib/session-token";
+import { getSessionToken, clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
+import { rememberShopParams, getRememberedShop, appHref } from "@/lib/shop-context";
 import { AppNav } from "./components/AppNav";
 
 declare global {
@@ -20,12 +21,14 @@ type MerchantAuth = {
   shop: string | null;
   getSessionToken: () => Promise<string | null>;
   clearSessionTokenCache: () => void;
+  appHref: (path: string) => string;
 };
 
 const MerchantAuthContext = createContext<MerchantAuth>({
   shop: null,
   getSessionToken: async () => null,
   clearSessionTokenCache: () => undefined,
+  appHref: (p) => p,
 });
 
 export function useMerchantAuth() {
@@ -41,7 +44,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const shopParam = params.get("shop");
+    const shopParam = params.get("shop") ?? getRememberedShop();
+    const hostParam = params.get("host");
+    if (shopParam) rememberShopParams(shopParam, hostParam);
     setShop(shopParam);
 
     async function bootstrap() {
@@ -57,16 +62,11 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           window.open(`/api/auth?shop=${encodeURIComponent(shopParam)}`, "_top");
           return;
         }
-        if (typeof window.shopify?.idToken === "function") {
-          await getSessionToken();
-        }
 
-        // First install / re-install: force plan selection before dashboard.
-        // After Shopify billing approval (?billing=return), land on plans then home once active.
-        const token = await getSessionToken();
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (token) headers.Authorization = `Bearer ${token}`;
-        headers["x-aftersale-shop"] = shopParam;
+        // Ensure App Bridge token is warm before first GraphQL calls.
+        await getSessionToken();
+
+        const headers = await merchantAuthHeaders();
         const billingReturn = params.get("billing") === "return";
         const billingUrl = billingReturn ? "/api/billing?sync=1" : "/api/billing";
         const billingRes = await fetch(billingUrl, { headers });
@@ -80,17 +80,17 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
           if (billingReturn) {
             if (billing.current?.slug || billing.billingStatus === "ACTIVE") {
-              router.replace(`/?shop=${encodeURIComponent(shopParam)}`);
+              router.replace(appHref("/"));
               setReady(true);
               return;
             }
-            router.replace(`/plans?welcome=1&shop=${encodeURIComponent(shopParam)}&billing=return`);
+            router.replace(appHref("/plans?welcome=1&billing=return"));
             setReady(true);
             return;
           }
 
           if (billing.needsPlanSelection && !onPlans) {
-            router.replace(`/plans?welcome=1&shop=${encodeURIComponent(shopParam)}`);
+            router.replace(appHref("/plans?welcome=1"));
             setReady(true);
             return;
           }
@@ -106,25 +106,16 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     void bootstrap();
   }, [pathname, router]);
 
-  const value = useMemo(() => ({ shop, getSessionToken, clearSessionTokenCache }), [shop]);
+  const value = useMemo(
+    () => ({ shop, getSessionToken, clearSessionTokenCache, appHref }),
+    [shop],
+  );
 
   if (!ready) {
     return (
       <AppProvider i18n={enTranslations}>
-        <div
-          style={{
-            display: "grid",
-            placeItems: "center",
-            minHeight: "100vh",
-            gap: 16,
-            background:
-              "radial-gradient(700px 320px at 20% 0%, rgba(99,102,241,.18), transparent 55%), #f4f6fb",
-          }}
-        >
+        <div className="as-m-boot">
           <Spinner accessibilityLabel="Loading AfterSale OS" size="large" />
-          <p style={{ margin: 0, color: "#64748b", fontWeight: 600, letterSpacing: "0.04em" }}>
-            Loading AfterSale OS…
-          </p>
         </div>
       </AppProvider>
     );
@@ -134,15 +125,19 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <AppProvider i18n={enTranslations}>
       <MerchantAuthContext.Provider value={value}>
         <Frame>
-          <AppNav />
-          {error ? (
-            <div style={{ padding: 16 }}>
-              <Banner tone="critical" title="Connection error">
-                <p>{error}</p>
-              </Banner>
+          <div className="as-m-shell">
+            <AppNav />
+            <div className="as-m-main">
+              {error ? (
+                <div style={{ padding: "12px 16px" }}>
+                  <Banner tone="critical" title="Connection error">
+                    <p>{error}</p>
+                  </Banner>
+                </div>
+              ) : null}
+              <div className="as-m-page">{children}</div>
             </div>
-          ) : null}
-          <div className="as-m-page">{children}</div>
+          </div>
         </Frame>
       </MerchantAuthContext.Provider>
     </AppProvider>

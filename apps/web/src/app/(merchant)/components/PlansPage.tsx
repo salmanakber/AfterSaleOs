@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Banner, Button, Layout, Page, Text } from "@shopify/polaris";
-import { getSessionToken, clearSessionTokenCache } from "@/lib/session-token";
+import { clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
+import { appHref } from "@/lib/shop-context";
 import { gqlRequest } from "@/lib/graphql";
 
 type Plan = {
@@ -31,14 +32,7 @@ type UsageMeter = { metric: string; used: number; limit: number };
 
 async function billingFetch(init?: RequestInit & { sync?: boolean }): Promise<Response> {
   async function once(): Promise<Response> {
-    const token = await getSessionToken();
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(init?.headers as Record<string, string> | undefined),
-    };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const shop = new URLSearchParams(window.location.search).get("shop");
-    if (shop) headers["x-aftersale-shop"] = shop;
+    const headers = await merchantAuthHeaders(init?.headers as Record<string, string> | undefined);
     const qs = init?.sync ? "?sync=1" : "";
     const { sync: _s, ...rest } = init ?? {};
     return fetch(`/api/billing${qs}`, { ...rest, headers });
@@ -74,8 +68,7 @@ export function PlansPage() {
       setData(json);
 
       if (billingReturn && (json.current?.slug || json.billingStatus === "ACTIVE")) {
-        const shop = new URLSearchParams(window.location.search).get("shop");
-        router.replace(shop ? `/?shop=${encodeURIComponent(shop)}` : "/");
+        router.replace(appHref("/"));
         return;
       }
 
@@ -140,8 +133,7 @@ export function PlansPage() {
       }
       await load();
       if (welcome) {
-        const shop = new URLSearchParams(window.location.search).get("shop");
-        router.replace(shop ? `/?shop=${encodeURIComponent(shop)}` : "/");
+        router.replace(appHref("/"));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Billing error");

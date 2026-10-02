@@ -7,13 +7,12 @@ import {
   Button,
   FormLayout,
   InlineStack,
-  Layout,
   Page,
   Text,
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
-import { getSessionToken, clearSessionTokenCache } from "@/lib/session-token";
+import { clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
 
 type ShopSettings = {
   brandingLogoUrl: string | null;
@@ -40,19 +39,22 @@ const QUERY = `#graphql
 `;
 
 function appBase() {
-  return (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
+  return (
+    (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "") ||
+    (typeof window !== "undefined" ? window.location.origin : "")
+  );
 }
 
 function openOutsideAdmin(url: string) {
-  // App Bridge intercepts Polaris Button urls → Shopify admin 404.
-  // Always break out of the iframe for storefront / hosted customer pages.
   window.open(url, "_blank", "noopener,noreferrer");
 }
+
+type PreviewKind = "portal" | "register" | "claim";
 
 export function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [logoUrl, setLogoUrl] = useState("");
-  const [accent, setAccent] = useState("#F59E0B");
+  const [accent, setAccent] = useState("#3B82F6");
   const [timezone, setTimezone] = useState("UTC");
   const [voidOnRefund, setVoidOnRefund] = useState(true);
   const [shopDomain, setShopDomain] = useState("");
@@ -63,13 +65,15 @@ export function SettingsPage() {
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"brand" | "share" | "embed">("brand");
+  const [activeTab, setActiveTab] = useState<"brand" | "share" | "embed" | "preview">("brand");
+  const [previewKind, setPreviewKind] = useState<PreviewKind>("portal");
+  const [embedHeight, setEmbedHeight] = useState(720);
 
   useEffect(() => {
     gqlRequest<{ home: { shop: ShopSettings } }>(QUERY)
       .then((d) => {
         setLogoUrl(d.home.shop.brandingLogoUrl ?? "");
-        setAccent(d.home.shop.brandingAccentColor ?? "#F59E0B");
+        setAccent(d.home.shop.brandingAccentColor ?? "#3B82F6");
         setTimezone(d.home.shop.timezone ?? "UTC");
         setVoidOnRefund(d.home.shop.voidWarrantyOnRefund);
         setShopDomain(d.home.shop.shopDomain);
@@ -100,13 +104,13 @@ export function SettingsPage() {
 
   const embeds = useMemo(() => {
     const frame = (src: string, title: string) =>
-      `<iframe src="${src}&embed=1" title="${title}" style="width:100%;min-height:720px;border:0;border-radius:16px;overflow:hidden;" loading="lazy" allow="clipboard-write"></iframe>`;
+      `<iframe\n  src="${src}&embed=1"\n  title="${title}"\n  style="width:100%;min-height:${embedHeight}px;border:0;border-radius:12px;"\n  loading="lazy"\n  allow="clipboard-write"\n></iframe>`;
     return {
       portal: frame(hosted.portal, "Warranty portal"),
       register: frame(hosted.register, "Warranty registration"),
       claim: frame(hosted.claim, "Warranty claim"),
     };
-  }, [hosted]);
+  }, [hosted, embedHeight]);
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
@@ -153,13 +157,10 @@ export function SettingsPage() {
     setError(null);
     try {
       async function once() {
-        const token = await getSessionToken();
+        const headers = await merchantAuthHeaders();
+        delete headers["Content-Type"];
         const fd = new FormData();
         fd.append("file", file);
-        const headers: Record<string, string> = {};
-        if (token) headers.Authorization = `Bearer ${token}`;
-        const shop = new URLSearchParams(window.location.search).get("shop");
-        if (shop) headers["x-aftersale-shop"] = shop;
         return fetch("/api/merchant/branding/upload", { method: "POST", headers, body: fd });
       }
       let res = await once();
@@ -180,7 +181,7 @@ export function SettingsPage() {
   function copyText(key: string, value: string) {
     void navigator.clipboard.writeText(value).then(() => {
       setCopied(key);
-      window.setTimeout(() => setCopied(null), 1800);
+      window.setTimeout(() => setCopied(null), 1600);
     });
   }
 
@@ -189,305 +190,340 @@ export function SettingsPage() {
       <Page title="Customer pages">
         <div className="as-m-skeleton">
           <div className="as-m-skel as-m-skel-hero" />
-          <div className="as-m-skel" style={{ height: 280, borderRadius: 18 }} />
+          <div className="as-m-skel" style={{ height: 240, borderRadius: 12 }} />
         </div>
       </Page>
     );
   }
 
   return (
-    <Page title="Customer pages" subtitle="Brand, share, and embed warranty experiences" backAction={{ url: "/" }}>
-      <Layout>
-        <Layout.Section>
-          <div className="as-m-hero">
-            <div className="as-m-hero-grid" aria-hidden />
-            <div className="as-m-hero-kicker">
-              <span className="as-m-hero-dot" />
-              Customer experience
+    <Page
+      title="Customer pages"
+      subtitle="Brand, share, preview, and embed warranty experiences"
+      backAction={{ url: "/" }}
+    >
+      <div className="as-m-hero">
+        <div className="as-m-hero-kicker">
+          <span className="as-m-hero-dot" />
+          Storefront & embed
+        </div>
+        <h2>Customer experience kit</h2>
+        <p>
+          Configure branding once, then share hosted links, storefront proxy URLs, or embed snippets
+          anywhere.
+        </p>
+        <div className="as-m-hero-actions">
+          <button type="button" className="as-m-chip as-m-chip-accent" onClick={() => openOutsideAdmin(hosted.portal)}>
+            Open portal
+          </button>
+          <button type="button" className="as-m-chip" onClick={() => setActiveTab("preview")}>
+            Live preview
+          </button>
+          <button type="button" className="as-m-chip" onClick={() => setActiveTab("embed")}>
+            Get embed code
+          </button>
+        </div>
+      </div>
+
+      {error ? (
+        <div style={{ marginBottom: 12 }}>
+          <Banner tone="critical" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
+        </div>
+      ) : null}
+      {saved ? (
+        <div style={{ marginBottom: 12 }}>
+          <Banner tone="success" onDismiss={() => setSaved(false)}>
+            Settings saved.
+          </Banner>
+        </div>
+      ) : null}
+
+      <div className="as-m-tabs">
+        {(
+          [
+            ["brand", "Branding"],
+            ["share", "Share links"],
+            ["embed", "Embed"],
+            ["preview", "Live preview"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className="as-m-tab"
+            data-active={activeTab === id}
+            onClick={() => setActiveTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "brand" ? (
+        <div className="as-m-settings-grid" style={{ marginTop: 14 }}>
+          <div className="as-m-panel">
+            <div className="as-m-panel-title">
+              <h3>Brand kit</h3>
             </div>
-            <h2>Pages your buyers actually use</h2>
-            <p>
-              Portal, registration, and claims — branded for {shopName || "your store"}, shareable on your
-              storefront, or embedded anywhere with an iframe.
-            </p>
-            <div className="as-m-hero-actions">
-              <button type="button" className="as-m-chip as-m-chip-accent" onClick={() => openOutsideAdmin(hosted.portal)}>
-                Preview portal
-              </button>
-              <button type="button" className="as-m-chip" onClick={() => openOutsideAdmin(hosted.register)}>
-                Preview register
-              </button>
-              <button type="button" className="as-m-chip" onClick={() => openOutsideAdmin(hosted.claim)}>
-                Preview claim
-              </button>
-            </div>
+            <form onSubmit={onSave}>
+              <BlockStack gap="400">
+                <div>
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                    Logo
+                  </Text>
+                  <Text as="p" tone="subdued">
+                    Upload to Cloudinary (PNG, JPG, WEBP, GIF, SVG · max 5MB).
+                  </Text>
+                  <div className="as-m-logo-picker">
+                    <div className="as-m-logo-preview">
+                      {logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={logoUrl} alt="Logo preview" />
+                      ) : (
+                        <span>No logo</span>
+                      )}
+                    </div>
+                    <div className="as-m-logo-actions">
+                      <input
+                        ref={fileRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                        hidden
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void uploadLogo(f);
+                          e.target.value = "";
+                        }}
+                      />
+                      <Button loading={uploading} onClick={() => fileRef.current?.click()}>
+                        {logoUrl ? "Replace logo" : "Upload logo"}
+                      </Button>
+                      {logoUrl ? (
+                        <Button tone="critical" variant="plain" onClick={() => setLogoUrl("")}>
+                          Remove
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                <FormLayout>
+                  <div className="as-m-color-row">
+                    <div style={{ flex: 1 }}>
+                      <TextField
+                        label="Accent color"
+                        value={accent}
+                        onChange={setAccent}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <label className="as-m-color-input" title="Pick color">
+                      <input
+                        type="color"
+                        value={/^#[0-9A-Fa-f]{6}$/.test(accent) ? accent : "#3B82F6"}
+                        onChange={(e) => setAccent(e.target.value.toUpperCase())}
+                      />
+                    </label>
+                  </div>
+                  <div className="as-m-color-swatch" style={{ background: accent || "#3B82F6" }} />
+                  <TextField label="Timezone" value={timezone} onChange={setTimezone} autoComplete="off" />
+                  <label className="as-m-toggle">
+                    <input
+                      type="checkbox"
+                      checked={voidOnRefund}
+                      onChange={(e) => setVoidOnRefund(e.target.checked)}
+                    />
+                    <span>
+                      <strong style={{ display: "block", fontSize: 13 }}>Void warranty on refund</strong>
+                      <span style={{ fontSize: 12, color: "#6b7280" }}>
+                        Keep coverage aligned with refunded orders
+                      </span>
+                    </span>
+                  </label>
+                  <Button submit variant="primary" loading={busy}>
+                    Save branding
+                  </Button>
+                </FormLayout>
+              </BlockStack>
+            </form>
           </div>
-        </Layout.Section>
 
-        {error ? (
-          <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setError(null)}>
-              {error}
-            </Banner>
-          </Layout.Section>
-        ) : null}
-        {saved ? (
-          <Layout.Section>
-            <Banner tone="success" onDismiss={() => setSaved(false)}>
-              Customer page settings saved.
-            </Banner>
-          </Layout.Section>
-        ) : null}
+          <div>
+            <div
+              className="as-m-preview"
+              style={{ ["--as-preview-accent" as string]: accent || "#3B82F6" }}
+            >
+              <div className="as-m-preview-bar">
+                <i />
+                <i />
+                <i />
+              </div>
+              <div className="as-m-preview-body">
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoUrl}
+                    alt=""
+                    style={{ height: 36, marginBottom: 12, objectFit: "contain", maxWidth: "70%" }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                ) : null}
+                <h4>{shopName || "Your store"} warranty portal</h4>
+                <p>Look up coverage, register a product, or start a claim.</p>
+                <span className="as-m-preview-cta">Open my warranties</span>
+              </div>
+            </div>
+            <p className="as-m-hint">Instant brand preview. Use Live preview for the real pages.</p>
+          </div>
+        </div>
+      ) : null}
 
-        <Layout.Section>
-          <div className="as-m-tabs">
+      {activeTab === "share" ? (
+        <div className="as-m-panel" style={{ marginTop: 14 }}>
+          <div className="as-m-panel-title">
+            <h3>Share links</h3>
+          </div>
+          <Text as="p" tone="subdued">
+            Hosted links always work. Storefront links need app proxy (`shopify app deploy`).
+          </Text>
+          <div className="as-m-link-grid">
             {(
               [
-                ["brand", "Branding"],
-                ["share", "Share links"],
-                ["embed", "Embed anywhere"],
+                ["Portal", "portal"],
+                ["Registration", "register"],
+                ["Claim form", "claim"],
               ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                className="as-m-tab"
-                data-active={activeTab === id}
-                onClick={() => setActiveTab(id)}
-              >
-                {label}
-              </button>
+            ).map(([label, key]) => (
+              <div key={key} className="as-m-link-card">
+                <strong>{label}</strong>
+                <div className="as-m-link-row">
+                  <span className="as-m-link-label">Hosted</span>
+                  <code>{hosted[key]}</code>
+                  <InlineStack gap="200">
+                    <Button size="slim" onClick={() => openOutsideAdmin(hosted[key])}>
+                      Open
+                    </Button>
+                    <Button size="slim" onClick={() => copyText(`${key}-h`, hosted[key])}>
+                      {copied === `${key}-h` ? "Copied" : "Copy"}
+                    </Button>
+                  </InlineStack>
+                </div>
+                <div className="as-m-link-row">
+                  <span className="as-m-link-label">Storefront</span>
+                  <code>{storefront[key]}</code>
+                  <InlineStack gap="200">
+                    <Button size="slim" onClick={() => openOutsideAdmin(storefront[key])}>
+                      Open
+                    </Button>
+                    <Button size="slim" onClick={() => copyText(`${key}-s`, storefront[key])}>
+                      {copied === `${key}-s` ? "Copied" : "Copy"}
+                    </Button>
+                  </InlineStack>
+                </div>
+              </div>
             ))}
           </div>
-        </Layout.Section>
+          <div className="as-m-callout">
+            Theme editor: add AfterSale register / lookup / claim blocks for product and footer entry
+            points.
+          </div>
+        </div>
+      ) : null}
 
-        {activeTab === "brand" ? (
-          <>
-            <Layout.Section variant="oneHalf">
-              <div className="as-m-panel">
-                <div className="as-m-panel-title">
-                  <h3>Brand kit</h3>
-                </div>
-                <form onSubmit={onSave}>
-                  <BlockStack gap="400">
-                    <div>
-                      <Text as="p" variant="bodyMd" fontWeight="semibold">
-                        Logo
-                      </Text>
-                      <Text as="p" tone="subdued">
-                        Upload PNG, JPG, WEBP, GIF, or SVG (max 5MB). Stored on Cloudinary.
-                      </Text>
-                      <div className="as-m-logo-picker">
-                        <div className="as-m-logo-preview">
-                          {logoUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={logoUrl} alt="Logo preview" />
-                          ) : (
-                            <span>No logo yet</span>
-                          )}
-                        </div>
-                        <div className="as-m-logo-actions">
-                          <input
-                            ref={fileRef}
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                            hidden
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) void uploadLogo(f);
-                              e.target.value = "";
-                            }}
-                          />
-                          <Button loading={uploading} onClick={() => fileRef.current?.click()}>
-                            {logoUrl ? "Replace logo" : "Upload logo"}
-                          </Button>
-                          {logoUrl ? (
-                            <Button
-                              tone="critical"
-                              variant="plain"
-                              onClick={() => setLogoUrl("")}
-                            >
-                              Remove
-                            </Button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
+      {activeTab === "embed" ? (
+        <div className="as-m-panel" style={{ marginTop: 14 }}>
+          <div className="as-m-panel-title">
+            <h3>Embed anywhere</h3>
+          </div>
+          <Text as="p" tone="subdued">
+            Paste into Shopify pages, help centers, or landing builders. Compact mode uses{" "}
+            <code>embed=1</code>.
+          </Text>
+          <div style={{ marginTop: 12, maxWidth: 280 }}>
+            <TextField
+              label="Iframe height (px)"
+              type="number"
+              value={String(embedHeight)}
+              onChange={(v) => setEmbedHeight(Math.max(400, Number(v) || 720))}
+              autoComplete="off"
+            />
+          </div>
+          <div className="as-m-link-grid">
+            {(
+              [
+                ["Warranty portal", "portal"],
+                ["Registration", "register"],
+                ["Claim form", "claim"],
+              ] as const
+            ).map(([label, key]) => (
+              <div key={key} className="as-m-link-card">
+                <strong>{label}</strong>
+                <pre className="as-m-embed-code">{embeds[key]}</pre>
+                <InlineStack gap="200">
+                  <Button
+                    size="slim"
+                    variant="primary"
+                    onClick={() => copyText(`embed-${key}`, embeds[key])}
+                  >
+                    {copied === `embed-${key}` ? "Copied" : "Copy embed"}
+                  </Button>
+                  <Button
+                    size="slim"
+                    onClick={() => {
+                      setPreviewKind(key);
+                      setActiveTab("preview");
+                    }}
+                  >
+                    Preview
+                  </Button>
+                </InlineStack>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
-                    <FormLayout>
-                      <div className="as-m-color-row">
-                        <div style={{ flex: 1 }}>
-                          <TextField
-                            label="Accent color"
-                            value={accent}
-                            onChange={setAccent}
-                            autoComplete="off"
-                            helpText="Used on customer highlights and CTAs"
-                          />
-                        </div>
-                        <label className="as-m-color-input" title="Pick color">
-                          <input
-                            type="color"
-                            value={/^#[0-9A-Fa-f]{6}$/.test(accent) ? accent : "#F59E0B"}
-                            onChange={(e) => setAccent(e.target.value.toUpperCase())}
-                          />
-                        </label>
-                      </div>
-                      <div className="as-m-color-swatch" style={{ background: accent || "#F59E0B" }} />
-                      <TextField label="Timezone" value={timezone} onChange={setTimezone} autoComplete="off" />
-                      <label className="as-m-toggle">
-                        <input
-                          type="checkbox"
-                          checked={voidOnRefund}
-                          onChange={(e) => setVoidOnRefund(e.target.checked)}
-                        />
-                        <span>
-                          <strong style={{ display: "block" }}>Void warranty on refund</strong>
-                          <span style={{ fontSize: 12, color: "#64748b" }}>
-                            Keep coverage honest when orders are refunded
-                          </span>
-                        </span>
-                      </label>
-                      <Button submit variant="primary" loading={busy}>
-                        Save branding
-                      </Button>
-                    </FormLayout>
-                  </BlockStack>
-                </form>
-              </div>
-            </Layout.Section>
-
-            <Layout.Section variant="oneHalf">
-              <div
-                className="as-m-preview"
-                style={{ ["--as-preview-accent" as string]: accent || "#F59E0B" }}
-              >
-                <div className="as-m-preview-bar">
-                  <i />
-                  <i />
-                  <i />
-                </div>
-                <div className="as-m-preview-body">
-                  {logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={logoUrl}
-                      alt=""
-                      style={{ height: 40, marginBottom: 14, objectFit: "contain", maxWidth: "70%" }}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                  ) : null}
-                  <h4>{shopName || "Your store"} warranty portal</h4>
-                  <p>Look up coverage, register a product, or start a claim in seconds.</p>
-                  <span className="as-m-preview-cta">Open my warranties</span>
-                </div>
-              </div>
-              <p className="as-m-hint">
-                Live preview uses your logo + accent. Open a full page with the buttons above — opens outside
-                Shopify Admin so you never hit a fake 404.
-              </p>
-            </Layout.Section>
-          </>
-        ) : null}
-
-        {activeTab === "share" ? (
-          <Layout.Section>
-            <div className="as-m-panel">
-              <div className="as-m-panel-title">
-                <h3>Share links</h3>
-              </div>
-              <Text as="p" tone="subdued">
-                <strong>Hosted</strong> links always work (open on AfterSale).{" "}
-                <strong>Storefront</strong> links use your shop domain via app proxy — run{" "}
-                <code>shopify app deploy</code> once so `/apps/aftersale/*` is installed on the store.
-              </Text>
-              <div className="as-m-link-grid">
-                {(
-                  [
-                    ["Portal", "portal"],
-                    ["Registration", "register"],
-                    ["Claim form", "claim"],
-                  ] as const
-                ).map(([label, key]) => (
-                  <div key={key} className="as-m-link-card">
-                    <strong>{label}</strong>
-                    <div className="as-m-link-row">
-                      <span className="as-m-link-label">Hosted</span>
-                      <code>{hosted[key]}</code>
-                      <InlineStack gap="200">
-                        <Button size="slim" onClick={() => openOutsideAdmin(hosted[key])}>
-                          Open
-                        </Button>
-                        <Button size="slim" onClick={() => copyText(`${key}-h`, hosted[key])}>
-                          {copied === `${key}-h` ? "Copied" : "Copy"}
-                        </Button>
-                      </InlineStack>
-                    </div>
-                    <div className="as-m-link-row">
-                      <span className="as-m-link-label">Storefront</span>
-                      <code>{storefront[key]}</code>
-                      <InlineStack gap="200">
-                        <Button size="slim" onClick={() => openOutsideAdmin(storefront[key])}>
-                          Open
-                        </Button>
-                        <Button size="slim" onClick={() => copyText(`${key}-s`, storefront[key])}>
-                          {copied === `${key}-s` ? "Copied" : "Copy"}
-                        </Button>
-                      </InlineStack>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="as-m-callout">
-                Theme editor: add <strong>AfterSale register / lookup / claim</strong> blocks from the theme app
-                extension for on-brand product and footer entry points.
-              </div>
-            </div>
-          </Layout.Section>
-        ) : null}
-
-        {activeTab === "embed" ? (
-          <Layout.Section>
-            <div className="as-m-panel">
-              <div className="as-m-panel-title">
-                <h3>Embed anywhere</h3>
-              </div>
-              <Text as="p" tone="subdued">
-                Paste these iframes into a Shopify page, landing page builder, help center, or any site that
-                allows embeds. Compact chrome via <code>embed=1</code>.
-              </Text>
-              <div className="as-m-link-grid">
-                {(
-                  [
-                    ["Warranty portal", "portal"],
-                    ["Registration", "register"],
-                    ["Claim form", "claim"],
-                  ] as const
-                ).map(([label, key]) => (
-                  <div key={key} className="as-m-link-card">
-                    <strong>{label}</strong>
-                    <pre className="as-m-embed-code">{embeds[key]}</pre>
-                    <InlineStack gap="200">
-                      <Button
-                        size="slim"
-                        variant="primary"
-                        onClick={() => copyText(`embed-${key}`, embeds[key])}
-                      >
-                        {copied === `embed-${key}` ? "Copied" : "Copy embed code"}
-                      </Button>
-                      <Button size="slim" onClick={() => openOutsideAdmin(`${hosted[key]}&embed=1`)}>
-                        Preview embed
-                      </Button>
-                    </InlineStack>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Layout.Section>
-        ) : null}
-      </Layout>
+      {activeTab === "preview" ? (
+        <div className="as-m-panel" style={{ marginTop: 14 }}>
+          <div className="as-m-panel-title">
+            <h3>Live preview</h3>
+            <InlineStack gap="200">
+              {(
+                [
+                  ["portal", "Portal"],
+                  ["register", "Register"],
+                  ["claim", "Claim"],
+                ] as const
+              ).map(([id, label]) => (
+                <Button
+                  key={id}
+                  size="slim"
+                  variant={previewKind === id ? "primary" : "secondary"}
+                  onClick={() => setPreviewKind(id)}
+                >
+                  {label}
+                </Button>
+              ))}
+              <Button size="slim" onClick={() => openOutsideAdmin(`${hosted[previewKind]}&embed=1`)}>
+                Open tab
+              </Button>
+            </InlineStack>
+          </div>
+          <iframe
+            className="as-m-iframe-preview"
+            title={`Preview ${previewKind}`}
+            src={`${hosted[previewKind]}&embed=1`}
+          />
+          <p className="as-m-hint">
+            Preview loads the hosted customer page with your branding. Save branding first if you just
+            changed the logo.
+          </p>
+        </div>
+      ) : null}
     </Page>
   );
 }

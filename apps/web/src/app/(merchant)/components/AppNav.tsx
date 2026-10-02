@@ -1,46 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { NavMenu } from "@shopify/app-bridge-react";
+import { appHref } from "@/lib/shop-context";
 
-type NavItem = { href: string; label: string };
-type NavGroup = { id: string; label: string; items: NavItem[] };
+type NavItem = { href: string; label: string; group?: string };
 
-const NAV_GROUPS: NavGroup[] = [
-  {
-    id: "ops",
-    label: "Operations",
-    items: [
-      { href: "/claims", label: "Claims" },
-      { href: "/repairs", label: "Repairs" },
-      { href: "/resolutions", label: "Resolutions" },
-      { href: "/suppliers", label: "Suppliers" },
-    ],
-  },
-  {
-    id: "coverage",
-    label: "Coverage",
-    items: [
-      { href: "/warranties", label: "Warranties" },
-      { href: "/registrations", label: "Registrations" },
-      { href: "/products-rules", label: "Products & Rules" },
-    ],
-  },
-  {
-    id: "setup",
-    label: "Setup",
-    items: [
-      { href: "/automations", label: "Automations" },
-      { href: "/settings", label: "Customer pages" },
-      { href: "/plans", label: "Plans & Usage" },
-    ],
-  },
-];
-
-const FLAT_LINKS: NavItem[] = [
-  { href: "/", label: "Home" },
-  ...NAV_GROUPS.flatMap((g) => g.items),
+const NAV: NavItem[] = [
+  { href: "/", label: "Home", group: "Overview" },
+  { href: "/claims", label: "Claims", group: "Operations" },
+  { href: "/repairs", label: "Repairs", group: "Operations" },
+  { href: "/resolutions", label: "Resolutions", group: "Operations" },
+  { href: "/suppliers", label: "Suppliers", group: "Operations" },
+  { href: "/warranties", label: "Warranties", group: "Coverage" },
+  { href: "/registrations", label: "Registrations", group: "Coverage" },
+  { href: "/products-rules", label: "Products & Rules", group: "Coverage" },
+  { href: "/automations", label: "Automations", group: "Setup" },
+  { href: "/settings", label: "Customer pages", group: "Setup" },
+  { href: "/plans", label: "Plans & Usage", group: "Setup" },
 ];
 
 function pathActive(pathname: string | null, href: string) {
@@ -49,107 +27,90 @@ function pathActive(pathname: string | null, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/** Shopify admin nav (App Bridge) + in-app menu bar with dropdowns. */
+/** Shopify admin NavMenu + minimal in-app sidebar. */
 export function AppNav() {
   const pathname = usePathname();
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const barRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    setOpenId(null);
-    setMobileOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (!barRef.current?.contains(e.target as Node)) {
-        setOpenId(null);
-        setMobileOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
+  const groups = ["Overview", "Operations", "Coverage", "Setup"] as const;
 
   return (
-    <>
-      {/* Portaled into Shopify admin chrome — never show these anchors in-app. */}
+    <div className="as-m-nav-column">
       <div className="as-m-navmenu-host" aria-hidden="true">
         <NavMenu>
-          <a href="/" rel="home">
+          <a href={appHref("/")} rel="home">
             Home
           </a>
-          {FLAT_LINKS.filter((l) => l.href !== "/").map((item) => (
-            <a key={item.href} href={item.href}>
+          {NAV.filter((i) => i.href !== "/").map((item) => (
+            <a key={item.href} href={appHref(item.href)}>
               {item.label}
             </a>
           ))}
         </NavMenu>
       </div>
 
-      <nav className="as-m-menubar" ref={barRef} aria-label="AfterSale navigation">
-        <a className="as-m-menubar-brand" href="/" data-active={pathActive(pathname, "/")}>
-          <span className="as-m-menubar-mark">A</span>
-          <span className="as-m-menubar-title">AfterSale OS</span>
-        </a>
+      <button
+        type="button"
+        className="as-m-sidebar-mobile-toggle"
+        aria-label="Toggle navigation"
+        onClick={() => setMobileOpen((v) => !v)}
+      >
+        Menu
+      </button>
 
-        <div className={`as-m-menubar-links${mobileOpen ? " is-open" : ""}`}>
-          <a className="as-m-menubar-link" href="/" data-active={pathActive(pathname, "/")}>
-            Home
+      <aside
+        className={`as-m-sidebar${collapsed ? " is-collapsed" : ""}${mobileOpen ? " is-mobile-open" : ""}`}
+        aria-label="App navigation"
+      >
+        <div className="as-m-sidebar-head">
+          <a className="as-m-sidebar-brand" href={appHref("/")} onClick={() => setMobileOpen(false)}>
+            <span className="as-m-sidebar-mark">AS</span>
+            {!collapsed ? <span className="as-m-sidebar-name">AfterSale</span> : null}
           </a>
+          <button
+            type="button"
+            className="as-m-sidebar-collapse"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => setCollapsed((v) => !v)}
+          >
+            {collapsed ? "›" : "‹"}
+          </button>
+        </div>
 
-          {NAV_GROUPS.map((group) => {
-            const groupActive = group.items.some((i) => pathActive(pathname, i.href));
-            const open = openId === group.id;
+        <nav className="as-m-sidebar-nav">
+          {groups.map((group) => {
+            const items = NAV.filter((i) => i.group === group);
+            if (items.length === 0) return null;
             return (
-              <div key={group.id} className="as-m-menubar-dropdown">
-                <button
-                  type="button"
-                  className="as-m-menubar-trigger"
-                  data-active={groupActive}
-                  data-open={open}
-                  aria-expanded={open}
-                  aria-haspopup="menu"
-                  onClick={() => setOpenId(open ? null : group.id)}
-                >
-                  {group.label}
-                  <span className="as-m-menubar-caret" aria-hidden>
-                    ▾
-                  </span>
-                </button>
-                {open ? (
-                  <div className="as-m-menubar-panel" role="menu">
-                    {group.items.map((item) => (
-                      <a
-                        key={item.href}
-                        href={item.href}
-                        role="menuitem"
-                        data-active={pathActive(pathname, item.href)}
-                        onClick={() => setOpenId(null)}
-                      >
-                        {item.label}
-                      </a>
-                    ))}
-                  </div>
-                ) : null}
+              <div key={group} className="as-m-sidebar-group">
+                {!collapsed ? <div className="as-m-sidebar-label">{group}</div> : null}
+                {items.map((item) => (
+                  <a
+                    key={item.href}
+                    href={appHref(item.href)}
+                    className="as-m-sidebar-link"
+                    data-active={pathActive(pathname, item.href)}
+                    title={item.label}
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <span className="as-m-sidebar-dot" aria-hidden />
+                    {!collapsed ? <span>{item.label}</span> : null}
+                  </a>
+                ))}
               </div>
             );
           })}
-        </div>
+        </nav>
+      </aside>
 
+      {mobileOpen ? (
         <button
           type="button"
-          className="as-m-menubar-burger"
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          aria-expanded={mobileOpen}
-          onClick={() => setMobileOpen((v) => !v)}
-        >
-          <span />
-          <span />
-          <span />
-        </button>
-      </nav>
-    </>
+          className="as-m-sidebar-backdrop"
+          aria-label="Close menu"
+          onClick={() => setMobileOpen(false)}
+        />
+      ) : null}
+    </div>
   );
 }

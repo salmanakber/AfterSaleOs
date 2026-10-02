@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Badge, Banner, Layout, Page, Text } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
+import { appHref } from "@/lib/shop-context";
 
 type HomeData = {
   home: {
@@ -105,39 +106,37 @@ export function HomeDashboard() {
         )
       }
       secondaryActions={[
-        { content: "Claims", url: "/claims" },
-        { content: "Warranties", url: "/warranties" },
-        { content: "Customer pages", url: "/settings" },
-        { content: "Plans", url: "/plans" },
+        { content: "Claims", url: appHref("/claims") },
+        { content: "Warranties", url: appHref("/warranties") },
+        { content: "Customer pages", url: appHref("/settings") },
+        { content: "Plans", url: appHref("/plans") },
       ]}
     >
       <Layout>
         <Layout.Section>
           <div className="as-m-hero">
-            <div className="as-m-hero-grid" aria-hidden />
             <div className="as-m-hero-kicker">
               <span className="as-m-hero-dot" />
-              Live operations
+              Overview
             </div>
             <h2>
               {greeting}
               {data.shop.shopName ? `, ${data.shop.shopName}` : ""}
             </h2>
             <p>
-              Warranties, claims, and resolutions in one premium workspace. Customer submissions are
-              never blocked by plan limits — you stay in control of capacity and SLA.
+              Track warranties and claims without blocking customers when you hit plan limits.
             </p>
             <div className="as-m-hero-actions">
-              <a className="as-m-chip as-m-chip-accent" href="/claims/new">
+              <a className="as-m-chip as-m-chip-accent" href={appHref("/claims/new")}>
                 New claim
               </a>
-              <a className="as-m-chip" href="/warranties">
+              <a className="as-m-chip" href={appHref("/warranties")}>
                 Warranties
               </a>
-              <a className="as-m-chip" href="/settings">
-                Brand customer pages
+              <a className="as-m-chip" href={appHref("/settings")}>
+                Customer pages
               </a>
-              <a className="as-m-chip" href="/plans">
+              <a className="as-m-chip" href={appHref("/plans")}>
                 {data.shop.plan ? data.shop.plan.name : "Choose plan"}
               </a>
             </div>
@@ -146,7 +145,7 @@ export function HomeDashboard() {
 
         {data.setupChecklist.length > 0 ? (
           <Layout.Section>
-            <div className="as-m-panel" style={{ animationDelay: "0.05s" }}>
+            <div className="as-m-panel">
               <div className="as-m-panel-title">
                 <h3>Finish setup</h3>
                 <Badge tone="attention">{`${data.setupChecklist.length} left`}</Badge>
@@ -156,13 +155,12 @@ export function HomeDashboard() {
                   <a
                     key={item.id}
                     className="as-m-list-item"
-                    href={item.href ?? "#"}
-                    style={{ animationDelay: `${0.08 + i * 0.04}s` }}
+                    href={item.href ? appHref(item.href) : "#"}
                   >
                     <span className="as-m-list-icon">{String(i + 1).padStart(2, "0")}</span>
                     <span className="as-m-list-body">
                       <strong>{item.title}</strong>
-                      <span>Recommended to go live cleanly</span>
+                      <span>Recommended before go-live</span>
                     </span>
                   </a>
                 ))}
@@ -201,7 +199,11 @@ export function HomeDashboard() {
             ) : (
               <div className="as-m-list">
                 {data.needsAttention.map((item) => (
-                  <a key={item.id} className="as-m-list-item" href={item.href ?? "#"}>
+                  <a
+                    key={item.id}
+                    className="as-m-list-item"
+                    href={item.href ? appHref(item.href) : "#"}
+                  >
                     <span className="as-m-list-icon" data-tone="warn">
                       !
                     </span>
@@ -220,7 +222,7 @@ export function HomeDashboard() {
           <div className="as-m-panel" style={{ animationDelay: "0.16s" }}>
             <div className="as-m-panel-title">
               <h3>Plan usage</h3>
-              <a className="as-m-chip" href="/plans" style={{ color: "inherit", background: "#eef2ff" }}>
+              <a className="as-m-chip" href={appHref("/plans")}>
                 Manage
               </a>
             </div>
@@ -235,10 +237,10 @@ export function HomeDashboard() {
               <Meter label="Claims this month" used={claimUsage.used} limit={claimUsage.limit} />
             ) : null}
             <div className="as-m-hero-actions" style={{ marginTop: 8 }}>
-              <a className="as-m-chip" href="/settings" style={{ color: "inherit", background: "#f8fafc" }}>
-                Customize customer pages
+              <a className="as-m-chip" href={appHref("/settings")}>
+                Customer pages
               </a>
-              <a className="as-m-chip" href="/automations" style={{ color: "inherit", background: "#f8fafc" }}>
+              <a className="as-m-chip" href={appHref("/automations")}>
                 Automations
               </a>
             </div>
