@@ -830,10 +830,36 @@
   background: var(--as-primary-tint);
 }
 
-.as-empty {
-  text-align: center;
-  padding: 28px 12px;
+.as-brand-logo {
+  height: 32px;
+  width: auto;
+  max-width: 120px;
+  object-fit: contain;
+  border-radius: 6px;
 }
+
+.as-brand-logo-lg {
+  height: 48px;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+}
+
+.as-shell-embed {
+  width: min(100% - 16px, 680px);
+  padding-top: 12px;
+  padding-bottom: 20px;
+}
+
+.as-shell-embed .as-hero {
+  padding-top: 8px;
+  margin-bottom: 12px;
+}
+
+.as-shell-embed .as-panel {
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
 
 .as-empty strong {
   display: block;

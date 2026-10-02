@@ -11,6 +11,7 @@ function RegisterInner() {
   const productId = params.get("product_id") ?? "";
   const variantId = params.get("variant_id") ?? "";
   const qr = params.get("qr") ?? "";
+  const embed = params.get("embed") === "1";
 
   const [mode, setMode] = useState<"shopify" | "outside">("shopify");
   const [email, setEmail] = useState("");
@@ -68,6 +69,8 @@ function RegisterInner() {
       <CustomerShell
         title="You're covered"
         lede="Registration received. Your certificate is ready when coverage activates."
+        shopDomain={shop}
+        embed={embed}
         steps={["Details", "Submit", "Certificate"]}
         activeStep={2}
         footer={
@@ -101,6 +104,8 @@ function RegisterInner() {
           ? `Activate coverage for ${productTitle}.`
           : "Activate coverage in under a minute."
       }
+      shopDomain={shop}
+      embed={embed}
       steps={["Details", "Submit", "Certificate"]}
       activeStep={0}
       footer={

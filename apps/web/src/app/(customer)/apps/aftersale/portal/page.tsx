@@ -8,6 +8,7 @@ function PortalInner() {
   const params = useSearchParams();
   const shop = params.get("shop") ?? "";
   const token = params.get("token");
+  const embed = params.get("embed") === "1";
 
   const [email, setEmail] = useState("");
   const [orderNumber, setOrderNumber] = useState("");
@@ -82,6 +83,8 @@ function PortalInner() {
     <CustomerShell
       title="Your warranties"
       lede="Certificates, coverage dates, and claim entry in one calm place."
+      shopDomain={shop}
+      embed={embed}
       steps={warranties ? ["Verify", "Open portal", "Manage"] : ["Verify", "Email link", "Open portal"]}
       activeStep={warranties ? 2 : 0}
       footer={

@@ -8,6 +8,7 @@ function ClaimFormInner() {
   const params = useSearchParams();
   const shop = params.get("shop") ?? "";
   const certificateToken = params.get("certificate") ?? "";
+  const embed = params.get("embed") === "1";
   const query = useMemo(() => params.toString(), [params]);
 
   const [email, setEmail] = useState("");
@@ -82,6 +83,8 @@ function ClaimFormInner() {
       <CustomerShell
         title="Claim received"
         lede="We’ve logged it and started review."
+        shopDomain={shop}
+        embed={embed}
         steps={["Describe", "Evidence", "Submitted"]}
         activeStep={2}
       >
@@ -108,6 +111,8 @@ function ClaimFormInner() {
     <CustomerShell
       title="Submit a claim"
       lede="Tell us what happened. Photos help us resolve faster."
+      shopDomain={shop}
+      embed={embed}
       steps={["Describe", "Evidence", "Submitted"]}
       activeStep={summary.trim() ? 1 : 0}
     >
