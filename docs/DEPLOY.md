@@ -87,8 +87,11 @@ Order and refund webhooks stay disabled in `shopify.app.toml` until Partners app
 ## Build order (monorepo)
 
 ```bash
+npm install
 npm run build -w @aftersale/db   # merchant-ops exports land in dist/
 npm run build                    # web, worker, admin
 ```
 
 Restart **web** and **worker** after deploy so GraphQL, email templates, and webhooks pick up changes.
+
+Post-deploy verification: [SMOKE_CHECKLIST.md](./SMOKE_CHECKLIST.md).

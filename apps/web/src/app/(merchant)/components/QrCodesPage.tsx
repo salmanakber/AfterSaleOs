@@ -149,7 +149,10 @@ export function QrCodesPage() {
                 Print the URL on packaging or use a QR designer tool.
               </Text>
               {links.length === 0 ? (
-                <Text as="p">No QR links yet.</Text>
+                <Text as="p" tone="subdued">
+                  No QR links yet. Create one, copy the short URL, and encode it with any QR generator
+                  for packaging or inserts.
+                </Text>
               ) : (
                 <DataTable
                   columnContentTypes={["text", "text", "numeric", "text", "text"]}

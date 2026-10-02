@@ -102,6 +102,7 @@ export function ProductsRulesPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [serialLists, setSerialLists] = useState<SerialList[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [serialOpen, setSerialOpen] = useState(false);
@@ -241,8 +242,8 @@ export function ProductsRulesPage() {
       setSerialBulk("");
       setSerialOpen(false);
       setError(null);
+      setSuccess(`Added ${res.addSerialNumbers.added} of ${res.addSerialNumbers.submitted} serials.`);
       load();
-      alert(`Added ${res.addSerialNumbers.added} of ${res.addSerialNumbers.submitted} serials`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Import failed");
     } finally {
@@ -329,6 +330,13 @@ export function ProductsRulesPage() {
           <Layout.Section>
             <Banner tone="critical" title="Error" onDismiss={() => setError(null)}>
               <p>{error}</p>
+            </Banner>
+          </Layout.Section>
+        ) : null}
+        {success ? (
+          <Layout.Section>
+            <Banner tone="success" onDismiss={() => setSuccess(null)}>
+              <p>{success}</p>
             </Banner>
           </Layout.Section>
         ) : null}

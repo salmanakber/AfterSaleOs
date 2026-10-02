@@ -10,6 +10,7 @@ import {
   qrPublicUrl,
   setQrLinkActive,
   shopPlanFeatures,
+  staffSeatUsage,
   upsertNotificationTemplate,
   upsertStaffMember,
   updateWorkflowStatusLabel,
@@ -55,9 +56,15 @@ export const merchantOpsTypeDefs = /* GraphQL */ `
     isPlatformDefault: Boolean!
   }
 
+  type StaffQuota {
+    seatsUsed: Int!
+    seatsLimit: Int!
+  }
+
   extend type Query {
     qrLinks: [QrLinkItem!]!
     staffMembers: [StaffMemberItem!]!
+    staffQuota: StaffQuota!
     serialLists: [SerialListItem!]!
     notificationTemplates: [NotificationTemplateItem!]!
   }
@@ -111,6 +118,12 @@ export const merchantOpsResolvers = {
         active: r.active,
         createdAt: r.createdAt.toISOString(),
       }));
+    },
+    staffQuota: async (_: unknown, __: unknown, ctx: { request: Request }) => {
+      const m = await merchant(ctx);
+      const plan = await shopPlanFeatures(m.shopId);
+      const seatsUsed = await staffSeatUsage(m.shopId);
+      return { seatsUsed, seatsLimit: plan?.staffSeats ?? 1 };
     },
     serialLists: async (_: unknown, __: unknown, ctx: { request: Request }) => {
       const m = await merchant(ctx);

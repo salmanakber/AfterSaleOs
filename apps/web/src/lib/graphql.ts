@@ -1,4 +1,5 @@
 import { clearSessionTokenCache, merchantAuthHeaders } from "./session-token";
+import { friendlyError } from "./merchant-errors";
 
 export async function gqlRequest<T>(
   query: string,
@@ -19,19 +20,26 @@ export async function gqlRequest<T>(
     res = await once();
   }
 
-  const json = await res.json();
+  let json: { data?: T; errors?: { message?: string }[] };
+  try {
+    json = await res.json();
+  } catch {
+    throw new Error(friendlyError("Network error"));
+  }
+
   if (json.errors?.length) {
-    const msg = String(json.errors[0].message ?? "GraphQL error");
+    const first = json.errors[0];
+    const msg = String(first?.message ?? "GraphQL error");
     if (msg.includes("UNAUTHORIZED") || msg.includes("SESSION_TOKEN")) {
       clearSessionTokenCache();
       const retry = await once();
-      const retryJson = await retry.json();
+      const retryJson = (await retry.json()) as { data?: T; errors?: { message?: string }[] };
       if (retryJson.errors?.length) {
-        throw new Error(retryJson.errors[0].message ?? "GraphQL error");
+        throw new Error(friendlyError(retryJson.errors[0]?.message ?? "UNAUTHORIZED"));
       }
       return retryJson.data as T;
     }
-    throw new Error(msg);
+    throw new Error(friendlyError(msg));
   }
   return json.data as T;
 }

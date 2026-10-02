@@ -1,11 +1,26 @@
 import { prisma, shopRepository, syncOrderFromWebhook, syncProductFromWebhook, voidWarrantiesOnRefund } from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
 
+function log(level: "info" | "warn" | "error", event: string, fields: Record<string, unknown>) {
+  const line = JSON.stringify({
+    ts: new Date().toISOString(),
+    service: "worker",
+    processor: "webhook",
+    level,
+    event,
+    ...fields,
+  });
+  if (level === "error") console.error(line);
+  else if (level === "warn") console.warn(line);
+  else console.log(line);
+}
+
 export async function processWebhookEvent(webhookEventId: string) {
   const event = await prisma.webhookEvent.findUnique({ where: { id: webhookEventId } });
   if (!event) return;
   if (event.status === "COMPLETED") return;
 
+  const started = Date.now();
   await prisma.webhookEvent.update({
     where: { id: event.id },
     data: { status: "PROCESSING", attempts: { increment: 1 } },
@@ -36,20 +51,41 @@ export async function processWebhookEvent(webhookEventId: string) {
         if (shop) await handleCustomerUpdate(shop.id, event.payload);
         break;
       default:
-        console.log(`[webhook] unhandled topic ${event.topic}`);
+        log("warn", "webhook.unhandled", {
+          webhookEventId: event.id,
+          topic: event.topic,
+          shopDomain: event.shopDomain,
+        });
     }
 
     await prisma.webhookEvent.update({
       where: { id: event.id },
       data: { status: "COMPLETED", processedAt: new Date(), lastError: null },
     });
+
+    log("info", "webhook.completed", {
+      webhookEventId: event.id,
+      topic: event.topic,
+      shopId: shop?.id ?? null,
+      shopDomain: event.shopDomain,
+      attempts: event.attempts + 1,
+      ms: Date.now() - started,
+    });
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     await prisma.webhookEvent.update({
       where: { id: event.id },
       data: {
         status: "FAILED",
-        lastError: err instanceof Error ? err.message : String(err),
+        lastError: message,
       },
+    });
+    log("error", "webhook.failed", {
+      webhookEventId: event.id,
+      topic: event.topic,
+      shopDomain: event.shopDomain,
+      error: message,
+      ms: Date.now() - started,
     });
     throw err;
   }

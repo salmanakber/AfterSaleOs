@@ -18,6 +18,7 @@ import {
 } from "@shopify/polaris";
 import { theme } from "@aftersale/shared";
 import { gqlRequest } from "@/lib/graphql";
+import { friendlyError } from "@/lib/merchant-errors";
 
 type Warranty = {
   id: string;
@@ -108,8 +109,15 @@ export function WarrantiesPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [extendOpen, setExtendOpen] = useState(false);
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [voidReason, setVoidReason] = useState("");
+  const [extendMonths, setExtendMonths] = useState("3");
+  const [extendReason, setExtendReason] = useState("Goodwill extension");
   const [lookback, setLookback] = useState("12");
   const [busy, setBusy] = useState(false);
 
@@ -132,7 +140,7 @@ export function WarrantiesPage() {
         setRules(d.warrantyRules);
         if (!mRuleId && d.warrantyRules[0]) setMRuleId(d.warrantyRules[0].id);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+      .catch((e) => setError(friendlyError(e)));
   }, [query, status, mRuleId]);
 
   useEffect(() => {
@@ -144,9 +152,10 @@ export function WarrantiesPage() {
     try {
       await gqlRequest(START_BACKFILL, { months: Number(lookback) });
       setBackfillOpen(false);
+      setSuccess("Backfill job started. Progress appears below.");
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Backfill failed");
+      setError(friendlyError(e, "Backfill failed"));
     } finally {
       setBusy(false);
     }
@@ -165,34 +174,67 @@ export function WarrantiesPage() {
         },
       });
       setManualOpen(false);
+      setSuccess("Manual warranty created.");
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Create failed");
+      setError(friendlyError(e, "Create failed"));
     } finally {
       setBusy(false);
     }
   }
 
-  async function voidOne(id: string) {
-    const reason = window.prompt("Void reason?");
-    if (!reason) return;
+  function openVoid(id: string) {
+    setActionId(id);
+    setVoidReason("");
+    setVoidOpen(true);
+  }
+
+  function openExtend(id: string) {
+    setActionId(id);
+    setExtendMonths("3");
+    setExtendReason("Goodwill extension");
+    setExtendOpen(true);
+  }
+
+  async function confirmVoid() {
+    if (!actionId || !voidReason.trim()) {
+      setError("A void reason is required.");
+      return;
+    }
+    setBusy(true);
     try {
-      await gqlRequest(VOID, { id, reason });
+      await gqlRequest(VOID, { id: actionId, reason: voidReason.trim() });
+      setVoidOpen(false);
+      setSuccess("Warranty voided.");
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Void failed");
+      setError(friendlyError(e, "Void failed"));
+    } finally {
+      setBusy(false);
     }
   }
 
-  async function extendOne(id: string) {
-    const months = window.prompt("Extend by how many months?", "3");
-    if (!months) return;
-    const reason = window.prompt("Reason for extension?", "Goodwill extension") ?? "Extended";
+  async function confirmExtend() {
+    if (!actionId) return;
+    const months = Number(extendMonths);
+    if (!Number.isFinite(months) || months < 1) {
+      setError("Enter a valid number of months (1 or more).");
+      return;
+    }
+    setBusy(true);
     try {
-      await gqlRequest(EXTEND, { id, extraMonths: Number(months), reason });
+      await gqlRequest(EXTEND, {
+        id: actionId,
+        extraMonths: months,
+        reason: extendReason.trim() || "Extended",
+      });
+      setExtendOpen(false);
+      setSuccess(`Warranty extended by ${months} month${months === 1 ? "" : "s"}.`);
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Extend failed");
+      setError(friendlyError(e, "Extend failed"));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -208,12 +250,16 @@ export function WarrantiesPage() {
     w.startAt ? new Date(w.startAt).toLocaleDateString() : "—",
     w.endAt ? new Date(w.endAt).toLocaleDateString() : "Lifetime",
     <InlineStack key={`a-${w.id}`} gap="100">
-      <Button variant="plain" onClick={() => extendOne(w.id)}>
-        Extend
-      </Button>
-      <Button tone="critical" variant="plain" onClick={() => voidOne(w.id)}>
-        Void
-      </Button>
+      {w.status !== "VOID" ? (
+        <Button variant="plain" onClick={() => openExtend(w.id)}>
+          Extend
+        </Button>
+      ) : null}
+      {w.status !== "VOID" ? (
+        <Button tone="critical" variant="plain" onClick={() => openVoid(w.id)}>
+          Void
+        </Button>
+      ) : null}
     </InlineStack>,
   ]);
 
@@ -231,6 +277,13 @@ export function WarrantiesPage() {
           <Layout.Section>
             <Banner tone="critical" onDismiss={() => setError(null)}>
               <p>{error}</p>
+            </Banner>
+          </Layout.Section>
+        ) : null}
+        {success ? (
+          <Layout.Section>
+            <Banner tone="success" onDismiss={() => setSuccess(null)}>
+              <p>{success}</p>
             </Banner>
           </Layout.Section>
         ) : null}
@@ -290,9 +343,15 @@ export function WarrantiesPage() {
               </InlineStack>
 
               {nodes.length === 0 ? (
-                <Text as="p" tone="subdued">
-                  No warranties yet. Create a rule, then run backfill or wait for new orders.
-                </Text>
+                <BlockStack gap="200">
+                  <Text as="p" tone="subdued">
+                    No warranties match this view yet.
+                  </Text>
+                  <Text as="p" tone="subdued">
+                    Create a warranty rule under Products &amp; rules, then run a backfill or wait for
+                    new Shopify orders (order webhooks require Protected Customer Data approval).
+                  </Text>
+                </BlockStack>
               ) : (
                 <DataTable
                   columnContentTypes={[
@@ -383,6 +442,63 @@ export function WarrantiesPage() {
               autoComplete="off"
             />
             <TextField label="Reason" value={mReason} onChange={setMReason} autoComplete="off" />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={voidOpen}
+        onClose={() => setVoidOpen(false)}
+        title="Void warranty"
+        primaryAction={{
+          content: "Void warranty",
+          onAction: confirmVoid,
+          loading: busy,
+          destructive: true,
+        }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setVoidOpen(false) }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            <Text as="p" tone="subdued">
+              Voiding permanently ends coverage. Customers will no longer see an active certificate.
+            </Text>
+            <TextField
+              label="Reason"
+              value={voidReason}
+              onChange={setVoidReason}
+              autoComplete="off"
+              multiline={3}
+              helpText="Shown in merchant history (not emailed to the customer)."
+            />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={extendOpen}
+        onClose={() => setExtendOpen(false)}
+        title="Extend warranty"
+        primaryAction={{ content: "Extend", onAction: confirmExtend, loading: busy }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setExtendOpen(false) }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            <TextField
+              label="Extra months"
+              type="number"
+              value={extendMonths}
+              onChange={setExtendMonths}
+              autoComplete="off"
+              min={1}
+            />
+            <TextField
+              label="Reason"
+              value={extendReason}
+              onChange={setExtendReason}
+              autoComplete="off"
+              multiline={2}
+            />
           </BlockStack>
         </Modal.Section>
       </Modal>

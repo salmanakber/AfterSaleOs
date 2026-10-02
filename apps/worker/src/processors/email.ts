@@ -3,15 +3,31 @@
  */
 import { getNotificationTemplateForSend } from "@aftersale/db";
 
+function log(level: "info" | "warn" | "error", event: string, fields: Record<string, unknown>) {
+  const line = JSON.stringify({
+    ts: new Date().toISOString(),
+    service: "worker",
+    processor: "email",
+    level,
+    event,
+    ...fields,
+  });
+  if (level === "error") console.error(line);
+  else if (level === "warn") console.warn(line);
+  else console.log(line);
+}
+
 export async function processEmailJob(data: {
   shopId: string;
   to: string;
   template: string;
   data: Record<string, unknown>;
 }) {
+  const started = Date.now();
   const custom = await getNotificationTemplateForSend(data.shopId, data.template);
   let subject: string;
   let html: string;
+  const source = custom?.subject && custom.bodyHtml ? "shop_template" : "builtin";
 
   if (custom?.subject && custom.bodyHtml) {
     subject = interpolate(custom.subject, data.data);
@@ -23,11 +39,14 @@ export async function processEmailJob(data: {
   }
 
   if (!process.env.RESEND_API_KEY) {
-    console.log("[email] skipped (no RESEND_API_KEY)", {
+    log("warn", "email.skipped", {
+      reason: "missing_resend_api_key",
+      shopId: data.shopId,
       to: data.to,
       template: data.template,
-      shopId: data.shopId,
+      source,
       subject,
+      ms: Date.now() - started,
     });
     return;
   }
@@ -47,8 +66,27 @@ export async function processEmailJob(data: {
   });
 
   if (!res.ok) {
-    throw new Error(`Resend failed: ${await res.text()}`);
+    const body = await res.text();
+    log("error", "email.failed", {
+      shopId: data.shopId,
+      to: data.to,
+      template: data.template,
+      source,
+      status: res.status,
+      body: body.slice(0, 500),
+      ms: Date.now() - started,
+    });
+    throw new Error(`Resend failed: ${body}`);
   }
+
+  log("info", "email.sent", {
+    shopId: data.shopId,
+    to: data.to,
+    template: data.template,
+    source,
+    subject,
+    ms: Date.now() - started,
+  });
 }
 
 function interpolate(template: string, data: Record<string, unknown>) {

@@ -13,9 +13,11 @@ import {
   Modal,
   Page,
   Select,
+  Text,
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
+import { friendlyError } from "@/lib/merchant-errors";
 
 type Staff = {
   id: string;
@@ -25,9 +27,12 @@ type Staff = {
   active: boolean;
 };
 
+type Quota = { seatsUsed: number; seatsLimit: number };
+
 const QUERY = `#graphql
   query Team {
     staffMembers { id email name role active }
+    staffQuota { seatsUsed seatsLimit }
   }
 `;
 
@@ -41,7 +46,9 @@ const UPSERT = `#graphql
 
 export function TeamPage() {
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [quota, setQuota] = useState<Quota>({ seatsUsed: 0, seatsLimit: 1 });
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -51,14 +58,19 @@ export function TeamPage() {
   const [active, setActive] = useState(true);
 
   const load = useCallback(() => {
-    gqlRequest<{ staffMembers: Staff[] }>(QUERY)
-      .then((d) => setStaff(d.staffMembers))
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+    gqlRequest<{ staffMembers: Staff[]; staffQuota: Quota }>(QUERY)
+      .then((d) => {
+        setStaff(d.staffMembers);
+        setQuota(d.staffQuota);
+      })
+      .catch((e) => setError(friendlyError(e)));
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const atLimit = quota.seatsUsed >= quota.seatsLimit;
 
   function openNew() {
     setEditId(null);
@@ -90,9 +102,10 @@ export function TeamPage() {
         active,
       });
       setOpen(false);
+      setSuccess(editId ? "Team member updated." : "Team member added.");
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      setError(friendlyError(e, "Save failed"));
     } finally {
       setBusy(false);
     }
@@ -111,7 +124,15 @@ export function TeamPage() {
   ]);
 
   return (
-    <Page title="Team" subtitle="Staff for claim assignment and repair technicians" primaryAction={{ content: "Add member", onAction: openNew }}>
+    <Page
+      title="Team"
+      subtitle={`${quota.seatsUsed} of ${quota.seatsLimit} active seats used`}
+      primaryAction={{
+        content: "Add member",
+        onAction: openNew,
+        disabled: atLimit,
+      }}
+    >
       <Layout>
         {error ? (
           <Layout.Section>
@@ -120,11 +141,33 @@ export function TeamPage() {
             </Banner>
           </Layout.Section>
         ) : null}
+        {success ? (
+          <Layout.Section>
+            <Banner tone="success" onDismiss={() => setSuccess(null)}>
+              {success}
+            </Banner>
+          </Layout.Section>
+        ) : null}
+        {atLimit ? (
+          <Layout.Section>
+            <Banner tone="warning">
+              You&apos;ve used all {quota.seatsLimit} staff seats on your plan. Deactivate a member or
+              upgrade to add more.
+            </Banner>
+          </Layout.Section>
+        ) : null}
         <Layout.Section>
           <Card>
             <BlockStack gap="300">
               {staff.length === 0 ? (
-                <p style={{ margin: 0, color: "#6b7280" }}>No staff yet. Add emails your team uses in Shopify.</p>
+                <BlockStack gap="200">
+                  <Text as="p" tone="subdued">
+                    No staff yet. Add teammates who handle claims, repairs, or analytics.
+                  </Text>
+                  <Text as="p" tone="subdued">
+                    Use the same emails they sign in with on Shopify admin when possible.
+                  </Text>
+                </BlockStack>
               ) : (
                 <DataTable
                   columnContentTypes={["text", "text", "text", "text", "text"]}
@@ -158,10 +201,11 @@ export function TeamPage() {
               ]}
               value={role}
               onChange={setRole}
+              helpText="Owner / admin can manage the team. Keep at least one active owner."
             />
             <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-              Active (counts toward plan seat limit)
+              Active (counts toward plan seat limit: {quota.seatsUsed}/{quota.seatsLimit})
             </label>
           </FormLayout>
         </Modal.Section>

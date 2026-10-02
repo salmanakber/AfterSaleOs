@@ -11,12 +11,14 @@ import {
   FormLayout,
   InlineStack,
   Layout,
+  Modal,
   Page,
   Select,
   Text,
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
+import { friendlyError } from "@/lib/merchant-errors";
 
 type ClaimDetail = {
   id: string;
@@ -79,6 +81,8 @@ export function ClaimDetailPage() {
   const [supplierId, setSupplierId] = useState("");
   const [supplierAmount, setSupplierAmount] = useState("");
   const [supplierStatus, setSupplierStatus] = useState("NOT_FILED");
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideReason, setOverrideReason] = useState("");
 
   const load = useCallback(() => {
     gqlRequest<{
@@ -98,7 +102,7 @@ export function ClaimDetailPage() {
         setSuppliers(d.suppliers);
         if (!supplierId && d.suppliers[0]) setSupplierId(d.suppliers[0].id);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+      .catch((e) => setError(friendlyError(e)));
   }, [id, supplierId]);
 
   useEffect(() => {
@@ -186,8 +190,15 @@ export function ClaimDetailPage() {
   }
 
   async function overrideEligibility() {
-    const reason = window.prompt("Override reason (required)");
-    if (!reason) return;
+    setOverrideReason("");
+    setOverrideOpen(true);
+  }
+
+  async function confirmOverride() {
+    if (!overrideReason.trim()) {
+      setError("An override reason is required.");
+      return;
+    }
     setBusy(true);
     try {
       await gqlRequest(
@@ -195,11 +206,12 @@ export function ClaimDetailPage() {
         mutation O($id: ID!, $reason: String!) {
           overrideClaimEligibility(id: $id, reason: $reason) { id eligibilityOverride }
         }`,
-        { id, reason },
+        { id, reason: overrideReason.trim() },
       );
+      setOverrideOpen(false);
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Override failed");
+      setError(friendlyError(e, "Override failed"));
     } finally {
       setBusy(false);
     }
@@ -593,6 +605,30 @@ export function ClaimDetailPage() {
           </Layout.Section>
         ) : null}
       </Layout>
+
+      <Modal
+        open={overrideOpen}
+        onClose={() => setOverrideOpen(false)}
+        title="Override eligibility"
+        primaryAction={{ content: "Apply override", onAction: confirmOverride, loading: busy }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setOverrideOpen(false) }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            <Text as="p" tone="subdued">
+              Record why this claim is being treated as eligible despite automated checks. This is
+              required for audit history.
+            </Text>
+            <TextField
+              label="Reason"
+              value={overrideReason}
+              onChange={setOverrideReason}
+              multiline={3}
+              autoComplete="off"
+            />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
     </Page>
   );
 }

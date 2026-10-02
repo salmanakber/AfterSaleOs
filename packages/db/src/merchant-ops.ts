@@ -47,6 +47,15 @@ export async function listStaffMembers(shopId: string) {
   });
 }
 
+const STAFF_ROLES = new Set(["OWNER_ADMIN", "SUPPORT_AGENT", "ANALYST", "TECHNICIAN"]);
+
+export async function staffSeatUsage(shopId: string) {
+  const used = await prisma.staffMember.count({
+    where: { shopId, active: true },
+  });
+  return used;
+}
+
 export async function upsertStaffMember(params: {
   shopId: string;
   id?: string;
@@ -58,28 +67,68 @@ export async function upsertStaffMember(params: {
 }) {
   const email = params.email.trim().toLowerCase();
   if (!email) throw new Error("Email is required");
+  if (!email.includes("@")) throw new Error("Enter a valid email address.");
+
+  const role = params.role ?? "SUPPORT_AGENT";
+  if (!STAFF_ROLES.has(role)) {
+    throw new Error("Invalid staff role. Choose Owner, Support, Analyst, or Technician.");
+  }
+
+  const willBeActive = params.active ?? true;
 
   if (params.id) {
     const existing = await prisma.staffMember.findFirst({
       where: { id: params.id, shopId: params.shopId },
     });
     if (!existing) throw new Error("Staff member not found");
+
+    // Seat check when reactivating someone who was inactive
+    if (willBeActive && !existing.active) {
+      const activeCount = await staffSeatUsage(params.shopId);
+      if (activeCount >= params.staffSeatsLimit) {
+        throw new Error(
+          `Staff seat limit reached (${params.staffSeatsLimit} active). Deactivate someone or upgrade your plan.`,
+        );
+      }
+    }
+
+    // Keep at least one active owner/admin
+    if (
+      existing.role === "OWNER_ADMIN" &&
+      existing.active &&
+      (role !== "OWNER_ADMIN" || willBeActive === false)
+    ) {
+      const otherOwners = await prisma.staffMember.count({
+        where: {
+          shopId: params.shopId,
+          role: "OWNER_ADMIN",
+          active: true,
+          NOT: { id: existing.id },
+        },
+      });
+      if (otherOwners === 0) {
+        throw new Error("Keep at least one active Owner / admin on the team.");
+      }
+    }
+
     return prisma.staffMember.update({
       where: { id: existing.id },
       data: {
         email,
         name: params.name ?? undefined,
-        role: (params.role as never) ?? undefined,
+        role: role as never,
         active: params.active ?? undefined,
       },
     });
   }
 
-  const activeCount = await prisma.staffMember.count({
-    where: { shopId: params.shopId, active: true },
-  });
-  if (activeCount >= params.staffSeatsLimit) {
-    throw new Error(`Staff seat limit reached (${params.staffSeatsLimit}). Upgrade your plan.`);
+  if (willBeActive) {
+    const activeCount = await staffSeatUsage(params.shopId);
+    if (activeCount >= params.staffSeatsLimit) {
+      throw new Error(
+        `Staff seat limit reached (${params.staffSeatsLimit} active). Deactivate someone or upgrade your plan.`,
+      );
+    }
   }
 
   return prisma.staffMember.upsert({
@@ -88,13 +137,13 @@ export async function upsertStaffMember(params: {
       shopId: params.shopId,
       email,
       name: params.name ?? null,
-      role: (params.role as never) ?? "SUPPORT_AGENT",
-      active: params.active ?? true,
+      role: role as never,
+      active: willBeActive,
     },
     update: {
       name: params.name ?? undefined,
-      role: (params.role as never) ?? undefined,
-      active: params.active ?? true,
+      role: role as never,
+      active: willBeActive,
     },
   });
 }

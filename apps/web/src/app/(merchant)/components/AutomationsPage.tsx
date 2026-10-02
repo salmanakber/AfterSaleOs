@@ -17,6 +17,7 @@ import {
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
+import { friendlyError } from "@/lib/merchant-errors";
 
 type Workflow = {
   id: string;
@@ -71,7 +72,11 @@ export function AutomationsPage() {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [tplOpen, setTplOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameId, setRenameId] = useState<string | null>(null);
+  const [renameLabel, setRenameLabel] = useState("");
   const [tplKey, setTplKey] = useState("");
   const [tplSubject, setTplSubject] = useState("");
   const [tplBody, setTplBody] = useState("");
@@ -83,19 +88,34 @@ export function AutomationsPage() {
         setWorkflow(d.claimWorkflow);
         setTemplates(d.notificationTemplates);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+      .catch((e) => setError(friendlyError(e)));
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function renameStatus(statusId: string, label: string) {
+  function openRename(statusId: string, label: string) {
+    setRenameId(statusId);
+    setRenameLabel(label);
+    setRenameOpen(true);
+  }
+
+  async function saveRename() {
+    if (!renameId || !renameLabel.trim()) {
+      setError("Status label cannot be empty.");
+      return;
+    }
+    setBusy(true);
     try {
-      await gqlRequest(UPDATE_LABEL, { statusId, label });
+      await gqlRequest(UPDATE_LABEL, { statusId: renameId, label: renameLabel.trim() });
+      setRenameOpen(false);
+      setSuccess("Status label updated.");
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Update failed");
+      setError(friendlyError(e, "Update failed"));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -117,9 +137,10 @@ export function AutomationsPage() {
     try {
       await gqlRequest(UPSERT_TPL, { key: tplKey, subject: tplSubject, bodyHtml: tplBody });
       setTplOpen(false);
+      setSuccess("Email template saved. New claim emails will use this copy.");
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      setError(friendlyError(e, "Save failed"));
     } finally {
       setBusy(false);
     }
@@ -132,14 +153,7 @@ export function AutomationsPage() {
       s.systemState,
       s.emailTemplateKey ?? "—",
       <InlineStack key={s.id} gap="200">
-        <Button
-          size="slim"
-          variant="plain"
-          onClick={() => {
-            const next = window.prompt("Status label", s.label);
-            if (next) void renameStatus(s.id, next);
-          }}
-        >
+        <Button size="slim" variant="plain" onClick={() => openRename(s.id, s.label)}>
           Rename
         </Button>
         {s.emailTemplateKey ? (
@@ -155,13 +169,24 @@ export function AutomationsPage() {
       <Layout>
         {error ? (
           <Layout.Section>
-            <Banner tone="critical">{error}</Banner>
+            <Banner tone="critical" onDismiss={() => setError(null)}>
+              {error}
+            </Banner>
+          </Layout.Section>
+        ) : null}
+        {success ? (
+          <Layout.Section>
+            <Banner tone="success" onDismiss={() => setSuccess(null)}>
+              {success}
+            </Banner>
           </Layout.Section>
         ) : null}
 
         {!workflow ? (
           <Layout.Section>
-            <Text as="p">Loading…</Text>
+            <Text as="p" tone="subdued">
+              Loading workflow…
+            </Text>
           </Layout.Section>
         ) : (
           <>
@@ -175,8 +200,9 @@ export function AutomationsPage() {
                     {workflow.isDefault ? <Badge tone="info">Default</Badge> : null}
                   </InlineStack>
                   <Text as="p" tone="subdued">
-                    Transitions are enforced when updating claims. Customize labels and emails per status.
-                    Use placeholders: {"{{claimNumber}}"}, {"{{status}}"}, {"{{trackingUrl}}"}, {"{{summary}}"}, {"{{shopName}}"}.
+                    Transitions are enforced when updating claims. Customize labels and emails per
+                    status. Placeholders: {"{{claimNumber}}"}, {"{{status}}"}, {"{{trackingUrl}}"},{" "}
+                    {"{{summary}}"}, {"{{shopName}}"}.
                   </Text>
                 </BlockStack>
               </Card>
@@ -188,11 +214,17 @@ export function AutomationsPage() {
                   <Text as="h2" variant="headingMd">
                     Statuses
                   </Text>
-                  <DataTable
-                    columnContentTypes={["text", "text", "text", "text", "text"]}
-                    headings={["Label", "Key", "System state", "Email template", "Actions"]}
-                    rows={statusRows}
-                  />
+                  {statusRows.length === 0 ? (
+                    <Text as="p" tone="subdued">
+                      No statuses configured for this workflow yet.
+                    </Text>
+                  ) : (
+                    <DataTable
+                      columnContentTypes={["text", "text", "text", "text", "text"]}
+                      headings={["Label", "Key", "System state", "Email template", "Actions"]}
+                      rows={statusRows}
+                    />
+                  )}
                 </BlockStack>
               </Card>
             </Layout.Section>
@@ -203,17 +235,41 @@ export function AutomationsPage() {
                   <Text as="h2" variant="headingMd">
                     Allowed transitions
                   </Text>
-                  {workflow.transitions.map((t) => (
-                    <Text as="p" key={t.id} tone="subdued">
-                      {t.fromKey} → {t.toKey}
+                  {workflow.transitions.length === 0 ? (
+                    <Text as="p" tone="subdued">
+                      No transitions defined.
                     </Text>
-                  ))}
+                  ) : (
+                    workflow.transitions.map((t) => (
+                      <Text as="p" key={t.id} tone="subdued">
+                        {t.fromKey} → {t.toKey}
+                      </Text>
+                    ))
+                  )}
                 </BlockStack>
               </Card>
             </Layout.Section>
           </>
         )}
       </Layout>
+
+      <Modal
+        open={renameOpen}
+        onClose={() => setRenameOpen(false)}
+        title="Rename status"
+        primaryAction={{ content: "Save", onAction: saveRename, loading: busy }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setRenameOpen(false) }]}
+      >
+        <Modal.Section>
+          <TextField
+            label="Label"
+            value={renameLabel}
+            onChange={setRenameLabel}
+            autoComplete="off"
+            helpText="Shown to merchants and customers. The internal key stays the same."
+          />
+        </Modal.Section>
+      </Modal>
 
       <Modal
         open={tplOpen}
@@ -225,7 +281,13 @@ export function AutomationsPage() {
         <Modal.Section>
           <FormLayout>
             <TextField label="Subject" value={tplSubject} onChange={setTplSubject} autoComplete="off" />
-            <TextField label="Body HTML" value={tplBody} onChange={setTplBody} multiline={10} autoComplete="off" />
+            <TextField
+              label="Body HTML"
+              value={tplBody}
+              onChange={setTplBody}
+              multiline={10}
+              autoComplete="off"
+            />
           </FormLayout>
         </Modal.Section>
       </Modal>

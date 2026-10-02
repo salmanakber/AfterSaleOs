@@ -10,10 +10,13 @@ import {
   DataTable,
   InlineStack,
   Layout,
+  Modal,
   Page,
   Text,
+  TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
+import { friendlyError } from "@/lib/merchant-errors";
 
 type Reg = {
   id: string;
@@ -49,11 +52,16 @@ const REJECT = `#graphql
 export function RegistrationsPage() {
   const [rows, setRows] = useState<Reg[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectId, setRejectId] = useState<string | null>(null);
+  const [rejectNote, setRejectNote] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
     gqlRequest<{ registrations: Reg[] }>(QUERY)
       .then((d) => setRows(d.registrations))
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+      .catch((e) => setError(friendlyError(e)));
   }, []);
 
   useEffect(() => {
@@ -61,14 +69,38 @@ export function RegistrationsPage() {
   }, [load]);
 
   async function approve(id: string) {
-    await gqlRequest(APPROVE, { id });
-    load();
+    setBusy(true);
+    setError(null);
+    try {
+      await gqlRequest(APPROVE, { id });
+      setSuccess("Registration approved.");
+      load();
+    } catch (e) {
+      setError(friendlyError(e, "Approve failed"));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  async function reject(id: string) {
-    const note = window.prompt("Rejection note (optional)") ?? "";
-    await gqlRequest(REJECT, { id, note });
-    load();
+  function openReject(id: string) {
+    setRejectId(id);
+    setRejectNote("");
+    setRejectOpen(true);
+  }
+
+  async function confirmReject() {
+    if (!rejectId) return;
+    setBusy(true);
+    try {
+      await gqlRequest(REJECT, { id: rejectId, note: rejectNote.trim() || null });
+      setRejectOpen(false);
+      setSuccess("Registration rejected.");
+      load();
+    } catch (e) {
+      setError(friendlyError(e, "Reject failed"));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -81,12 +113,24 @@ export function RegistrationsPage() {
             </Banner>
           </Layout.Section>
         ) : null}
+        {success ? (
+          <Layout.Section>
+            <Banner tone="success" onDismiss={() => setSuccess(null)}>
+              <p>{success}</p>
+            </Banner>
+          </Layout.Section>
+        ) : null}
         <Layout.Section>
           <Card>
             {rows.length === 0 ? (
-              <Text as="p" tone="subdued">
-                No registrations yet. Customers register via the storefront app proxy or QR link.
-              </Text>
+              <BlockStack gap="200">
+                <Text as="p" tone="subdued">
+                  No registrations yet.
+                </Text>
+                <Text as="p" tone="subdued">
+                  Customers register via the storefront app proxy, theme embed blocks, or QR codes.
+                </Text>
+              </BlockStack>
             ) : (
               <DataTable
                 columnContentTypes={["text", "text", "text", "text", "text", "text", "text"]}
@@ -111,15 +155,15 @@ export function RegistrationsPage() {
                   new Date(r.createdAt).toLocaleString(),
                   r.status === "PENDING_VERIFICATION" || r.status === "NEEDS_REVIEW" ? (
                     <InlineStack key={`a-${r.id}`} gap="200">
-                      <Button size="slim" onClick={() => approve(r.id)}>
+                      <Button size="slim" onClick={() => approve(r.id)} loading={busy}>
                         Approve
                       </Button>
-                      <Button size="slim" tone="critical" onClick={() => reject(r.id)}>
+                      <Button size="slim" tone="critical" onClick={() => openReject(r.id)}>
                         Reject
                       </Button>
                     </InlineStack>
                   ) : (
-                    r.reviewNote ?? ""
+                    "—"
                   ),
                 ])}
               />
@@ -127,6 +171,30 @@ export function RegistrationsPage() {
           </Card>
         </Layout.Section>
       </Layout>
+
+      <Modal
+        open={rejectOpen}
+        onClose={() => setRejectOpen(false)}
+        title="Reject registration"
+        primaryAction={{
+          content: "Reject",
+          onAction: confirmReject,
+          loading: busy,
+          destructive: true,
+        }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setRejectOpen(false) }]}
+      >
+        <Modal.Section>
+          <TextField
+            label="Note (optional)"
+            value={rejectNote}
+            onChange={setRejectNote}
+            multiline={3}
+            autoComplete="off"
+            helpText="Internal note for your team. Not shown to the customer by default."
+          />
+        </Modal.Section>
+      </Modal>
     </Page>
   );
 }
