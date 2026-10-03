@@ -78,7 +78,7 @@ After code changes that touch the theme extension or app config:
 shopify app deploy
 ```
 
-New theme blocks: **AfterSale portal/register/claim (embed)** — add in the theme editor under Apps.
+New theme blocks: **AfterSale portal/register/claim embed** — add in the theme editor under Apps.
 
 ## Protected customer data (orders / refunds)
 
