@@ -38,13 +38,9 @@ export async function GET(
   if (link.targetType === "product" && link.targetId) q.set("product_id", link.targetId);
   if (link.targetType === "variant" && link.targetId) q.set("variant_id", link.targetId);
 
-  // Prefer storefront app proxy URL when shop domain known
-  if (shop?.shopDomain) {
-    return NextResponse.redirect(
-      `https://${shop.shopDomain}/apps/aftersale/register?${q.toString()}`,
-    );
-  }
-  return NextResponse.redirect(`${appUrl}/apps/aftersale/register?${q.toString()}`);
+  // Hosted app URL — reliable (app-proxy pages need assetPrefix + absolute APIs).
+  const base = appUrl.replace(/\/$/, "") || (shop?.shopDomain ? `https://${shop.shopDomain}` : "");
+  return NextResponse.redirect(`${base}/apps/aftersale/register?${q.toString()}`);
 }
 
 export async function POST(request: NextRequest) {

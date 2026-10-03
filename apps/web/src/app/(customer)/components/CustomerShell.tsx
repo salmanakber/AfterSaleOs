@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
+import { publicApiUrl } from "@/lib/public-api";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function CustomerShell({
@@ -32,7 +33,7 @@ export function CustomerShell({
   useEffect(() => {
     if (!shopDomain) return;
     let cancelled = false;
-    fetch(`/api/public/branding?shop=${encodeURIComponent(shopDomain)}`)
+    fetch(publicApiUrl(`/api/public/branding?shop=${encodeURIComponent(shopDomain)}`))
       .then((r) => (r.ok ? r.json() : null))
       .then((json) => {
         if (cancelled || !json) return;

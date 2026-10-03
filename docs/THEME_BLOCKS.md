@@ -2,6 +2,22 @@
 
 Shopify **never auto-adds** theme app blocks. After deploy you must place or enable them.
 
+## Embed stuck on “Loading…”
+
+Theme iframes must load the **hosted app** (`https://aftersale.tidyflowapp.com/...`), not the shop proxy (`/apps/aftersale/...`). Proxy HTML cannot load Next.js `/_next` JS from the shop domain, so the page never hydrates.
+
+After pulling the fix:
+
+```bash
+git pull
+npm install
+npm run build    # needs APP_URL + NEXT_PUBLIC_APP_URL
+# restart web
+shopify app deploy
+```
+
+In the theme block settings, confirm **App URL** is `https://aftersale.tidyflowapp.com` (not your `.myshopify.com` domain).
+
 ## Fastest path (recommended)
 
 1. `shopify app deploy` succeeds.

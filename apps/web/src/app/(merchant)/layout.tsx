@@ -1,3 +1,4 @@
+import Script from "next/script";
 import "@shopify/polaris/build/esm/styles.css";
 import "./merchant.css";
 import { AppProviders } from "./providers";
@@ -5,6 +6,10 @@ import { AppProviders } from "./providers";
 export default function MerchantLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
+      <Script
+        src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
+        strategy="beforeInteractive"
+      />
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link

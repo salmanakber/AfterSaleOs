@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { customerPageUrl, publicApiUrl } from "@/lib/public-api";
 import { CustomerShell } from "../../../components/CustomerShell";
 
 function PortalInner() {
@@ -35,7 +36,7 @@ function PortalInner() {
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch("/api/public/portal", {
+        const res = await fetch(publicApiUrl("/api/public/portal"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),
@@ -59,7 +60,12 @@ function PortalInner() {
     setLoading(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/public/guest-link?shop=${encodeURIComponent(shop)}`, {
+      if (!shop) {
+        setMessage("Missing shop. Open this portal from your store link or embed.");
+        setLoading(false);
+        return;
+      }
+      const res = await fetch(publicApiUrl(`/api/public/guest-link?shop=${encodeURIComponent(shop)}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, orderNumber, shop }),
@@ -88,7 +94,7 @@ function PortalInner() {
       steps={warranties ? ["Verify", "Open portal", "Manage"] : ["Verify", "Email link", "Open portal"]}
       activeStep={warranties ? 2 : 0}
       footer={
-        <a className="as-link" href={`/apps/aftersale/register?shop=${encodeURIComponent(shop)}`}>
+        <a className="as-link" href={customerPageUrl("/apps/aftersale/register", shop)}>
           Register another product →
         </a>
       }
@@ -126,12 +132,14 @@ function PortalInner() {
                   </span>
                 </div>
                 <div className="as-actions" style={{ marginTop: 8 }}>
-                  <a className="as-btn as-btn-secondary" href={`/c/${w.certificateToken}`}>
+                  <a className="as-btn as-btn-secondary" href={customerPageUrl(`/c/${w.certificateToken}`)}>
                     View certificate
                   </a>
                   <a
                     className="as-btn as-btn-ghost"
-                    href={`/apps/aftersale/claim?shop=${encodeURIComponent(shop)}&certificate=${encodeURIComponent(w.certificateToken)}`}
+                    href={customerPageUrl("/apps/aftersale/claim", shop, {
+                      certificate: w.certificateToken,
+                    })}
                   >
                     Start a claim
                   </a>
@@ -175,7 +183,17 @@ function PortalInner() {
 
 export default function PortalPage() {
   return (
-    <Suspense fallback={<div className="as-shell">Loading portal…</div>}>
+    <Suspense
+      fallback={
+        <div className="as-shell as-shell-embed" style={{ padding: 24 }}>
+          <div className="as-panel">
+            <p className="as-muted" style={{ margin: 0 }}>
+              Opening your warranty portal…
+            </p>
+          </div>
+        </div>
+      }
+    >
       <PortalInner />
     </Suspense>
   );

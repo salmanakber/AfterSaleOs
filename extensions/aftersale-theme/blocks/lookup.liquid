@@ -1,6 +1,8 @@
-{% comment %} Warranty lookup entry block for footer / account pages {% endcomment %}
+{% comment %} Warranty lookup entry block {% endcomment %}
+{% assign as_app_url = block.settings.app_url | default: 'https://aftersale.tidyflowapp.com' | strip | remove_last: '/' %}
+
 <div class="as-lookup-block" {{ block.shopify_attributes }}>
-  <a href="/apps/aftersale/portal?shop={{ shop.permanent_domain }}">
+  <a href="{{ as_app_url }}/apps/aftersale/portal?shop={{ shop.permanent_domain }}">
     {{ block.settings.label | default: "Check your warranty" }}
   </a>
 </div>
@@ -10,6 +12,12 @@
   "name": "AfterSale lookup",
   "target": "section",
   "settings": [
+    {
+      "type": "text",
+      "id": "app_url",
+      "label": "App URL",
+      "default": "https://aftersale.tidyflowapp.com"
+    },
     {
       "type": "text",
       "id": "label",

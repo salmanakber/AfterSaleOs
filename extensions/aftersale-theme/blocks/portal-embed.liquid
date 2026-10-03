@@ -1,15 +1,18 @@
 {% comment %}
-  Embeds the AfterSale warranty portal (iframe). Uses app proxy /apps/aftersale/portal.
+  Embeds warranty portal via hosted app URL (not app proxy) so Next.js JS loads correctly.
 {% endcomment %}
+
+{% assign as_app_url = block.settings.app_url | default: 'https://aftersale.tidyflowapp.com' | strip | remove_last: '/' %}
 
 <div class="as-embed-block" {{ block.shopify_attributes }}>
   <iframe
     class="as-embed-block__frame"
     title="{{ block.settings.title | default: 'Warranty portal' }}"
-    src="/apps/aftersale/portal?shop={{ shop.permanent_domain }}&embed=1"
-    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:12px;"
+    src="{{ as_app_url }}/apps/aftersale/portal?shop={{ shop.permanent_domain }}&embed=1"
+    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:12px;background:#f8fafc;"
     loading="lazy"
     allow="clipboard-write"
+    referrerpolicy="no-referrer-when-downgrade"
   ></iframe>
 </div>
 
@@ -19,6 +22,13 @@
   "target": "section",
   "stylesheet": "aftersale.css",
   "settings": [
+    {
+      "type": "text",
+      "id": "app_url",
+      "label": "App URL (do not use shop domain)",
+      "default": "https://aftersale.tidyflowapp.com",
+      "info": "Must be your AfterSale hosting URL so the form can load."
+    },
     {
       "type": "text",
       "id": "title",

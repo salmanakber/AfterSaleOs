@@ -1,18 +1,23 @@
 {% comment %}
-  AfterSale product registration block.
-  Uses app proxy path /apps/aftersale/* (requires app deploy + proxy enabled).
+  AfterSale product registration block — hosted URL so the form always loads.
 {% endcomment %}
+
+{% assign as_app_url = block.settings.app_url | default: 'https://aftersale.tidyflowapp.com' | strip | remove_last: '/' %}
+{% assign product_q = '' %}
+{% if product %}
+  {% assign product_q = product.title | url_encode %}
+{% endif %}
 
 <div class="as-register-block" {{ block.shopify_attributes }}>
   <a
     class="as-register-block__btn"
-    href="/apps/aftersale/register?shop={{ shop.permanent_domain }}&product={{ product.title | url_encode }}&product_id={{ product.id }}{% if product.selected_or_first_available_variant %}&variant_id={{ product.selected_or_first_available_variant.id }}{% endif %}"
+    href="{{ as_app_url }}/apps/aftersale/register?shop={{ shop.permanent_domain }}{% if product %}&product={{ product_q }}&product_id={{ product.id }}{% if product.selected_or_first_available_variant %}&variant_id={{ product.selected_or_first_available_variant.id }}{% endif %}{% endif %}"
   >
     {{ block.settings.button_label | default: "Register for warranty" }}
   </a>
   {% if block.settings.show_lookup %}
     <p class="as-register-block__lookup">
-      <a href="/apps/aftersale/portal?shop={{ shop.permanent_domain }}">
+      <a href="{{ as_app_url }}/apps/aftersale/portal?shop={{ shop.permanent_domain }}">
         {{ block.settings.lookup_label | default: "Look up your warranty" }}
       </a>
     </p>
@@ -28,6 +33,12 @@
     "templates": ["product", "page", "index"]
   },
   "settings": [
+    {
+      "type": "text",
+      "id": "app_url",
+      "label": "App URL",
+      "default": "https://aftersale.tidyflowapp.com"
+    },
     {
       "type": "text",
       "id": "button_label",

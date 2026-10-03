@@ -4,7 +4,8 @@
 {% endcomment %}
 
 {% assign accent = block.settings.accent_color | default: '#1a1d26' %}
-{% assign register_url = '/apps/aftersale/register?shop=' | append: shop.permanent_domain %}
+{% assign as_app_url = block.settings.app_url | default: 'https://aftersale.tidyflowapp.com' | strip | remove_last: '/' %}
+{% assign register_url = as_app_url | append: '/apps/aftersale/register?shop=' | append: shop.permanent_domain %}
 {% if product %}
   {% assign product_q = product.title | url_encode %}
   {% assign register_url = register_url | append: '&product=' | append: product_q %}
@@ -97,6 +98,12 @@
       "id": "accent_color",
       "label": "Accent color",
       "default": "#1A1D26"
+    },
+    {
+      "type": "text",
+      "id": "app_url",
+      "label": "App URL",
+      "default": "https://aftersale.tidyflowapp.com"
     }
   ]
 }

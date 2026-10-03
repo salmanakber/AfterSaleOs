@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { customerPageUrl, publicApiUrl } from "@/lib/public-api";
 import { CustomerShell } from "../../../components/CustomerShell";
 
 function RegisterInner() {
@@ -35,7 +36,8 @@ function RegisterInner() {
     setError(null);
     setMessage(null);
     try {
-      const res = await fetch(`/api/public/register?${query}`, {
+      if (!shop) throw new Error("Missing shop. Open this page from your store or embed link.");
+      const res = await fetch(publicApiUrl(`/api/public/register?${query}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -74,7 +76,7 @@ function RegisterInner() {
         steps={["Details", "Submit", "Certificate"]}
         activeStep={2}
         footer={
-          <a className="as-link" href={`/apps/aftersale/portal?shop=${encodeURIComponent(shop)}`}>
+          <a className="as-link" href={customerPageUrl("/apps/aftersale/portal", shop)}>
             Open warranty portal →
           </a>
         }
@@ -109,11 +111,16 @@ function RegisterInner() {
       steps={["Details", "Submit", "Certificate"]}
       activeStep={0}
       footer={
-        <a className="as-link" href={`/apps/aftersale/portal?shop=${encodeURIComponent(shop)}`}>
+        <a className="as-link" href={customerPageUrl("/apps/aftersale/portal", shop)}>
           Already registered? Open your portal →
         </a>
       }
     >
+      {!shop ? (
+        <div className="as-alert as-alert-error">
+          This registration page needs a shop link. Open it from your store, QR code, or theme embed.
+        </div>
+      ) : null}
       <div className="as-tabs as-no-print">
         <button
           type="button"
@@ -210,9 +217,21 @@ function RegisterInner() {
   );
 }
 
+function CustomerLoading({ label }: { label: string }) {
+  return (
+    <div className="as-shell as-shell-embed" style={{ padding: 24 }}>
+      <div className="as-panel">
+        <p className="as-muted" style={{ margin: 0 }}>
+          {label}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function RegisterPage() {
   return (
-    <Suspense fallback={<div className="as-shell">Loading…</div>}>
+    <Suspense fallback={<CustomerLoading label="Opening registration…" />}>
       <RegisterInner />
     </Suspense>
   );

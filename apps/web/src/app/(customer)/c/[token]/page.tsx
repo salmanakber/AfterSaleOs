@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { customerPageUrl, publicApiUrl } from "@/lib/public-api";
 import { ThemeToggle } from "../../components/ThemeToggle";
 
 type Cert = {
@@ -31,7 +32,7 @@ function CertificateInner() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/public/certificate/${token}`)
+    fetch(publicApiUrl(`/api/public/certificate/${token}`))
       .then(async (res) => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Not found");
@@ -150,7 +151,7 @@ function CertificateInner() {
       ) : null}
 
       <div className="as-actions as-no-print">
-        <a className="as-btn" href={`/api/public/certificate/${token}/pdf`} download>
+        <a className="as-btn" href={publicApiUrl(`/api/public/certificate/${token}/pdf`)} download>
           Download PDF
         </a>
         <button className="as-btn as-btn-secondary" type="button" onClick={() => window.print()}>
@@ -158,7 +159,7 @@ function CertificateInner() {
         </button>
         <a
           className="as-btn as-btn-secondary"
-          href={`/apps/aftersale/portal?shop=${encodeURIComponent(cert.shop.shopDomain)}`}
+          href={customerPageUrl("/apps/aftersale/portal", cert.shop.shopDomain)}
         >
           Back to portal
         </a>

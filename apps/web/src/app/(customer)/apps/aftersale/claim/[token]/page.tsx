@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { publicApiUrl } from "@/lib/public-api";
 import { CustomerShell } from "../../../../components/CustomerShell";
 
 type ClaimView = {
@@ -34,7 +35,7 @@ function TrackInner() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/public/claims?token=${encodeURIComponent(token)}`)
+    fetch(publicApiUrl(`/api/public/claims?token=${encodeURIComponent(token)}`))
       .then(async (res) => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Not found");

@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { publicApiUrl } from "@/lib/public-api";
 import { CustomerShell } from "../../../components/CustomerShell";
 
 function ClaimFormInner() {
@@ -38,7 +39,7 @@ function ClaimFormInner() {
         for (const file of Array.from(files).slice(0, 5)) {
           const fd = new FormData();
           fd.append("file", file);
-          const up = await fetch(`/api/public/attachments/upload?${query}`, {
+          const up = await fetch(publicApiUrl(`/api/public/attachments/upload?${query}`), {
             method: "POST",
             body: fd,
           });
@@ -48,7 +49,8 @@ function ClaimFormInner() {
         }
       }
 
-      const res = await fetch(`/api/public/claims?${query}`, {
+      if (!shop) throw new Error("Missing shop. Open this claim form from your store or embed.");
+      const res = await fetch(publicApiUrl(`/api/public/claims?${query}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -207,7 +209,17 @@ function ClaimFormInner() {
 
 export default function ClaimFormPage() {
   return (
-    <Suspense fallback={<div className="as-shell">Loading…</div>}>
+    <Suspense
+      fallback={
+        <div className="as-shell as-shell-embed" style={{ padding: 24 }}>
+          <div className="as-panel">
+            <p className="as-muted" style={{ margin: 0 }}>
+              Opening claim form…
+            </p>
+          </div>
+        </div>
+      }
+    >
       <ClaimFormInner />
     </Suspense>
   );

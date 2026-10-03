@@ -16,6 +16,8 @@ import {
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
+import { friendlyError } from "@/lib/merchant-errors";
+import { appHref } from "@/lib/shop-context";
 
 type ClaimRow = {
   id: string;
@@ -65,7 +67,7 @@ export function ClaimsListPage() {
         setNodes(d.claims.nodes);
         setTotal(d.claims.total);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+      .catch((e) => setError(friendlyError(e)));
   }, [status, query]);
 
   useEffect(() => {
@@ -76,7 +78,7 @@ export function ClaimsListPage() {
     <Page
       title="Claims"
       subtitle={`${total} total`}
-      primaryAction={{ content: "New claim", url: "/claims/new" }}
+      primaryAction={{ content: "New claim", url: appHref("/claims/new") }}
     >
       <Layout>
         {error ? (
@@ -122,15 +124,26 @@ export function ClaimsListPage() {
               </InlineStack>
 
               {nodes.length === 0 ? (
-                <Text as="p" tone="subdued">
-                  No claims yet. Customers can submit via the storefront claim form.
-                </Text>
+                <BlockStack gap="200">
+                  <Text as="p" tone="subdued">
+                    No claims match this view yet.
+                  </Text>
+                  <Text as="p" tone="subdued">
+                    Customers submit via Customer pages → claim form, theme claim block, or you can
+                    create one with New claim. Publish a warranty rule first so eligibility has coverage
+                    to check.
+                  </Text>
+                  <InlineStack gap="200">
+                    <Button url={appHref("/claims/new")}>New claim</Button>
+                    <Button url={appHref("/settings")}>Customer pages</Button>
+                  </InlineStack>
+                </BlockStack>
               ) : (
                 <DataTable
                   columnContentTypes={["text", "text", "text", "text", "text", "text", "text"]}
                   headings={["Claim", "Customer", "Product", "Summary", "Eligibility", "Status", "Opened"]}
                   rows={nodes.map((c) => [
-                    <Button key={c.id} variant="plain" url={`/claims/${c.id}`}>
+                    <Button key={c.id} variant="plain" url={appHref(`/claims/${c.id}`)}>
                       {c.claimNumber}
                     </Button>,
                     c.customerEmail ?? "—",

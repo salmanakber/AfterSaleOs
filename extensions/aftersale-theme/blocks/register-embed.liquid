@@ -1,15 +1,22 @@
 {% comment %}
-  Embeds product registration (iframe). Passes product context when block is on a product template.
+  Embeds product registration via hosted app URL (fixes perpetual Loading in iframe).
 {% endcomment %}
+
+{% assign as_app_url = block.settings.app_url | default: 'https://aftersale.tidyflowapp.com' | strip | remove_last: '/' %}
+{% assign product_q = '' %}
+{% if product %}
+  {% assign product_q = product.title | url_encode %}
+{% endif %}
 
 <div class="as-embed-block" {{ block.shopify_attributes }}>
   <iframe
     class="as-embed-block__frame"
     title="{{ block.settings.title | default: 'Register warranty' }}"
-    src="/apps/aftersale/register?shop={{ shop.permanent_domain }}&embed=1{% if product %}&product={{ product.title | url_encode }}&product_id={{ product.id }}{% if product.selected_or_first_available_variant %}&variant_id={{ product.selected_or_first_available_variant.id }}{% endif %}{% endif %}"
-    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:12px;"
+    src="{{ as_app_url }}/apps/aftersale/register?shop={{ shop.permanent_domain }}&embed=1{% if product %}&product={{ product_q }}&product_id={{ product.id }}{% if product.selected_or_first_available_variant %}&variant_id={{ product.selected_or_first_available_variant.id }}{% endif %}{% endif %}"
+    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:12px;background:#f8fafc;"
     loading="lazy"
     allow="clipboard-write"
+    referrerpolicy="no-referrer-when-downgrade"
   ></iframe>
 </div>
 
@@ -19,6 +26,13 @@
   "target": "section",
   "stylesheet": "aftersale.css",
   "settings": [
+    {
+      "type": "text",
+      "id": "app_url",
+      "label": "App URL (do not use shop domain)",
+      "default": "https://aftersale.tidyflowapp.com",
+      "info": "Must be your AfterSale hosting URL so the form can load."
+    },
     {
       "type": "text",
       "id": "title",

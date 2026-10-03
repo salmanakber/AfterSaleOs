@@ -23,6 +23,8 @@ HOST=0.0.0.0
 NODE_ENV=production
 ```
 
+`APP_URL` and `NEXT_PUBLIC_APP_URL` must both be set (same value). They power theme embeds, `assetPrefix` for `/_next` assets, and customer API calls from storefront iframes.
+
 ## Run
 
 ```bash
