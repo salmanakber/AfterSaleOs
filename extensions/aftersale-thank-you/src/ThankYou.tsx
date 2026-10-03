@@ -1,31 +1,29 @@
-import {
-  reactExtension,
-  Banner,
-  BlockStack,
-  Button,
-  Text,
-  useShop,
-} from "@shopify/ui-extensions-react/checkout";
+import "@shopify/ui-extensions/preact";
+import { render } from "preact";
 
 /**
- * Thank-you page block: "Register this product for warranty"
- * Enable: Checkout editor → Thank you → Add app block → AfterSale thank you
+ * Thank-you page: Register this product for warranty.
+ * Enable in Checkout editor → Thank you → Add app block → AfterSale thank you
  */
-export default reactExtension("purchase.thank-you.block.render", () => <ThankYouRegister />);
+export default async function extension() {
+  render(<ThankYouRegister />, document.body);
+}
 
 function ThankYouRegister() {
-  const shop = useShop();
-  const registerUrl = `https://aftersale.tidyflowapp.com/apps/aftersale/register?shop=${encodeURIComponent(shop.myshopifyDomain)}`;
+  const shopDomain = shopify.shop.myshopifyDomain;
+  const registerUrl = `https://aftersale.tidyflowapp.com/apps/aftersale/register?shop=${encodeURIComponent(shopDomain)}`;
 
   return (
-    <Banner title="Register for warranty" status="info">
-      <BlockStack spacing="base">
-        <Text>
+    <s-banner heading="Register for warranty" tone="info">
+      <s-stack direction="block" gap="base">
+        <s-text>
           Protect your purchase — register your product for warranty coverage. It only takes a
           minute.
-        </Text>
-        <Button to={registerUrl}>Register this product</Button>
-      </BlockStack>
-    </Banner>
+        </s-text>
+        <s-button href={registerUrl} target="_blank">
+          Register this product
+        </s-button>
+      </s-stack>
+    </s-banner>
   );
 }

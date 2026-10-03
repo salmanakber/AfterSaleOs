@@ -10,14 +10,23 @@ Liquid theme blocks **cannot** run on Shopify Checkout. AfterSale uses these sur
 
 ## Thank you page (order confirmed)
 
-Extension: `extensions/aftersale-thank-you`
+Extension: `extensions/aftersale-thank-you` (Preact + `@shopify/ui-extensions` **2025.10**, not the old React package)
 
-1. `shopify app deploy`
-2. Shopify admin → **Settings → Checkout** → customize **Thank you** / **Order status**
-3. **Add app block** → **AfterSale thank you**
-4. Save
+1. From the repo root: `npm install` (workspace includes `extensions/*`)
+2. Confirm packages exist: `ls node_modules/@shopify/ui-extensions`
+3. `shopify app deploy`
+3. Shopify admin → **Settings → Checkout** → customize **Thank you** / **Order status**
+4. **Add app block** → **AfterSale thank you**
+5. Save
 
 The button opens the hosted register form with the shop pre-filled.
+
+If deploy fails on missing packages, run:
+
+```bash
+npm install -w aftersale-thank-you
+shopify app deploy
+```
 
 ## Why not classic cart drawer Liquid?
 
