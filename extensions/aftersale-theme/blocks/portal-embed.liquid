@@ -1,20 +1,38 @@
-{% comment %}
-  Embeds warranty portal via hosted app URL (not app proxy) so Next.js JS loads correctly.
-{% endcomment %}
+{% comment %} Embeds warranty portal via hosted app URL + editor preview. {% endcomment %}
 
-{% assign as_app_url = block.settings.app_url | default: 'https://aftersale.tidyflowapp.com' | strip | remove_last: '/' %}
+{% capture as_app_url %}{% render 'as-app-host', url: block.settings.app_url %}{% endcapture %}
+{% assign as_app_url = as_app_url | strip %}
+{% assign embed_src = as_app_url | append: '/apps/aftersale/portal?shop=' | append: shop.permanent_domain | append: '&embed=1' %}
 
-<div class="as-embed-block" {{ block.shopify_attributes }}>
+<div class="as-embed-block" {{ block.shopify_attributes }} data-as-embed>
+  <div class="as-embed-mock" data-as-embed-mock>
+    <div class="as-embed-mock__bar">
+      <span></span><span></span><span></span>
+      <em>Warranty portal · preview</em>
+    </div>
+    <div class="as-embed-mock__body">
+      <strong>Your warranties</strong>
+      <p>Customers look up coverage with email + order number, then open certificates and claims.</p>
+      <div class="as-embed-mock__fields">
+        <i></i><i></i>
+      </div>
+      <span class="as-embed-mock__btn">Email me a link</span>
+      <a class="as-embed-mock__link" href="{{ embed_src }}" target="_blank" rel="noopener">Open portal ↗</a>
+    </div>
+  </div>
   <iframe
     class="as-embed-block__frame"
     title="{{ block.settings.title | default: 'Warranty portal' }}"
-    src="{{ as_app_url }}/apps/aftersale/portal?shop={{ shop.permanent_domain }}&embed=1"
+    src="{{ embed_src }}"
     style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:12px;background:#f8fafc;"
-    loading="lazy"
+    loading="eager"
     allow="clipboard-write"
     referrerpolicy="no-referrer-when-downgrade"
+    data-as-embed-frame
   ></iframe>
 </div>
+
+<script src="{{ 'as-embed.js' | asset_url }}" defer></script>
 
 {% schema %}
 {
@@ -25,9 +43,9 @@
     {
       "type": "text",
       "id": "app_url",
-      "label": "App URL (do not use shop domain)",
+      "label": "App URL (hosted AfterSale)",
       "default": "https://aftersale.tidyflowapp.com",
-      "info": "Must be your AfterSale hosting URL so the form can load."
+      "info": "Use https://aftersale.tidyflowapp.com — never your .myshopify.com domain."
     },
     {
       "type": "text",

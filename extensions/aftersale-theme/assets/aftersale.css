@@ -25,12 +25,145 @@
 .as-embed-block {
   margin: 1rem 0;
   width: 100%;
+  position: relative;
 }
 
 .as-embed-block__frame {
   display: block;
   width: 100%;
   background: #f8fafc;
+}
+
+.as-embed-block.is-design-mode .as-embed-block__frame,
+.as-embed-block.is-frame-blocked .as-embed-block__frame {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.as-embed-mock {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+  margin-bottom: 0;
+  font-family: "Figtree", "Segoe UI", system-ui, sans-serif;
+}
+
+.as-embed-block.is-frame-loaded:not(.is-design-mode):not(.is-frame-blocked) .as-embed-mock {
+  display: none;
+}
+
+.as-embed-mock__bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  background: #0f172a;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.as-embed-mock__bar span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64748b;
+  display: inline-block;
+}
+
+.as-embed-mock__bar span:nth-child(1) {
+  background: #f87171;
+}
+.as-embed-mock__bar span:nth-child(2) {
+  background: #fbbf24;
+}
+.as-embed-mock__bar span:nth-child(3) {
+  background: #34d399;
+}
+
+.as-embed-mock__bar em {
+  margin-left: 8px;
+  font-style: normal;
+  letter-spacing: 0.02em;
+}
+
+.as-embed-mock__body {
+  padding: 18px 16px 16px;
+  display: grid;
+  gap: 10px;
+  background: linear-gradient(180deg, #fff, #f8fafc);
+}
+
+.as-embed-mock__body strong {
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
+
+.as-embed-mock__body p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #6b7280;
+}
+
+.as-embed-mock__fields {
+  display: grid;
+  gap: 8px;
+}
+
+.as-embed-mock__fields i {
+  display: block;
+  height: 36px;
+  border-radius: 8px;
+  background: #eef2f7;
+  border: 1px solid #e5e7eb;
+}
+
+.as-embed-mock__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  background: #1a1d26;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.as-embed-mock__link {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1a1d26;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.as-embed-mock--compact {
+  margin-bottom: 10px;
+}
+
+.as-embed-mock--compact .as-embed-mock__body {
+  padding: 12px 14px;
+  gap: 4px;
+}
+
+.as-register-block .as-embed-mock--compact,
+.as-claim-block .as-embed-mock--compact,
+.as-lookup-block .as-embed-mock--compact {
+  display: none;
+}
+
+/* Theme editor: show compact preview cards for button blocks */
+.shopify-design-mode .as-register-block .as-embed-mock--compact,
+.shopify-design-mode .as-claim-block .as-embed-mock--compact,
+.shopify-design-mode .as-lookup-block .as-embed-mock--compact {
+  display: block;
 }
 
 /* —— Warranty opt-in card —— */

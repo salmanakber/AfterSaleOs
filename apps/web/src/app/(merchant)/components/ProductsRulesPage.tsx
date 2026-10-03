@@ -330,7 +330,7 @@ export function ProductsRulesPage() {
       title="Products & Rules"
       primaryAction={{ content: "Create rule", onAction: () => setOpen(true) }}
       secondaryActions={
-        tour ? [{ content: "Take a tour", onAction: () => tour.startTour("rules") }] : undefined
+        tour ? [{ content: "Take a tour", onAction: () => tour.startTour("rules", { force: true }) }] : undefined
       }
     >
       <Layout>

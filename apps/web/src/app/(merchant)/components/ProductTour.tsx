@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -22,7 +23,7 @@ type TourContextValue = {
   active: TourDefinition | null;
   stepIndex: number;
   step: TourStep | null;
-  startTour: (id: string) => void;
+  startTour: (id: string, opts?: { force?: boolean }) => void;
   next: () => void;
   prev: () => void;
   skip: () => void;
@@ -47,29 +48,32 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState<TourDefinition | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [tabHandler, setTabHandlerState] = useState<((tab: string) => void) | null>(null);
+  const activeIdRef = useRef<string | null>(null);
 
   const setTabHandler = useCallback((fn: ((tab: string) => void) | null) => {
     setTabHandlerState(() => fn);
   }, []);
 
-  const startTour = useCallback((id: string) => {
+  const startTour = useCallback((id: string, opts?: { force?: boolean }) => {
     const def = TOURS[id];
     if (!def) return;
+    // Prevent auto-start / re-renders from resetting an in-progress tour to step 0.
+    if (!opts?.force && activeIdRef.current === id) return;
+    activeIdRef.current = id;
     setActive(def);
     setStepIndex(0);
   }, []);
 
-  const finish = useCallback(
-    (skipped: boolean) => {
-      if (active) {
-        if (skipped && active.id === "welcome") skipWelcomeTour();
-        else markTourCompleted(active.id);
-      }
-      setActive(null);
-      setStepIndex(0);
-    },
-    [active],
-  );
+  const finish = useCallback((skipped: boolean) => {
+    const id = activeIdRef.current;
+    if (id) {
+      if (skipped && id === "welcome") skipWelcomeTour();
+      else markTourCompleted(id);
+    }
+    activeIdRef.current = null;
+    setActive(null);
+    setStepIndex(0);
+  }, []);
 
   const step = active?.steps[stepIndex] ?? null;
 
@@ -78,14 +82,24 @@ export function TourProvider({ children }: { children: ReactNode }) {
   }, [step?.id, step?.tab, tabHandler]);
 
   const next = useCallback(() => {
-    if (!active) return;
-    if (stepIndex >= active.steps.length - 1) finish(false);
-    else setStepIndex((i) => i + 1);
-  }, [active, stepIndex, finish]);
+    const id = activeIdRef.current;
+    if (!id) return;
+    const current = TOURS[id];
+    if (!current) return;
+    setStepIndex((i) => {
+      if (i >= current.steps.length - 1) {
+        queueMicrotask(() => finish(false));
+        return i;
+      }
+      return i + 1;
+    });
+  }, [finish]);
 
   const prev = useCallback(() => {
     setStepIndex((i) => Math.max(0, i - 1));
   }, []);
+
+  const skip = useCallback(() => finish(true), [finish]);
 
   const value = useMemo(
     () => ({
@@ -95,10 +109,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
       startTour,
       next,
       prev,
-      skip: () => finish(true),
+      skip,
       setTabHandler,
     }),
-    [active, stepIndex, step, startTour, next, prev, finish, setTabHandler],
+    [active, stepIndex, step, startTour, next, prev, skip, setTabHandler],
   );
 
   return (
@@ -111,7 +125,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
           stepIndex={stepIndex}
           onNext={next}
           onPrev={prev}
-          onSkip={() => finish(true)}
+          onSkip={skip}
         />
       ) : null}
     </TourContext.Provider>
@@ -254,7 +268,7 @@ export function TourTrigger({
     <button
       type="button"
       className={className}
-      onClick={() => tour.startTour(tourId)}
+      onClick={() => tour.startTour(tourId, { force: true })}
       data-tour-trigger={tourId}
     >
       {done ? "Replay tour" : label}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge, Banner, Layout, Page, Text } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 import { appHref } from "@/lib/shop-context";
@@ -58,6 +58,7 @@ export function HomeDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const tour = useOptionalTour();
+  const autoTourStarted = useRef(false);
 
   useEffect(() => {
     gqlRequest<HomeData>(HOME_QUERY)
@@ -67,8 +68,9 @@ export function HomeDashboard() {
   }, []);
 
   useEffect(() => {
-    if (loading || !data || !tour) return;
+    if (autoTourStarted.current || loading || !data || !tour) return;
     if (!shouldAutoStartWelcome()) return;
+    autoTourStarted.current = true;
     const t = window.setTimeout(() => tour.startTour("welcome"), 700);
     return () => window.clearTimeout(t);
   }, [loading, data, tour]);

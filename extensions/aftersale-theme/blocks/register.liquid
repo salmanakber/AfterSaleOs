@@ -2,13 +2,20 @@
   AfterSale product registration block — hosted URL so the form always loads.
 {% endcomment %}
 
-{% assign as_app_url = block.settings.app_url | default: 'https://aftersale.tidyflowapp.com' | strip | remove_last: '/' %}
+{% capture as_app_url %}{% render 'as-app-host', url: block.settings.app_url %}{% endcapture %}
+{% assign as_app_url = as_app_url | strip %}
 {% assign product_q = '' %}
 {% if product %}
   {% assign product_q = product.title | url_encode %}
 {% endif %}
 
 <div class="as-register-block" {{ block.shopify_attributes }}>
+  <div class="as-embed-mock as-embed-mock--compact">
+    <div class="as-embed-mock__body">
+      <strong>{{ block.settings.button_label | default: "Register for warranty" }}</strong>
+      <p>Button opens the hosted registration form for this product.</p>
+    </div>
+  </div>
   <a
     class="as-register-block__btn"
     href="{{ as_app_url }}/apps/aftersale/register?shop={{ shop.permanent_domain }}{% if product %}&product={{ product_q }}&product_id={{ product.id }}{% if product.selected_or_first_available_variant %}&variant_id={{ product.selected_or_first_available_variant.id }}{% endif %}{% endif %}"
@@ -36,8 +43,9 @@
     {
       "type": "text",
       "id": "app_url",
-      "label": "App URL",
-      "default": "https://aftersale.tidyflowapp.com"
+      "label": "App URL (hosted AfterSale)",
+      "default": "https://aftersale.tidyflowapp.com",
+      "info": "Never use your .myshopify.com domain."
     },
     {
       "type": "text",

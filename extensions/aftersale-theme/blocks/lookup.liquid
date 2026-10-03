@@ -1,7 +1,14 @@
 {% comment %} Warranty lookup entry block {% endcomment %}
-{% assign as_app_url = block.settings.app_url | default: 'https://aftersale.tidyflowapp.com' | strip | remove_last: '/' %}
+{% capture as_app_url %}{% render 'as-app-host', url: block.settings.app_url %}{% endcapture %}
+{% assign as_app_url = as_app_url | strip %}
 
 <div class="as-lookup-block" {{ block.shopify_attributes }}>
+  <div class="as-embed-mock as-embed-mock--compact">
+    <div class="as-embed-mock__body">
+      <strong>{{ block.settings.label | default: "Check your warranty" }}</strong>
+      <p>Link to the customer warranty portal.</p>
+    </div>
+  </div>
   <a href="{{ as_app_url }}/apps/aftersale/portal?shop={{ shop.permanent_domain }}">
     {{ block.settings.label | default: "Check your warranty" }}
   </a>
@@ -11,11 +18,12 @@
 {
   "name": "AfterSale lookup",
   "target": "section",
+  "stylesheet": "aftersale.css",
   "settings": [
     {
       "type": "text",
       "id": "app_url",
-      "label": "App URL",
+      "label": "App URL (hosted AfterSale)",
       "default": "https://aftersale.tidyflowapp.com"
     },
     {

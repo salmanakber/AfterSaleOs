@@ -1,24 +1,45 @@
-{% comment %}
-  Embeds claim flow via hosted app URL (fixes perpetual Loading in iframe).
-{% endcomment %}
+{% comment %} Embeds claim flow via hosted app URL + editor preview. {% endcomment %}
 
-{% assign as_app_url = block.settings.app_url | default: 'https://aftersale.tidyflowapp.com' | strip | remove_last: '/' %}
+{% capture as_app_url %}{% render 'as-app-host', url: block.settings.app_url %}{% endcapture %}
+{% assign as_app_url = as_app_url | strip %}
 {% assign product_q = '' %}
 {% if product %}
   {% assign product_q = product.title | url_encode %}
 {% endif %}
+{% assign embed_src = as_app_url | append: '/apps/aftersale/claim?shop=' | append: shop.permanent_domain | append: '&embed=1' %}
+{% if product %}
+  {% assign embed_src = embed_src | append: '&product=' | append: product_q | append: '&product_id=' | append: product.id %}
+{% endif %}
 
-<div class="as-embed-block" {{ block.shopify_attributes }}>
+<div class="as-embed-block" {{ block.shopify_attributes }} data-as-embed>
+  <div class="as-embed-mock" data-as-embed-mock>
+    <div class="as-embed-mock__bar">
+      <span></span><span></span><span></span>
+      <em>File a claim · preview</em>
+    </div>
+    <div class="as-embed-mock__body">
+      <strong>File a warranty claim</strong>
+      <p>Customers describe the issue, attach photos, and track status after submit.</p>
+      <div class="as-embed-mock__fields">
+        <i></i><i></i><i></i><i></i>
+      </div>
+      <span class="as-embed-mock__btn">Submit claim</span>
+      <a class="as-embed-mock__link" href="{{ embed_src }}" target="_blank" rel="noopener">Open claim form ↗</a>
+    </div>
+  </div>
   <iframe
     class="as-embed-block__frame"
     title="{{ block.settings.title | default: 'File a claim' }}"
-    src="{{ as_app_url }}/apps/aftersale/claim?shop={{ shop.permanent_domain }}&embed=1{% if product %}&product={{ product_q }}&product_id={{ product.id }}{% endif %}"
+    src="{{ embed_src }}"
     style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:12px;background:#f8fafc;"
-    loading="lazy"
+    loading="eager"
     allow="clipboard-write"
     referrerpolicy="no-referrer-when-downgrade"
+    data-as-embed-frame
   ></iframe>
 </div>
+
+<script src="{{ 'as-embed.js' | asset_url }}" defer></script>
 
 {% schema %}
 {
@@ -29,9 +50,9 @@
     {
       "type": "text",
       "id": "app_url",
-      "label": "App URL (do not use shop domain)",
+      "label": "App URL (hosted AfterSale)",
       "default": "https://aftersale.tidyflowapp.com",
-      "info": "Must be your AfterSale hosting URL so the form can load."
+      "info": "Use https://aftersale.tidyflowapp.com — never your .myshopify.com domain."
     },
     {
       "type": "text",

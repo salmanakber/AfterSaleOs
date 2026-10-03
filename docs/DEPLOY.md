@@ -97,3 +97,6 @@ npm run build                    # web, worker, admin
 Restart **web** and **worker** after deploy so GraphQL, email templates, and webhooks pick up changes.
 
 Post-deploy verification: [SMOKE_CHECKLIST.md](./SMOKE_CHECKLIST.md).
+
+Theme embeds / refused to connect: [THEME_BLOCKS.md](./THEME_BLOCKS.md).  
+Thank-you page register button: [CHECKOUT_REGISTER.md](./CHECKOUT_REGISTER.md).

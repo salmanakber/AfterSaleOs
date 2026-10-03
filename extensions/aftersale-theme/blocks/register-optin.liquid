@@ -4,7 +4,8 @@
 {% endcomment %}
 
 {% assign accent = block.settings.accent_color | default: '#1a1d26' %}
-{% assign as_app_url = block.settings.app_url | default: 'https://aftersale.tidyflowapp.com' | strip | remove_last: '/' %}
+{% capture as_app_url %}{% render 'as-app-host', url: block.settings.app_url %}{% endcapture %}
+{% assign as_app_url = as_app_url | strip %}
 {% assign register_url = as_app_url | append: '/apps/aftersale/register?shop=' | append: shop.permanent_domain %}
 {% if product %}
   {% assign product_q = product.title | url_encode %}

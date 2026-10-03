@@ -1,11 +1,18 @@
 {% comment %} AfterSale claim entry block — hosted URL {% endcomment %}
-{% assign as_app_url = block.settings.app_url | default: 'https://aftersale.tidyflowapp.com' | strip | remove_last: '/' %}
+{% capture as_app_url %}{% render 'as-app-host', url: block.settings.app_url %}{% endcapture %}
+{% assign as_app_url = as_app_url | strip %}
 {% assign product_q = '' %}
 {% if product %}
   {% assign product_q = product.title | url_encode %}
 {% endif %}
 
 <div class="as-claim-block" {{ block.shopify_attributes }}>
+  <div class="as-embed-mock as-embed-mock--compact">
+    <div class="as-embed-mock__body">
+      <strong>{{ block.settings.button_label | default: "File a warranty claim" }}</strong>
+      <p>Button opens the hosted claim form.</p>
+    </div>
+  </div>
   <a
     class="as-register-block__btn"
     href="{{ as_app_url }}/apps/aftersale/claim?shop={{ shop.permanent_domain }}{% if product %}&product={{ product_q }}&product_id={{ product.id }}{% endif %}"
@@ -26,7 +33,7 @@
     {
       "type": "text",
       "id": "app_url",
-      "label": "App URL",
+      "label": "App URL (hosted AfterSale)",
       "default": "https://aftersale.tidyflowapp.com"
     },
     {

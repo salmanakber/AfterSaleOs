@@ -2,9 +2,17 @@
 
 Shopify **never auto-adds** theme app blocks. After deploy you must place or enable them.
 
+## `myshopify.com refused to connect`
+
+The iframe was pointing at the **shop domain** (invalid Liquid `remove_last` broke the hosted App URL). Shopify blocks framing its own storefront/proxy in many cases.
+
+**Fix:** App URL must be `https://aftersale.tidyflowapp.com` — never `*.myshopify.com`. Redeploy the theme extension after pull.
+
 ## Embed stuck on “Loading…”
 
 Theme iframes must load the **hosted app** (`https://aftersale.tidyflowapp.com/...`), not the shop proxy (`/apps/aftersale/...`). Proxy HTML cannot load Next.js `/_next` JS from the shop domain, so the page never hydrates.
+
+Embed blocks now also show a **visual preview card** in the theme editor (Shopify often blocks live iframes inside the editor).
 
 After pulling the fix:
 
