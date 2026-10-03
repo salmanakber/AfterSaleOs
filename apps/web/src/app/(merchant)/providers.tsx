@@ -7,6 +7,7 @@ import enTranslations from "@shopify/polaris/locales/en.json";
 import { getSessionToken, clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
 import { rememberShopParams, getRememberedShop, appHref } from "@/lib/shop-context";
 import { AppNav } from "./components/AppNav";
+import { TourProvider } from "./components/ProductTour";
 
 declare global {
   interface Window {
@@ -124,21 +125,23 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <AppProvider i18n={enTranslations}>
       <MerchantAuthContext.Provider value={value}>
-        <Frame>
-          <div className="as-m-shell">
-            <AppNav />
-            <div className="as-m-main">
-              {error ? (
-                <div style={{ padding: "12px 16px" }}>
-                  <Banner tone="critical" title="Connection error">
-                    <p>{error}</p>
-                  </Banner>
-                </div>
-              ) : null}
-              <div className="as-m-page">{children}</div>
+        <TourProvider>
+          <Frame>
+            <div className="as-m-shell">
+              <AppNav />
+              <div className="as-m-main">
+                {error ? (
+                  <div style={{ padding: "12px 16px" }}>
+                    <Banner tone="critical" title="Connection error">
+                      <p>{error}</p>
+                    </Banner>
+                  </div>
+                ) : null}
+                <div className="as-m-page">{children}</div>
+              </div>
             </div>
-          </div>
-        </Frame>
+          </Frame>
+        </TourProvider>
       </MerchantAuthContext.Provider>
     </AppProvider>
   );

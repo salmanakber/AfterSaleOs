@@ -17,6 +17,7 @@ import {
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
+import { TourTrigger } from "./ProductTour";
 import { friendlyError } from "@/lib/merchant-errors";
 
 type Workflow = {
@@ -166,6 +167,9 @@ export function AutomationsPage() {
 
   return (
     <Page title="Automations" subtitle="Claim workflow statuses and customer email templates">
+      <div style={{ marginBottom: 12 }}>
+        <TourTrigger tourId="automations" />
+      </div>
       <Layout>
         {error ? (
           <Layout.Section>
@@ -210,6 +214,7 @@ export function AutomationsPage() {
 
             <Layout.Section>
               <Card>
+                <div data-tour="automations-statuses">
                 <BlockStack gap="300">
                   <Text as="h2" variant="headingMd">
                     Statuses
@@ -226,6 +231,7 @@ export function AutomationsPage() {
                     />
                   )}
                 </BlockStack>
+                </div>
               </Card>
             </Layout.Section>
 

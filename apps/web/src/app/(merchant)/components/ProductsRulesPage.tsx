@@ -17,6 +17,7 @@ import {
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
+import { TourTrigger, useOptionalTour } from "./ProductTour";
 
 type Rule = {
   id: string;
@@ -98,6 +99,7 @@ const LINK_SERIAL_LIST = `#graphql
 `;
 
 export function ProductsRulesPage() {
+  const tour = useOptionalTour();
   const [rules, setRules] = useState<Rule[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [serialLists, setSerialLists] = useState<SerialList[]>([]);
@@ -324,7 +326,13 @@ export function ProductsRulesPage() {
   );
 
   return (
-    <Page title="Products & Rules" primaryAction={{ content: "Create rule", onAction: () => setOpen(true) }}>
+    <Page
+      title="Products & Rules"
+      primaryAction={{ content: "Create rule", onAction: () => setOpen(true) }}
+      secondaryActions={
+        tour ? [{ content: "Take a tour", onAction: () => tour.startTour("rules") }] : undefined
+      }
+    >
       <Layout>
         {error ? (
           <Layout.Section>
@@ -343,6 +351,7 @@ export function ProductsRulesPage() {
 
         <Layout.Section>
           <Card>
+            <div data-tour="rules-panel">
             <BlockStack gap="400">
               <Text as="h2" variant="headingMd">
                 Warranty rules
@@ -373,11 +382,13 @@ export function ProductsRulesPage() {
                 ))
               )}
             </BlockStack>
+            </div>
           </Card>
         </Layout.Section>
 
         <Layout.Section>
           <Card>
+            <div data-tour="serials-panel">
             <BlockStack gap="300">
               <InlineStack align="space-between">
                 <Text as="h2" variant="headingMd">
@@ -402,6 +413,7 @@ export function ProductsRulesPage() {
                 </Text>
               ))}
             </BlockStack>
+            </div>
           </Card>
         </Layout.Section>
 

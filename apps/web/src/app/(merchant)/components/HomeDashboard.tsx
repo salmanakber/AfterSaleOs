@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Badge, Banner, Layout, Page, Text } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 import { appHref } from "@/lib/shop-context";
+import { shouldAutoStartWelcome } from "@/lib/tours";
+import { TourTrigger, useOptionalTour } from "./ProductTour";
 
 type HomeData = {
   home: {
@@ -55,6 +57,7 @@ export function HomeDashboard() {
   const [data, setData] = useState<HomeData["home"] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const tour = useOptionalTour();
 
   useEffect(() => {
     gqlRequest<HomeData>(HOME_QUERY)
@@ -62,6 +65,13 @@ export function HomeDashboard() {
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (loading || !data || !tour) return;
+    if (!shouldAutoStartWelcome()) return;
+    const t = window.setTimeout(() => tour.startTour("welcome"), 700);
+    return () => window.clearTimeout(t);
+  }, [loading, data, tour]);
 
   if (loading) {
     return (
@@ -130,12 +140,13 @@ export function HomeDashboard() {
               <a className="as-m-chip as-m-chip-accent" href={appHref("/claims/new")}>
                 New claim
               </a>
-              <a className="as-m-chip" href={appHref("/warranties")}>
+              <a className="as-m-chip" href={appHref("/warranties")} data-tour="hero-warranties">
                 Warranties
               </a>
-              <a className="as-m-chip" href={appHref("/settings")}>
+              <a className="as-m-chip" href={appHref("/settings")} data-tour="hero-customer-pages">
                 Customer pages
               </a>
+              <TourTrigger tourId="welcome" label="Take welcome tour" />
               <a className="as-m-chip" href={appHref("/plans")}>
                 {data.shop.plan ? data.shop.plan.name : "Choose plan"}
               </a>
@@ -145,7 +156,7 @@ export function HomeDashboard() {
 
         {data.setupChecklist.length > 0 ? (
           <Layout.Section>
-            <div className="as-m-panel">
+            <div className="as-m-panel" data-tour="setup-checklist">
               <div className="as-m-panel-title">
                 <h3>Finish setup</h3>
                 <Badge tone="attention">{`${data.setupChecklist.length} left`}</Badge>

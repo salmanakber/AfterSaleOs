@@ -13,6 +13,7 @@ import {
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 import { clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
+import { TourTrigger, useOptionalTour } from "./ProductTour";
 
 type ShopSettings = {
   brandingLogoUrl: string | null;
@@ -65,9 +66,20 @@ export function SettingsPage() {
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"brand" | "share" | "embed" | "preview">("brand");
+  const [activeTab, setActiveTab] = useState<"brand" | "share" | "embed" | "preview" | "guide">("guide");
   const [previewKind, setPreviewKind] = useState<PreviewKind>("portal");
   const [embedHeight, setEmbedHeight] = useState(720);
+  const tour = useOptionalTour();
+
+  useEffect(() => {
+    if (!tour) return;
+    tour.setTabHandler((tab) => {
+      if (tab === "brand" || tab === "share" || tab === "embed" || tab === "preview" || tab === "guide") {
+        setActiveTab(tab);
+      }
+    });
+    return () => tour.setTabHandler(null);
+  }, [tour]);
 
   useEffect(() => {
     gqlRequest<{ home: { shop: ShopSettings } }>(QUERY)
@@ -209,19 +221,20 @@ export function SettingsPage() {
         </div>
         <h2>Customer experience kit</h2>
         <p>
-          Configure branding once, then share hosted links, storefront proxy URLs, or embed snippets
-          anywhere.
+          One branding kit. Three ways to publish: Shopify theme blocks (Liquid), iframe embeds, or
+          shareable links.
         </p>
         <div className="as-m-hero-actions">
           <button type="button" className="as-m-chip as-m-chip-accent" onClick={() => openOutsideAdmin(hosted.portal)}>
             Open portal
           </button>
+          <button type="button" className="as-m-chip" onClick={() => setActiveTab("guide")}>
+            How it works
+          </button>
           <button type="button" className="as-m-chip" onClick={() => setActiveTab("preview")}>
             Live preview
           </button>
-          <button type="button" className="as-m-chip" onClick={() => setActiveTab("embed")}>
-            Get embed code
-          </button>
+          <TourTrigger tourId="customer-pages" label="Take customer pages tour" />
         </div>
       </div>
 
@@ -243,9 +256,10 @@ export function SettingsPage() {
       <div className="as-m-tabs">
         {(
           [
+            ["guide", "How it works"],
             ["brand", "Branding"],
-            ["share", "Share links"],
-            ["embed", "Embed"],
+            ["share", "Share & Liquid"],
+            ["embed", "Embed code"],
             ["preview", "Live preview"],
           ] as const
         ).map(([id, label]) => (
@@ -261,8 +275,83 @@ export function SettingsPage() {
         ))}
       </div>
 
+      {activeTab === "guide" ? (
+        <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-ways">
+          <div className="as-m-panel-title">
+            <h3>How Liquid & embeds work</h3>
+            <TourTrigger tourId="customer-pages" className="as-m-chip as-m-chip-accent" />
+          </div>
+          <p className="as-m-guide-lead">
+            Customers always use the same AfterSale pages (portal, register, claim). You choose{" "}
+            <strong>where</strong> those pages appear.
+          </p>
+          <div className="as-m-way-grid">
+            <button type="button" className="as-m-way-card" onClick={() => setActiveTab("share")} data-tour="cx-liquid">
+              <span className="as-m-way-num">01</span>
+              <strong>Shopify theme blocks</strong>
+              <p>
+                After <code>shopify app deploy</code>, enable <em>App embeds</em> (easiest) or add an
+                Apps block on the product template. Includes the warranty checkbox card.
+              </p>
+              <ul>
+                <li>Warranty opt-in embed (App embeds toggle)</li>
+                <li>Warranty register card (product Add block)</li>
+                <li>Register / claim / lookup buttons &amp; iframes</li>
+              </ul>
+              <span className="as-m-way-cta">Open Share &amp; Liquid →</span>
+            </button>
+            <button type="button" className="as-m-way-card" onClick={() => setActiveTab("embed")} data-tour="cx-embed">
+              <span className="as-m-way-num">02</span>
+              <strong>Embed iframe code</strong>
+              <p>
+                Copy HTML into a custom page, help center, or landing builder. Uses{" "}
+                <code>embed=1</code> for a compact chrome-free layout.
+              </p>
+              <ul>
+                <li>Works outside Shopify theme</li>
+                <li>Same branding as hosted pages</li>
+              </ul>
+              <span className="as-m-way-cta">Get embed code →</span>
+            </button>
+            <button type="button" className="as-m-way-card" onClick={() => setActiveTab("share")}>
+              <span className="as-m-way-num">03</span>
+              <strong>Share links</strong>
+              <p>
+                Hosted URLs always work. Storefront proxy URLs (
+                <code>/apps/aftersale/…</code>) keep customers on your shop domain.
+              </p>
+              <ul>
+                <li>Email, SMS, QR packaging</li>
+                <li>Support macros &amp; order notes</li>
+              </ul>
+              <span className="as-m-way-cta">Copy links →</span>
+            </button>
+          </div>
+          <div className="as-m-flow">
+            <div className="as-m-flow-step">
+              <strong>Brand</strong>
+              <span>Logo + accent</span>
+            </div>
+            <span className="as-m-flow-arrow" aria-hidden>
+              →
+            </span>
+            <div className="as-m-flow-step">
+              <strong>Publish</strong>
+              <span>Liquid / embed / link</span>
+            </div>
+            <span className="as-m-flow-arrow" aria-hidden>
+              →
+            </span>
+            <div className="as-m-flow-step">
+              <strong>Customer</strong>
+              <span>Register · claim · portal</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {activeTab === "brand" ? (
-        <div className="as-m-settings-grid" style={{ marginTop: 14 }}>
+        <div className="as-m-settings-grid" style={{ marginTop: 14 }} data-tour="cx-brand">
           <div className="as-m-panel">
             <div className="as-m-panel-title">
               <h3>Brand kit</h3>
@@ -383,13 +472,47 @@ export function SettingsPage() {
       ) : null}
 
       {activeTab === "share" ? (
-        <div className="as-m-panel" style={{ marginTop: 14 }}>
+        <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-liquid">
           <div className="as-m-panel-title">
-            <h3>Share links</h3>
+            <h3>Share links & theme blocks</h3>
           </div>
           <Text as="p" tone="subdued">
-            Hosted links always work. Storefront links need app proxy (`shopify app deploy`).
+            Hosted links always work. Storefront links need the app proxy from{" "}
+            <code>shopify app deploy</code>.
           </Text>
+
+          <div className="as-m-liquid-guide">
+            <strong>Where to find AfterSale in the theme editor</strong>
+            <ol>
+              <li>
+                Deploy first: <code>shopify app deploy</code> (blocks only appear after a successful
+                release).
+              </li>
+              <li>
+                <strong>Easiest — App embeds:</strong> Customize theme → left sidebar gear /{" "}
+                <em>App embeds</em> → enable <strong>Warranty opt-in embed</strong>. Shows the
+                checkbox on product pages automatically.
+              </li>
+              <li>
+                <strong>Or Add block:</strong> open a <em>Product</em> template → Product information
+                → <strong>Add block</strong> → <strong>Apps</strong> →{" "}
+                <strong>Warranty register card</strong>.
+              </li>
+              <li>
+                <strong>Or Add section:</strong> Product template → <strong>Add section</strong> →{" "}
+                <strong>Apps</strong> → AfterSale blocks.
+              </li>
+              <li>
+                Partners → your app → Extensions → turn on <em>Development store preview</em> if
+                blocks still missing on a dev store.
+              </li>
+            </ol>
+            <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "#1e3a8a" }}>
+              Checkout pages cannot use Liquid theme blocks. Use the product-page opt-in (cart note)
+              plus registration after purchase / thank-you email for now.
+            </p>
+          </div>
+
           <div className="as-m-link-grid">
             {(
               [
@@ -427,21 +550,17 @@ export function SettingsPage() {
               </div>
             ))}
           </div>
-          <div className="as-m-callout">
-            Theme editor: add AfterSale register / lookup / claim blocks for product and footer entry
-            points.
-          </div>
         </div>
       ) : null}
 
       {activeTab === "embed" ? (
-        <div className="as-m-panel" style={{ marginTop: 14 }}>
+        <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-embed">
           <div className="as-m-panel-title">
             <h3>Embed anywhere</h3>
           </div>
           <Text as="p" tone="subdued">
-            Paste into Shopify pages, help centers, or landing builders. Compact mode uses{" "}
-            <code>embed=1</code>.
+            Paste into Shopify custom HTML, help centers, or landing builders. Compact mode uses{" "}
+            <code>embed=1</code>. Prefer theme embed blocks when staying inside Online Store.
           </Text>
           <div style={{ marginTop: 12, maxWidth: 280 }}>
             <TextField
@@ -488,7 +607,7 @@ export function SettingsPage() {
       ) : null}
 
       {activeTab === "preview" ? (
-        <div className="as-m-panel" style={{ marginTop: 14 }}>
+        <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-preview">
           <div className="as-m-panel-title">
             <h3>Live preview</h3>
             <InlineStack gap="200">

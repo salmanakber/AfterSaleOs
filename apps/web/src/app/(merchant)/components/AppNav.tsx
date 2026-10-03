@@ -63,6 +63,7 @@ export function AppNav() {
       <aside
         className={`as-m-sidebar${collapsed ? " is-collapsed" : ""}${mobileOpen ? " is-mobile-open" : ""}`}
         aria-label="App navigation"
+        data-tour="sidebar"
       >
         <div className="as-m-sidebar-head">
           <a className="as-m-sidebar-brand" href={appHref("/")} onClick={() => setMobileOpen(false)}>

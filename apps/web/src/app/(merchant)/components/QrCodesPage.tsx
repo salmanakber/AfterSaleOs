@@ -18,6 +18,7 @@ import {
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
+import { TourTrigger } from "./ProductTour";
 
 type QrLink = {
   id: string;
@@ -132,6 +133,9 @@ export function QrCodesPage() {
       subtitle="Short links for product registration — encode the URL in any QR generator"
       primaryAction={{ content: "Create QR link", onAction: () => setOpen(true) }}
     >
+      <div style={{ marginBottom: 12 }}>
+        <TourTrigger tourId="qr" />
+      </div>
       <Layout>
         {error ? (
           <Layout.Section>
@@ -143,6 +147,7 @@ export function QrCodesPage() {
 
         <Layout.Section>
           <Card>
+            <div data-tour="qr-panel">
             <BlockStack gap="300">
               <Text as="p" tone="subdued">
                 Each scan is logged. Customers land on registration with <code>source=qr</code>.
@@ -161,6 +166,7 @@ export function QrCodesPage() {
                 />
               )}
             </BlockStack>
+            </div>
           </Card>
         </Layout.Section>
       </Layout>
