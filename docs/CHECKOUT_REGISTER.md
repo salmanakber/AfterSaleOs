@@ -1,36 +1,31 @@
-# Checkout & cart warranty registration
+# Checkout, cart & product warranty placement
 
 Liquid theme blocks **cannot** run on Shopify Checkout. AfterSale uses these surfaces:
 
 | Place | What we ship | How to enable |
 |-------|----------------|---------------|
-| **Product page** | Warranty register card / opt-in checkbox | Theme editor → Product → Add block / App embeds |
-| **Thank you page** | Checkout UI block “Register this product” | After `shopify app deploy` → Checkout editor → Thank you → Add app block |
-| **Cart** | Optional cart attribute `aftersale_register_intent` from product opt-in | Automatic when customer checks the product-page box |
+| **Product page** | Warranty register card (checkbox, banner, or button) | Theme editor → Product → Add block / App embeds |
+| **Cart** | Same Warranty register card on the cart template | Theme editor → Cart → Add block → Apps |
+| **Thank you page** | Checkout UI block “Register this product” | Checkout editor → Thank you → Add app block → AfterSale thank you |
+
+The product/cart opt-in can also set cart attribute `aftersale_register_intent` when the customer checks the box.
 
 ## Thank you page (order confirmed)
 
-Extension: `extensions/aftersale-thank-you` (Preact + `@shopify/ui-extensions` **2025.10**, not the old React package)
+Extension: `extensions/aftersale-thank-you`
 
 1. From the repo root: `npm install` (workspace includes `extensions/*`)
-2. Confirm packages exist: `ls node_modules/@shopify/ui-extensions`
-3. `shopify app deploy`
+2. Redeploy the app so the thank-you extension is available
 3. Shopify admin → **Settings → Checkout** → customize **Thank you** / **Order status**
 4. **Add app block** → **AfterSale thank you**
 5. Save
 
 The button opens the hosted register form with the shop pre-filled.
 
-If deploy fails on missing packages, run:
+## Brand customization
 
-```bash
-npm install -w aftersale-thank-you
-shopify app deploy
-```
-
-## Why not classic cart drawer Liquid?
-
-Checkout Extensibility replaced checkout.liquid. Cart drawers can use theme app blocks only if the theme section supports `@app` blocks; product opt-in + thank-you CTA is the reliable path.
+- **Customer pages** (logo + accent): portal, registration, claims, embeds, PDF certificates
+- **Theme block settings**: style, accent color, background, corner radius, and copy for the storefront opt-in
 
 ## PCD note
 

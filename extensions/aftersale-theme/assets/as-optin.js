@@ -36,6 +36,19 @@
     if (!root || root.dataset.asBound === "1") return;
     root.dataset.asBound = "1";
     var check = root.querySelector("[data-as-optin-check]");
+    var btn = root.querySelector("[data-as-optin-btn]");
+    if (btn) {
+      btn.addEventListener("click", function () {
+        try {
+          sessionStorage.setItem("aftersale_register_intent", "1");
+          var url = root.getAttribute("data-register-url");
+          if (url) sessionStorage.setItem("aftersale_register_url", url);
+        } catch (e) {
+          /* ignore */
+        }
+        setCartAttribute("aftersale_register_intent", "yes");
+      });
+    }
     if (!check) return;
     check.addEventListener("change", function () {
       syncPanel(root);

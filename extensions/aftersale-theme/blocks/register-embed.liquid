@@ -2,7 +2,7 @@
   Embeds product registration via hosted app URL + editor preview card.
 {% endcomment %}
 
-{% capture as_app_url %}{% render 'as-app-host', url: block.settings.app_url %}{% endcapture %}
+{% capture as_app_url %}{% render 'as-app-host', url: '' %}{% endcapture %}
 {% assign as_app_url = as_app_url | strip %}
 {% assign product_q = '' %}
 {% if product %}
@@ -48,17 +48,10 @@
 
 {% schema %}
 {
-  "name": "AfterSale register embed",
+  "name": "Register form embed",
   "target": "section",
   "stylesheet": "aftersale.css",
   "settings": [
-    {
-      "type": "text",
-      "id": "app_url",
-      "label": "App URL (hosted AfterSale)",
-      "default": "https://aftersale.tidyflowapp.com",
-      "info": "Use https://aftersale.tidyflowapp.com — never your .myshopify.com domain."
-    },
     {
       "type": "text",
       "id": "title",

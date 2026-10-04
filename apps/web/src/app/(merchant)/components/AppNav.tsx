@@ -9,6 +9,7 @@ type NavItem = { href: string; label: string; group?: string };
 
 const NAV: NavItem[] = [
   { href: "/", label: "Home", group: "Overview" },
+  { href: "/setup", label: "Setup wizard", group: "Overview" },
   { href: "/claims", label: "Claims", group: "Operations" },
   { href: "/repairs", label: "Repairs", group: "Operations" },
   { href: "/resolutions", label: "Resolutions", group: "Operations" },

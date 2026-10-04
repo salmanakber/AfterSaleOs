@@ -109,7 +109,7 @@ export function HomeDashboard() {
   return (
     <Page
       title={shopLabel}
-      subtitle="AfterSale OS command center"
+      subtitle="Warranties, claims, and customer experience"
       titleMetadata={
         data.shop.plan ? (
           <Badge tone="info">{data.shop.plan.name}</Badge>
@@ -118,6 +118,7 @@ export function HomeDashboard() {
         )
       }
       secondaryActions={[
+        { content: "Setup wizard", url: appHref("/setup") },
         { content: "Claims", url: appHref("/claims") },
         { content: "Warranties", url: appHref("/warranties") },
         { content: "Customer pages", url: appHref("/settings") },
@@ -139,7 +140,10 @@ export function HomeDashboard() {
               Track warranties and claims without blocking customers when you hit plan limits.
             </p>
             <div className="as-m-hero-actions">
-              <a className="as-m-chip as-m-chip-accent" href={appHref("/claims/new")}>
+              <a className="as-m-chip as-m-chip-accent" href={appHref("/setup")} data-tour="hero-setup">
+                Setup wizard
+              </a>
+              <a className="as-m-chip" href={appHref("/claims/new")}>
                 New claim
               </a>
               <a className="as-m-chip" href={appHref("/warranties")} data-tour="hero-warranties">
@@ -161,7 +165,12 @@ export function HomeDashboard() {
             <div className="as-m-panel" data-tour="setup-checklist">
               <div className="as-m-panel-title">
                 <h3>Finish setup</h3>
-                <Badge tone="attention">{`${data.setupChecklist.length} left`}</Badge>
+                <div className="as-m-hero-actions" style={{ margin: 0 }}>
+                  <a className="as-m-chip as-m-chip-accent" href={appHref("/setup")}>
+                    Open setup wizard
+                  </a>
+                  <Badge tone="attention">{`${data.setupChecklist.length} left`}</Badge>
+                </div>
               </div>
               <div className="as-m-list">
                 {data.setupChecklist.map((item, i) => (

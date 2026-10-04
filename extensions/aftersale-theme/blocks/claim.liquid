@@ -1,18 +1,13 @@
-{% comment %} AfterSale claim entry block — hosted URL {% endcomment %}
-{% capture as_app_url %}{% render 'as-app-host', url: block.settings.app_url %}{% endcapture %}
+{% comment %} AfterSale claim entry button {% endcomment %}
+{% capture as_app_url %}{% render 'as-app-host', url: '' %}{% endcapture %}
 {% assign as_app_url = as_app_url | strip %}
+{% assign accent = block.settings.accent_color | default: '#1a1d26' %}
 {% assign product_q = '' %}
 {% if product %}
   {% assign product_q = product.title | url_encode %}
 {% endif %}
 
-<div class="as-claim-block" {{ block.shopify_attributes }}>
-  <div class="as-embed-mock as-embed-mock--compact">
-    <div class="as-embed-mock__body">
-      <strong>{{ block.settings.button_label | default: "File a warranty claim" }}</strong>
-      <p>Button opens the hosted claim form.</p>
-    </div>
-  </div>
+<div class="as-claim-block" style="--as-btn-accent: {{ accent }};" {{ block.shopify_attributes }}>
   <a
     class="as-register-block__btn"
     href="{{ as_app_url }}/apps/aftersale/claim?shop={{ shop.permanent_domain }}{% if product %}&product={{ product_q }}&product_id={{ product.id }}{% endif %}"
@@ -23,7 +18,7 @@
 
 {% schema %}
 {
-  "name": "AfterSale claim",
+  "name": "Warranty claim button",
   "target": "section",
   "stylesheet": "aftersale.css",
   "enabled_on": {
@@ -32,15 +27,15 @@
   "settings": [
     {
       "type": "text",
-      "id": "app_url",
-      "label": "App URL (hosted AfterSale)",
-      "default": "https://aftersale.tidyflowapp.com"
-    },
-    {
-      "type": "text",
       "id": "button_label",
       "label": "Button label",
       "default": "File a warranty claim"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Button color",
+      "default": "#1A1D26"
     }
   ]
 }

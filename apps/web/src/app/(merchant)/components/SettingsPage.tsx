@@ -12,6 +12,7 @@ import {
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
+import { appHref } from "@/lib/shop-context";
 import { clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
 import { TourTrigger, useOptionalTour } from "./ProductTour";
 
@@ -66,7 +67,9 @@ export function SettingsPage() {
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"brand" | "share" | "embed" | "preview" | "guide">("guide");
+  const [activeTab, setActiveTab] = useState<
+    "brand" | "share" | "embed" | "preview" | "guide" | "placement"
+  >("guide");
   const [previewKind, setPreviewKind] = useState<PreviewKind>("portal");
   const [embedHeight, setEmbedHeight] = useState(720);
   const tour = useOptionalTour();
@@ -74,12 +77,35 @@ export function SettingsPage() {
   useEffect(() => {
     if (!tour) return;
     tour.setTabHandler((tab) => {
-      if (tab === "brand" || tab === "share" || tab === "embed" || tab === "preview" || tab === "guide") {
+      if (
+        tab === "brand" ||
+        tab === "share" ||
+        tab === "embed" ||
+        tab === "preview" ||
+        tab === "guide" ||
+        tab === "placement"
+      ) {
         setActiveTab(tab);
       }
     });
     return () => tour.setTabHandler(null);
   }, [tour]);
+
+  const storeHandle = shopDomain.replace(".myshopify.com", "");
+  const apiKey = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY ?? "";
+  function themeEditorUrl(template: "product" | "cart" = "product") {
+    if (apiKey && storeHandle) {
+      return `https://admin.shopify.com/store/${storeHandle}/themes/current/editor?template=${template}&addAppBlockId=${apiKey}/register-optin&target=mainSection`;
+    }
+    return storeHandle
+      ? `https://admin.shopify.com/store/${storeHandle}/themes/current/editor?template=${template}`
+      : "#";
+  }
+  function checkoutEditorUrl() {
+    return storeHandle
+      ? `https://admin.shopify.com/store/${storeHandle}/settings/checkout/editor`
+      : "#";
+  }
 
   useEffect(() => {
     gqlRequest<{ home: { shop: ShopSettings } }>(QUERY)
@@ -211,25 +237,27 @@ export function SettingsPage() {
   return (
     <Page
       title="Customer pages"
-      subtitle="Brand, share, preview, and embed warranty experiences"
-      backAction={{ url: "/" }}
+      subtitle="Brand your warranty experience and place it on your storefront"
+      backAction={{ url: appHref("/") }}
+      secondaryActions={[{ content: "Setup wizard", url: appHref("/setup") }]}
     >
       <div className="as-m-hero">
         <div className="as-m-hero-kicker">
           <span className="as-m-hero-dot" />
-          Storefront & embed
+          Storefront experience
         </div>
-        <h2>Customer experience kit</h2>
+        <h2>Match your brand. Meet customers where they buy.</h2>
         <p>
-          One branding kit. Three ways to publish: Shopify theme blocks (Liquid), iframe embeds, or
-          shareable links.
+          Set logo and colors once — portal, registration, claims, theme blocks, embeds, and PDF
+          certificates all use the same look. Then place a warranty checkbox or button on product,
+          cart, or after checkout.
         </p>
         <div className="as-m-hero-actions">
-          <button type="button" className="as-m-chip as-m-chip-accent" onClick={() => openOutsideAdmin(hosted.portal)}>
-            Open portal
+          <button type="button" className="as-m-chip as-m-chip-accent" onClick={() => setActiveTab("placement")}>
+            Product · cart · checkout
           </button>
-          <button type="button" className="as-m-chip" onClick={() => setActiveTab("guide")}>
-            How it works
+          <button type="button" className="as-m-chip" onClick={() => openOutsideAdmin(hosted.portal)}>
+            Open portal
           </button>
           <button type="button" className="as-m-chip" onClick={() => setActiveTab("preview")}>
             Live preview
@@ -257,8 +285,9 @@ export function SettingsPage() {
         {(
           [
             ["guide", "How it works"],
+            ["placement", "Product · cart · checkout"],
             ["brand", "Branding"],
-            ["share", "Share & Liquid"],
+            ["share", "Share & theme"],
             ["embed", "Embed code"],
             ["preview", "Live preview"],
           ] as const
@@ -278,47 +307,53 @@ export function SettingsPage() {
       {activeTab === "guide" ? (
         <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-ways">
           <div className="as-m-panel-title">
-            <h3>How Liquid & embeds work</h3>
+            <h3>How customers find AfterSale</h3>
             <TourTrigger tourId="customer-pages" className="as-m-chip as-m-chip-accent" />
           </div>
           <p className="as-m-guide-lead">
-            Customers always use the same AfterSale pages (portal, register, claim). You choose{" "}
-            <strong>where</strong> those pages appear.
+            Customers always use the same branded pages (portal, register, claim). You choose{" "}
+            <strong>where</strong> they appear on your store.
           </p>
           <div className="as-m-way-grid">
-            <button type="button" className="as-m-way-card" onClick={() => setActiveTab("share")} data-tour="cx-liquid">
+            <button
+              type="button"
+              className="as-m-way-card"
+              onClick={() => setActiveTab("placement")}
+              data-tour="cx-liquid"
+            >
               <span className="as-m-way-num">01</span>
-              <strong>Shopify theme blocks</strong>
+              <strong>Theme blocks &amp; embeds</strong>
               <p>
-                After <code>shopify app deploy</code>, enable <em>App embeds</em> (easiest) or add an
-                Apps block on the product template. Includes the warranty checkbox card.
+                Add a warranty checkbox or styled button on product and cart pages, or enable the App
+                embed so it appears automatically. Customize colors, style, and copy in the theme
+                editor.
               </p>
               <ul>
-                <li>Warranty opt-in embed (App embeds toggle)</li>
-                <li>Warranty register card (product Add block)</li>
-                <li>Register / claim / lookup buttons &amp; iframes</li>
+                <li>Warranty register card (product / cart)</li>
+                <li>Warranty opt-in embed (App embeds)</li>
+                <li>Thank-you prompt after checkout</li>
               </ul>
-              <span className="as-m-way-cta">Open Share &amp; Liquid →</span>
+              <span className="as-m-way-cta">Open placement guide →</span>
             </button>
             <button type="button" className="as-m-way-card" onClick={() => setActiveTab("embed")} data-tour="cx-embed">
               <span className="as-m-way-num">02</span>
-              <strong>Embed iframe code</strong>
+              <strong>Embed on any page</strong>
               <p>
-                Copy HTML into a custom page, help center, or landing builder. Uses{" "}
-                <code>embed=1</code> for a compact chrome-free layout.
+                Copy a ready-made snippet into a help center, landing page, or custom HTML section.
+                Compact layout keeps your brand front and center.
               </p>
               <ul>
-                <li>Works outside Shopify theme</li>
-                <li>Same branding as hosted pages</li>
+                <li>Works outside the Online Store theme</li>
+                <li>Uses your saved logo and accent color</li>
               </ul>
               <span className="as-m-way-cta">Get embed code →</span>
             </button>
             <button type="button" className="as-m-way-card" onClick={() => setActiveTab("share")}>
               <span className="as-m-way-num">03</span>
-              <strong>Share links</strong>
+              <strong>Shareable links</strong>
               <p>
-                Hosted URLs always work. Storefront proxy URLs (
-                <code>/apps/aftersale/…</code>) keep customers on your shop domain.
+                Send hosted links by email or SMS, or use storefront links that keep customers on your
+                shop domain.
               </p>
               <ul>
                 <li>Email, SMS, QR packaging</li>
@@ -336,8 +371,8 @@ export function SettingsPage() {
               →
             </span>
             <div className="as-m-flow-step">
-              <strong>Publish</strong>
-              <span>Liquid / embed / link</span>
+              <strong>Place</strong>
+              <span>Product · cart · checkout</span>
             </div>
             <span className="as-m-flow-arrow" aria-hidden>
               →
@@ -346,6 +381,72 @@ export function SettingsPage() {
               <strong>Customer</strong>
               <span>Register · claim · portal</span>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === "placement" ? (
+        <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-placement">
+          <div className="as-m-panel-title">
+            <h3>Where the warranty checkbox / button appears</h3>
+          </div>
+          <p className="as-m-guide-lead">
+            Shopify does not allow custom checkout form fields on Online Store checkout. Use a
+            product or cart opt-in before payment, then a thank-you prompt after the order is placed.
+          </p>
+          <div className="as-m-way-grid">
+            <div className="as-m-way-card" style={{ cursor: "default" }}>
+              <span className="as-m-way-num">Product page</span>
+              <strong>Checkbox or styled button</strong>
+              <p>
+                In the theme editor, add <em>Warranty register card</em> under Apps, or enable{" "}
+                <em>Warranty opt-in embed</em> in App embeds. Pick style: checkbox card, soft banner,
+                or button — and set accent color to match your brand.
+              </p>
+              <Button url={themeEditorUrl("product")} target="_blank" variant="primary">
+                Open product theme editor
+              </Button>
+            </div>
+            <div className="as-m-way-card" style={{ cursor: "default" }}>
+              <span className="as-m-way-num">Cart</span>
+              <strong>Same block on cart</strong>
+              <p>
+                Add the Warranty register card to the cart template so shoppers can opt in before
+                checkout. Style and copy are editable in the block settings.
+              </p>
+              <Button url={themeEditorUrl("cart")} target="_blank">
+                Open cart theme editor
+              </Button>
+            </div>
+            <div className="as-m-way-card" style={{ cursor: "default" }}>
+              <span className="as-m-way-num">After checkout</span>
+              <strong>Thank-you page</strong>
+              <p>
+                In Checkout → Thank you, add the <em>AfterSale thank you</em> app block. Customers see
+                “Register this product” once the order is complete.
+              </p>
+              <Button url={checkoutEditorUrl()} target="_blank">
+                Open checkout editor
+              </Button>
+            </div>
+          </div>
+          <div className="as-m-liquid-guide">
+            <strong>Quick steps in the theme editor</strong>
+            <ol>
+              <li>
+                Online Store → Customize → open the <em>Product</em> or <em>Cart</em> template.
+              </li>
+              <li>
+                <strong>Add block</strong> → <strong>Apps</strong> → <strong>Warranty register card</strong>,
+                or open the theme gear → <strong>App embeds</strong> → enable{" "}
+                <strong>Warranty opt-in embed</strong>.
+              </li>
+              <li>
+                In the block settings, choose style (checkbox, banner, or button), accent color, and
+                labels so it matches your brand.
+              </li>
+              <li>Save the theme, then check a product page on your live storefront.</li>
+            </ol>
           </div>
         </div>
       ) : null}
@@ -363,7 +464,7 @@ export function SettingsPage() {
                     Logo
                   </Text>
                   <Text as="p" tone="subdued">
-                    Upload to Cloudinary (PNG, JPG, WEBP, GIF, SVG · max 5MB).
+                    PNG, JPG, WEBP, GIF, or SVG · max 5MB. Shown on customer pages and certificates.
                   </Text>
                   <div className="as-m-logo-picker">
                     <div className="as-m-logo-preview">
@@ -474,42 +575,42 @@ export function SettingsPage() {
       {activeTab === "share" ? (
         <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-liquid">
           <div className="as-m-panel-title">
-            <h3>Share links & theme blocks</h3>
+            <h3>Share links & theme placement</h3>
           </div>
           <Text as="p" tone="subdued">
-            Hosted links always work. Storefront links need the app proxy from{" "}
-            <code>shopify app deploy</code>.
+            Hosted links work everywhere. Storefront links keep customers on your shop domain. For
+            checkbox and button placement, use the Product · cart · checkout tab.
           </Text>
 
           <div className="as-m-liquid-guide">
-            <strong>Where to find AfterSale in the theme editor</strong>
+            <strong>Add AfterSale in your theme</strong>
             <ol>
               <li>
-                Deploy first: <code>shopify app deploy</code> (blocks only appear after a successful
-                release).
+                Online Store → Customize → open a <em>Product</em> or <em>Cart</em> template.
               </li>
               <li>
-                <strong>Easiest — App embeds:</strong> Customize theme → left sidebar gear /{" "}
-                <em>App embeds</em> → enable <strong>Warranty opt-in embed</strong>. Shows the
-                checkbox on product pages automatically.
+                <strong>Easiest — App embeds:</strong> theme settings gear → <em>App embeds</em> →
+                enable <strong>Warranty opt-in embed</strong>.
               </li>
               <li>
-                <strong>Or Add block:</strong> open a <em>Product</em> template → Product information
-                → <strong>Add block</strong> → <strong>Apps</strong> →{" "}
-                <strong>Warranty register card</strong>.
+                <strong>Or Add block:</strong> Product information → <strong>Add block</strong> →{" "}
+                <strong>Apps</strong> → <strong>Warranty register card</strong>. Choose checkbox,
+                banner, or button style and set your brand color.
               </li>
               <li>
-                <strong>Or Add section:</strong> Product template → <strong>Add section</strong> →{" "}
-                <strong>Apps</strong> → AfterSale blocks.
-              </li>
-              <li>
-                Partners → your app → Extensions → turn on <em>Development store preview</em> if
-                blocks still missing on a dev store.
+                After checkout: Checkout editor → Thank you → add <strong>AfterSale thank you</strong>.
               </li>
             </ol>
             <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "#1e3a8a" }}>
-              Checkout pages cannot use Liquid theme blocks. Use the product-page opt-in (cart note)
-              plus registration after purchase / thank-you email for now.
+              Need a walkthrough? Open the{" "}
+              <button
+                type="button"
+                className="as-m-inline-link"
+                onClick={() => setActiveTab("placement")}
+              >
+                Product · cart · checkout
+              </button>{" "}
+              tab or the Setup wizard.
             </p>
           </div>
 
@@ -559,8 +660,8 @@ export function SettingsPage() {
             <h3>Embed anywhere</h3>
           </div>
           <Text as="p" tone="subdued">
-            Paste into Shopify custom HTML, help centers, or landing builders. Compact mode uses{" "}
-            <code>embed=1</code>. Prefer theme embed blocks when staying inside Online Store.
+            Paste into a custom page, help center, or landing builder. Prefer theme blocks when
+            staying inside your Online Store.
           </Text>
           <div style={{ marginTop: 12, maxWidth: 280 }}>
             <TextField

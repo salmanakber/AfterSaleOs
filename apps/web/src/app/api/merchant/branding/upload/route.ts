@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Cloudinary is not configured. Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to your environment.",
+            "Logo upload is temporarily unavailable. Paste a logo URL in Branding, or contact support.",
         },
         { status: 503 },
       );

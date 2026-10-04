@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { publicApiUrl } from "@/lib/public-api";
 import { ThemeToggle } from "./ThemeToggle";
@@ -38,11 +38,15 @@ export function CustomerShell({
       .then((json) => {
         if (cancelled || !json) return;
         setLogoUrl(json.logoUrl ?? null);
-        setAccent(json.accentColor ?? "#F59E0B");
+        const nextAccent = json.accentColor ?? "#F59E0B";
+        setAccent(nextAccent);
         setShopName(json.shopName || brand);
-        if (json.accentColor) {
-          document.documentElement.style.setProperty("--as-accent", json.accentColor);
-        }
+        const root = document.documentElement;
+        root.style.setProperty("--as-accent", nextAccent);
+        root.style.setProperty("--as-primary", nextAccent);
+        root.style.setProperty("--as-primary-hover", nextAccent);
+        root.style.setProperty("--as-primary-tint", `color-mix(in srgb, ${nextAccent} 14%, white)`);
+        root.style.setProperty("--as-primary-soft", `color-mix(in srgb, ${nextAccent} 18%, transparent)`);
       })
       .catch(() => undefined);
     return () => {
@@ -52,9 +56,16 @@ export function CustomerShell({
 
   const displayBrand = shopName && shopName !== "AfterSale" ? shopName : brand;
   const showDefaultMark = !logoUrl && (!displayBrand || displayBrand === "AfterSale");
+  const brandStyle = {
+    ["--as-accent"]: accent,
+    ["--as-primary"]: accent,
+    ["--as-primary-hover"]: accent,
+    ["--as-primary-tint"]: `color-mix(in srgb, ${accent} 14%, white)`,
+    ["--as-primary-soft"]: `color-mix(in srgb, ${accent} 18%, transparent)`,
+  } as CSSProperties;
 
   return (
-    <div className={`as-shell${embed ? " as-shell-embed" : ""}`} style={{ ["--as-accent" as string]: accent }}>
+    <div className={`as-shell${embed ? " as-shell-embed" : ""}`} style={brandStyle}>
       {!embed ? (
         <div className="as-topbar as-no-print">
           <div className="as-mark-lockup">
@@ -64,7 +75,7 @@ export function CustomerShell({
             ) : (
               <span className="as-mark">A</span>
             )}
-            <span className="as-mark-text">{displayBrand === "AfterSale" ? "AfterSale OS" : displayBrand}</span>
+            <span className="as-mark-text">{displayBrand === "AfterSale" ? "AfterSale" : displayBrand}</span>
           </div>
           <ThemeToggle />
         </div>
@@ -73,10 +84,10 @@ export function CustomerShell({
       <header className="as-hero">
         <div className="as-kicker">
           <span className="as-kicker-dot" />
-          Warranty &amp; care
+          {displayBrand === "AfterSale" ? "Warranty & care" : `${displayBrand} · Warranty & care`}
         </div>
         <h1 className="as-brand">
-          {logoUrl && embed ? (
+          {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt={displayBrand} className="as-brand-logo-lg" />
           ) : showDefaultMark ? (

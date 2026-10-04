@@ -1,21 +1,16 @@
 {% comment %}
-  AfterSale product registration block — hosted URL so the form always loads.
+  AfterSale product registration button — opens branded registration.
 {% endcomment %}
 
-{% capture as_app_url %}{% render 'as-app-host', url: block.settings.app_url %}{% endcapture %}
+{% capture as_app_url %}{% render 'as-app-host', url: '' %}{% endcapture %}
 {% assign as_app_url = as_app_url | strip %}
+{% assign accent = block.settings.accent_color | default: '#1a1d26' %}
 {% assign product_q = '' %}
 {% if product %}
   {% assign product_q = product.title | url_encode %}
 {% endif %}
 
-<div class="as-register-block" {{ block.shopify_attributes }}>
-  <div class="as-embed-mock as-embed-mock--compact">
-    <div class="as-embed-mock__body">
-      <strong>{{ block.settings.button_label | default: "Register for warranty" }}</strong>
-      <p>Button opens the hosted registration form for this product.</p>
-    </div>
-  </div>
+<div class="as-register-block" style="--as-btn-accent: {{ accent }};" {{ block.shopify_attributes }}>
   <a
     class="as-register-block__btn"
     href="{{ as_app_url }}/apps/aftersale/register?shop={{ shop.permanent_domain }}{% if product %}&product={{ product_q }}&product_id={{ product.id }}{% if product.selected_or_first_available_variant %}&variant_id={{ product.selected_or_first_available_variant.id }}{% endif %}{% endif %}"
@@ -33,25 +28,24 @@
 
 {% schema %}
 {
-  "name": "AfterSale register",
+  "name": "Warranty register button",
   "target": "section",
   "stylesheet": "aftersale.css",
   "enabled_on": {
-    "templates": ["product", "page", "index"]
+    "templates": ["product", "page", "index", "cart"]
   },
   "settings": [
-    {
-      "type": "text",
-      "id": "app_url",
-      "label": "App URL (hosted AfterSale)",
-      "default": "https://aftersale.tidyflowapp.com",
-      "info": "Never use your .myshopify.com domain."
-    },
     {
       "type": "text",
       "id": "button_label",
       "label": "Button label",
       "default": "Register for warranty"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Button color",
+      "default": "#1A1D26"
     },
     {
       "type": "checkbox",

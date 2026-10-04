@@ -1,0 +1,403 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Banner,
+  BlockStack,
+  Button,
+  Card,
+  FormLayout,
+  InlineStack,
+  Layout,
+  Page,
+  ProgressBar,
+  Text,
+  TextField,
+} from "@shopify/polaris";
+import { gqlRequest } from "@/lib/graphql";
+import { friendlyError } from "@/lib/merchant-errors";
+import { appHref } from "@/lib/shop-context";
+import { clearSessionTokenCache } from "@/lib/session-token";
+
+type HomeShop = {
+  shopName: string | null;
+  shopDomain: string;
+  needsPlanSelection: boolean;
+  brandingLogoUrl: string | null;
+  brandingAccentColor: string | null;
+  plan: { name: string } | null;
+};
+
+type Rule = { id: string; name: string };
+
+const HOME = `#graphql
+  query SetupWizardHome {
+    home {
+      shop {
+        shopName shopDomain needsPlanSelection
+        brandingLogoUrl brandingAccentColor
+        plan { name }
+      }
+      setupChecklist { id title href }
+    }
+    warrantyRules { id name }
+  }
+`;
+
+const CREATE_RULE = `#graphql
+  mutation CreateDefaultRule($input: CreateRuleInput!) {
+    createWarrantyRule(input: $input) { id name }
+  }
+`;
+
+const SAVE_SETTINGS = `#graphql
+  mutation SaveBrand($logo: String, $accent: String) {
+    updateShopSettings(brandingLogoUrl: $logo, brandingAccentColor: $accent) {
+      brandingLogoUrl brandingAccentColor
+    }
+  }
+`;
+
+const STEPS = [
+  { id: "welcome", title: "Welcome" },
+  { id: "plan", title: "Plan" },
+  { id: "brand", title: "Brand" },
+  { id: "rule", title: "Coverage" },
+  { id: "storefront", title: "Storefront" },
+  { id: "done", title: "Done" },
+] as const;
+
+function themeEditorUrl(shopDomain: string, template: "product" | "cart" = "product") {
+  const store = shopDomain.replace(".myshopify.com", "");
+  const apiKey = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY ?? "";
+  // Opens theme editor on the product/cart template; merchant adds AfterSale under Apps.
+  if (apiKey) {
+    return `https://admin.shopify.com/store/${store}/themes/current/editor?template=${template}&addAppBlockId=${apiKey}/register-optin&target=mainSection`;
+  }
+  return `https://admin.shopify.com/store/${store}/themes/current/editor?template=${template}`;
+}
+
+function checkoutEditorUrl(shopDomain: string) {
+  const store = shopDomain.replace(".myshopify.com", "");
+  return `https://admin.shopify.com/store/${store}/settings/checkout/editor`;
+}
+
+export function SetupWizardPage() {
+  const [step, setStep] = useState(0);
+  const [shop, setShop] = useState<HomeShop | null>(null);
+  const [rules, setRules] = useState<Rule[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [accent, setAccent] = useState("#3B82F6");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [ruleName, setRuleName] = useState("Store warranty");
+  const [duration, setDuration] = useState("12");
+
+  const load = useCallback(() => {
+    gqlRequest<{
+      home: { shop: HomeShop; setupChecklist: { id: string }[] };
+      warrantyRules: Rule[];
+    }>(HOME)
+      .then((d) => {
+        setShop(d.home.shop);
+        setRules(d.warrantyRules);
+        setAccent(d.home.shop.brandingAccentColor ?? "#3B82F6");
+        setLogoUrl(d.home.shop.brandingLogoUrl ?? "");
+      })
+      .catch((e) => setError(friendlyError(e)));
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const progress = useMemo(() => ((step + 1) / STEPS.length) * 100, [step]);
+
+  async function saveBrand() {
+    setBusy(true);
+    setError(null);
+    try {
+      clearSessionTokenCache();
+      await gqlRequest(SAVE_SETTINGS, {
+        logo: logoUrl || null,
+        accent: accent || null,
+      });
+      setStep(3);
+      load();
+    } catch (e) {
+      setError(friendlyError(e, "Could not save branding"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createRule() {
+    setBusy(true);
+    setError(null);
+    try {
+      const months = duration.trim() === "" ? null : Number(duration);
+      await gqlRequest(CREATE_RULE, {
+        input: {
+          name: ruleName || "Store warranty",
+          priority: 100,
+          version: {
+            warrantyType: "store",
+            durationMonths: months,
+            startDateRule: "FULFILLMENT_DATE",
+            serialMode: "NOT_REQUIRED",
+            gracePeriodDays: 0,
+            termsHtml: "<p>Standard store warranty terms.</p>",
+          },
+          assignments: [{ targetType: "default", targetId: null }],
+        },
+      });
+      setStep(4);
+      load();
+    } catch (e) {
+      setError(friendlyError(e, "Could not create rule"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!shop) {
+    return (
+      <Page title="Setup">
+        <Text as="p">{error ?? "Loading setup…"}</Text>
+      </Page>
+    );
+  }
+
+  const storeHandle = shop.shopDomain.replace(".myshopify.com", "");
+
+  return (
+    <Page
+      title="Setup wizard"
+      subtitle="Configure AfterSale in a few guided steps"
+      backAction={{ url: appHref("/") }}
+    >
+      <Layout>
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="300">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd">
+                  {STEPS[step]?.title}
+                </Text>
+                <Text as="span" tone="subdued">
+                  Step {step + 1} of {STEPS.length}
+                </Text>
+              </InlineStack>
+              <ProgressBar progress={progress} size="small" />
+              <div className="as-m-wizard-steps">
+                {STEPS.map((s, i) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className="as-m-wizard-step"
+                    data-active={i === step}
+                    data-done={i < step}
+                    onClick={() => setStep(i)}
+                  >
+                    {s.title}
+                  </button>
+                ))}
+              </div>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+
+        {error ? (
+          <Layout.Section>
+            <Banner tone="critical" onDismiss={() => setError(null)}>
+              {error}
+            </Banner>
+          </Layout.Section>
+        ) : null}
+
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              {step === 0 ? (
+                <>
+                  <Text as="h3" variant="headingLg">
+                    Welcome{shop.shopName ? `, ${shop.shopName}` : ""}
+                  </Text>
+                  <Text as="p" tone="subdued">
+                    We’ll walk through plan, branding, warranty coverage, and where customers register
+                    — product page, cart, and after checkout.
+                  </Text>
+                  <Button variant="primary" onClick={() => setStep(1)}>
+                    Start setup
+                  </Button>
+                </>
+              ) : null}
+
+              {step === 1 ? (
+                <>
+                  <Text as="h3" variant="headingMd">
+                    Choose your plan
+                  </Text>
+                  <Text as="p" tone="subdued">
+                    {shop.plan
+                      ? `You’re on ${shop.plan.name}. You can change this anytime.`
+                      : "Select a plan to unlock warranties, claims, and storefront tools."}
+                  </Text>
+                  <InlineStack gap="200">
+                    <Button url={appHref("/plans")} variant={shop.plan ? "secondary" : "primary"}>
+                      {shop.plan ? "Manage plan" : "Choose a plan"}
+                    </Button>
+                    <Button variant="primary" onClick={() => setStep(2)} disabled={shop.needsPlanSelection && !shop.plan}>
+                      Continue
+                    </Button>
+                  </InlineStack>
+                </>
+              ) : null}
+
+              {step === 2 ? (
+                <>
+                  <Text as="h3" variant="headingMd">
+                    Your brand on customer pages
+                  </Text>
+                  <Text as="p" tone="subdued">
+                    Logo and accent color appear on registration, claims, portal, embeds, and PDF
+                    certificates.
+                  </Text>
+                  <FormLayout>
+                    <TextField label="Logo URL" value={logoUrl} onChange={setLogoUrl} autoComplete="off" helpText="Upload a logo anytime under Customer pages → Branding." />
+                    <TextField label="Accent color" value={accent} onChange={setAccent} autoComplete="off" />
+                  </FormLayout>
+                  <div
+                    className="as-m-preview"
+                    style={{ ["--as-preview-accent" as string]: accent, maxWidth: 360 }}
+                  >
+                    <div className="as-m-preview-body">
+                      <h4>{shop.shopName ?? "Your store"}</h4>
+                      <p>Customer warranty experience preview</p>
+                      <span className="as-m-preview-cta">Continue</span>
+                    </div>
+                  </div>
+                  <InlineStack gap="200">
+                    <Button onClick={() => setStep(1)}>Back</Button>
+                    <Button variant="primary" loading={busy} onClick={() => void saveBrand()}>
+                      Save & continue
+                    </Button>
+                  </InlineStack>
+                </>
+              ) : null}
+
+              {step === 3 ? (
+                <>
+                  <Text as="h3" variant="headingMd">
+                    Default warranty coverage
+                  </Text>
+                  <Text as="p" tone="subdued">
+                    {rules.length > 0
+                      ? `You already have ${rules.length} rule${rules.length === 1 ? "" : "s"} (e.g. ${rules[0]?.name}). You can skip or create another.`
+                      : "Create a default rule so new orders and registrations get coverage."}
+                  </Text>
+                  <FormLayout>
+                    <TextField label="Rule name" value={ruleName} onChange={setRuleName} autoComplete="off" />
+                    <TextField
+                      label="Duration (months, blank = lifetime)"
+                      value={duration}
+                      onChange={setDuration}
+                      autoComplete="off"
+                    />
+                  </FormLayout>
+                  <InlineStack gap="200">
+                    <Button onClick={() => setStep(2)}>Back</Button>
+                    {rules.length > 0 ? (
+                      <Button onClick={() => setStep(4)}>Skip</Button>
+                    ) : null}
+                    <Button variant="primary" loading={busy} onClick={() => void createRule()}>
+                      {rules.length > 0 ? "Create another rule" : "Create rule & continue"}
+                    </Button>
+                  </InlineStack>
+                </>
+              ) : null}
+
+              {step === 4 ? (
+                <>
+                  <Text as="h3" variant="headingMd">
+                    Add AfterSale on your storefront
+                  </Text>
+                  <Text as="p" tone="subdued">
+                    Place a warranty checkbox or button where shoppers already buy — then a thank-you
+                    prompt after checkout.
+                  </Text>
+                  <div className="as-m-way-grid">
+                    <div className="as-m-way-card" style={{ cursor: "default" }}>
+                      <span className="as-m-way-num">01</span>
+                      <strong>Product page</strong>
+                      <p>Checkbox or styled button: “Register this product for warranty”.</p>
+                      <Button
+                        url={themeEditorUrl(shop.shopDomain, "product")}
+                        target="_blank"
+                        variant="primary"
+                      >
+                        Open product theme editor
+                      </Button>
+                    </div>
+                    <div className="as-m-way-card" style={{ cursor: "default" }}>
+                      <span className="as-m-way-num">02</span>
+                      <strong>Cart</strong>
+                      <p>Same block on the cart template, or enable the App embed for product pages.</p>
+                      <Button url={themeEditorUrl(shop.shopDomain, "cart")} target="_blank">
+                        Open cart theme editor
+                      </Button>
+                    </div>
+                    <div className="as-m-way-card" style={{ cursor: "default" }}>
+                      <span className="as-m-way-num">03</span>
+                      <strong>After checkout</strong>
+                      <p>Thank-you page app block: “Register this product” after the order is placed.</p>
+                      <Button url={checkoutEditorUrl(shop.shopDomain)} target="_blank">
+                        Open checkout editor
+                      </Button>
+                    </div>
+                  </div>
+                  <Text as="p" tone="subdued">
+                    In the theme editor: <strong>Add block → Apps → Warranty register card</strong> (or
+                    enable <strong>Warranty opt-in embed</strong> under App embeds). Customize colors and
+                    style in the block settings to match your brand.
+                  </Text>
+                  <InlineStack gap="200">
+                    <Button onClick={() => setStep(3)}>Back</Button>
+                    <Button variant="primary" onClick={() => setStep(5)}>
+                      Continue
+                    </Button>
+                  </InlineStack>
+                </>
+              ) : null}
+
+              {step === 5 ? (
+                <>
+                  <Text as="h3" variant="headingLg">
+                    You’re ready
+                  </Text>
+                  <Text as="p" tone="subdued">
+                    Branding, coverage, and storefront entry points are set. You can refine anytime from
+                    the sidebar.
+                  </Text>
+                  <InlineStack gap="200">
+                    <Button variant="primary" url={appHref("/")}>
+                      Go to home
+                    </Button>
+                    <Button url={appHref("/settings")}>Customer pages</Button>
+                    <Button url={appHref("/warranties")}>Warranties</Button>
+                    <Button
+                      url={`https://admin.shopify.com/store/${storeHandle}/themes/current/editor`}
+                      target="_blank"
+                    >
+                      Customize theme
+                    </Button>
+                  </InlineStack>
+                </>
+              ) : null}
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+      </Layout>
+    </Page>
+  );
+}
