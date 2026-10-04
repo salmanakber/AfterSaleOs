@@ -59,6 +59,7 @@ const DETAIL = `#graphql
     staffMembers { id name email active }
     claimWorkflow { statuses { key label } }
     suppliers { id name }
+    aiCreditBalance { used limit remaining }
   }
 `;
 
@@ -83,6 +84,21 @@ export function ClaimDetailPage() {
   const [supplierStatus, setSupplierStatus] = useState("NOT_FILED");
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiAssist, setAiAssist] = useState<{
+    summary: string;
+    suggestedCategory: string;
+    categoryConfidence: number;
+    missingInfo: string[];
+    suggestedReply: string;
+    nextSteps: string[];
+    provider: string;
+    creditsRemaining: number;
+    creditsLimit: number;
+  } | null>(null);
+  const [aiCredits, setAiCredits] = useState<{ used: number; limit: number; remaining: number } | null>(
+    null,
+  );
 
   const load = useCallback(() => {
     gqlRequest<{
@@ -90,6 +106,7 @@ export function ClaimDetailPage() {
       staffMembers: typeof staff;
       claimWorkflow: { statuses: WorkflowStatus[] };
       suppliers: Supplier[];
+      aiCreditBalance: { used: number; limit: number; remaining: number };
     }>(DETAIL, { id })
       .then((d) => {
         if (!d.claim) throw new Error("Claim not found");
@@ -100,10 +117,94 @@ export function ClaimDetailPage() {
         setStaff(d.staffMembers);
         setWorkflowStatuses(d.claimWorkflow.statuses);
         setSuppliers(d.suppliers);
+        setAiCredits(d.aiCreditBalance);
         if (!supplierId && d.suppliers[0]) setSupplierId(d.suppliers[0].id);
       })
       .catch((e) => setError(friendlyError(e)));
   }, [id, supplierId]);
+
+  async function runAiAssist() {
+    setAiBusy(true);
+    setError(null);
+    try {
+      const d = await gqlRequest<{
+        runClaimAiAssist: NonNullable<typeof aiAssist> & { creditsUsed: number; model: string | null };
+      }>(
+        `#graphql
+        mutation Ai($claimId: ID!) {
+          runClaimAiAssist(claimId: $claimId) {
+            summary suggestedCategory categoryConfidence missingInfo suggestedReply nextSteps
+            provider model creditsUsed creditsRemaining creditsLimit
+          }
+        }`,
+        { claimId: id },
+      );
+      setAiAssist(d.runClaimAiAssist);
+      setAiCredits({
+        used: d.runClaimAiAssist.creditsLimit - d.runClaimAiAssist.creditsRemaining,
+        limit: d.runClaimAiAssist.creditsLimit,
+        remaining: d.runClaimAiAssist.creditsRemaining,
+      });
+    } catch (e) {
+      setError(friendlyError(e, "AI assist failed"));
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function applyAiCategory() {
+    if (!aiAssist) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await gqlRequest(
+        `#graphql
+        mutation ApplyCat($claimId: ID!, $category: String!) {
+          applyClaimAiCategory(claimId: $claimId, category: $category) { id issueCategory }
+        }`,
+        { claimId: id, category: aiAssist.suggestedCategory },
+      );
+      load();
+    } catch (e) {
+      setError(friendlyError(e, "Could not apply category"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function useSuggestedReply() {
+    if (!aiAssist) return;
+    setNote(aiAssist.suggestedReply);
+  }
+
+  async function saveSuggestedAsInternalNote() {
+    if (!aiAssist) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const body = [
+        "AI assist (suggest-only — not a decision)",
+        `Summary: ${aiAssist.summary}`,
+        `Suggested category: ${aiAssist.suggestedCategory} (${Math.round(aiAssist.categoryConfidence * 100)}%)`,
+        aiAssist.missingInfo.length ? `Missing info:\n- ${aiAssist.missingInfo.join("\n- ")}` : null,
+        `Draft reply:\n${aiAssist.suggestedReply}`,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      await gqlRequest(
+        `#graphql
+        mutation Note($id: ID!, $body: String!) {
+          addClaimNote(id: $id, body: $body, isInternal: true) { id }
+        }`,
+        { id, body },
+      );
+      load();
+    } catch (e) {
+      setError(friendlyError(e, "Could not save note"));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     load();
@@ -374,6 +475,95 @@ export function ClaimDetailPage() {
               <Text as="p" tone="subdued">
                 Category: {claim.issueCategory ?? "—"}
               </Text>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="300">
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="100">
+                  <Text as="h2" variant="headingMd">
+                    AI assist
+                  </Text>
+                  <Text as="p" tone="subdued">
+                    Suggest-only: summary, category, missing info, and a draft reply. Never approves or
+                    rejects for you.
+                    {aiCredits
+                      ? ` · ${aiCredits.remaining}/${aiCredits.limit} AI credits left this month`
+                      : null}
+                  </Text>
+                </BlockStack>
+                <Button variant="primary" loading={aiBusy} onClick={() => void runAiAssist()}>
+                  {aiAssist ? "Run again" : "Analyze claim"}
+                </Button>
+              </InlineStack>
+
+              {aiAssist ? (
+                <BlockStack gap="300">
+                  <Banner tone="info">
+                    <p>
+                      Provider: {aiAssist.provider}. Staff must review before acting — this is guidance,
+                      not a decision.
+                    </p>
+                  </Banner>
+                  <Text as="p">
+                    <strong>Summary</strong>
+                    <br />
+                    {aiAssist.summary}
+                  </Text>
+                  <InlineStack gap="200" blockAlign="center">
+                    <Text as="p">
+                      Suggested category: <strong>{aiAssist.suggestedCategory}</strong> (
+                      {Math.round(aiAssist.categoryConfidence * 100)}% confidence)
+                    </Text>
+                    <Button size="slim" loading={busy} onClick={() => void applyAiCategory()}>
+                      Apply category
+                    </Button>
+                  </InlineStack>
+                  {aiAssist.missingInfo.length > 0 ? (
+                    <BlockStack gap="100">
+                      <Text as="p" fontWeight="semibold">
+                        Missing information
+                      </Text>
+                      {aiAssist.missingInfo.map((m) => (
+                        <Text as="p" key={m} tone="subdued">
+                          · {m}
+                        </Text>
+                      ))}
+                    </BlockStack>
+                  ) : null}
+                  <BlockStack gap="100">
+                    <Text as="p" fontWeight="semibold">
+                      Suggested customer reply
+                    </Text>
+                    <Text as="p">{aiAssist.suggestedReply}</Text>
+                    <InlineStack gap="200">
+                      <Button onClick={useSuggestedReply}>Use in status note</Button>
+                      <Button onClick={() => void saveSuggestedAsInternalNote()} loading={busy}>
+                        Save as internal note
+                      </Button>
+                    </InlineStack>
+                  </BlockStack>
+                  {aiAssist.nextSteps.length > 0 ? (
+                    <BlockStack gap="100">
+                      <Text as="p" fontWeight="semibold">
+                        Next steps for your team
+                      </Text>
+                      {aiAssist.nextSteps.map((s) => (
+                        <Text as="p" key={s} tone="subdued">
+                          · {s}
+                        </Text>
+                      ))}
+                    </BlockStack>
+                  ) : null}
+                </BlockStack>
+              ) : (
+                <Text as="p" tone="subdued">
+                  Run analyze to get a fast triage brief. Uses 1 AI credit per run.
+                </Text>
+              )}
             </BlockStack>
           </Card>
         </Layout.Section>

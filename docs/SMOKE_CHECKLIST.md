@@ -66,6 +66,15 @@ Failed webhooks set `webhook_events.status=FAILED` and `lastError`.
 - [ ] Place a test order → warranty created without backfill
 - [ ] Refund with void-on-refund enabled → warranty voided
 
+## 9. AI assist (suggest-only)
+
+- [ ] `OPENAI_API_KEY` set (optional; heuristic works without it)
+- [ ] Open a claim → **AI assist → Analyze claim**
+- [ ] Credits decrement on Plans / claim panel
+- [ ] Apply category / save draft as internal note — status does **not** auto-change
+
+See [AI.md](./AI.md).
+
 ## Done when
 
-Merchant can install → configure rule → create/manage warranties → handle claim → customer gets certificate PDF — without browser prompts or raw GraphQL errors.
+Merchant can install → configure rule → create/manage warranties → handle claim → use AI triage suggest-only → customer gets certificate PDF — without browser prompts or raw GraphQL errors.

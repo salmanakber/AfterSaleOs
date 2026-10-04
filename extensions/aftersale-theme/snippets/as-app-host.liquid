@@ -1,14 +1,6 @@
 {% comment %}
-  Resolves hosted AfterSale app origin. Never use myshopify.com (iframes refuse to connect).
-  Usage: {% render 'as-app-host', url: block.settings.app_url %}
+  Hosted AfterSale origin. Prefer assigning AS_APP_HOST directly in blocks —
+  do not {% capture %}{% render %} this snippet into hrefs: Shopify wraps
+  snippet output with HTML comments that break URLs.
 {% endcomment %}
-{%- assign raw = url | default: 'https://aftersale.tidyflowapp.com' | strip | replace: 'http://', 'https://' -%}
-{%- if raw == blank or raw contains 'myshopify.com' or raw contains 'shopify.com/admin' -%}
-  {%- assign raw = 'https://aftersale.tidyflowapp.com' -%}
-{%- endif -%}
-{%- assign host_parts = raw | split: '/' -%}
-{%- if host_parts.size >= 3 -%}
-https://{{ host_parts[2] }}
-{%- else -%}
 https://aftersale.tidyflowapp.com
-{%- endif -%}

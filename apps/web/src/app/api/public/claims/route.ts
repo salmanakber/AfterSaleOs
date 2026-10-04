@@ -74,7 +74,11 @@ export async function POST(request: NextRequest) {
     attachmentIds: body.attachmentIds,
   });
 
-  const trackingUrl = `https://${resolved.shop.shopDomain}/apps/aftersale/claim/${claim.publicToken}`;
+  const appBase = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://aftersale.tidyflowapp.com").replace(
+    /\/$/,
+    "",
+  );
+  const trackingUrl = `${appBase}/apps/aftersale/claim/${claim.publicToken}?shop=${encodeURIComponent(resolved.shop.shopDomain)}`;
   await enqueueEmail({
     shopId: resolved.shop.id,
     to: body.email,
@@ -83,6 +87,7 @@ export async function POST(request: NextRequest) {
       claimNumber: claim.claimNumber,
       trackingUrl,
       eligibility: eligibility.outcome,
+      shopName: resolved.shop.shopName ?? resolved.shop.shopDomain,
     },
   });
 

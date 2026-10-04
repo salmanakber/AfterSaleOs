@@ -84,6 +84,7 @@ model Shop {
   productSuppliers      ProductSupplier[]
   supplierClaims        SupplierClaim[]
   workflowDefinitions   WorkflowDefinition[]
+  aiProcessingLogs      AiProcessingLog[]
 
   @@map("shops")
 }
@@ -1192,6 +1193,33 @@ model ShopNote {
 
   @@index([shopId, createdAt])
   @@map("shop_notes")
+}
+
+// ─── AI (M6 suggest-only assistant) ──────────────────────────────────────────
+
+model AiProcessingLog {
+  id           String   @id @default(cuid())
+  shopId       String   @map("shop_id")
+  claimId      String?  @map("claim_id")
+  feature      String
+  provider     String
+  model        String?
+  creditsUsed  Int      @default(1) @map("credits_used")
+  inputChars   Int      @default(0) @map("input_chars")
+  outputChars  Int      @default(0) @map("output_chars")
+  latencyMs    Int?     @map("latency_ms")
+  success      Boolean  @default(true)
+  errorMessage String?  @map("error_message")
+  /// Metadata only — never store raw customer PII / full prompts
+  meta         Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  shop         Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, createdAt])
+  @@index([shopId, feature, createdAt])
+  @@index([claimId])
+  @@map("ai_processing_logs")
 }
 
 // ─── Platform config (super-admin) ───────────────────────────────────────────

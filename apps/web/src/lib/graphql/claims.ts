@@ -8,6 +8,9 @@ import {
   mapEligibilityLabel,
   downloadToken,
   shopRepository,
+  runClaimAiAssist,
+  applySuggestedClaimCategory,
+  getAiCreditBalance,
 } from "@aftersale/db";
 import type { ClaimStatus } from "@prisma/client";
 import { enqueueEmail } from "@/lib/queue";
@@ -76,6 +79,27 @@ export const claimsTypeDefs = /* GraphQL */ `
     total: Int!
   }
 
+  type AiCreditBalance {
+    used: Int!
+    limit: Int!
+    remaining: Int!
+  }
+
+  """Suggest-only AI assist for a claim. Never changes status on its own."""
+  type ClaimAiAssist {
+    summary: String!
+    suggestedCategory: String!
+    categoryConfidence: Float!
+    missingInfo: [String!]!
+    suggestedReply: String!
+    nextSteps: [String!]!
+    provider: String!
+    model: String
+    creditsUsed: Int!
+    creditsRemaining: Int!
+    creditsLimit: Int!
+  }
+
   input CreateMerchantClaimInput {
     email: String!
     customerName: String
@@ -89,6 +113,7 @@ export const claimsTypeDefs = /* GraphQL */ `
     claims(status: String, query: String, limit: Int, offset: Int): ClaimConnection!
     claim(id: ID!): ClaimItem
     staffMembers: [ClaimStaff!]!
+    aiCreditBalance: AiCreditBalance!
   }
 
   extend type Mutation {
@@ -97,6 +122,8 @@ export const claimsTypeDefs = /* GraphQL */ `
     addClaimNote(id: ID!, body: String!, isInternal: Boolean): ClaimNote!
     assignClaim(id: ID!, assigneeId: ID): ClaimItem!
     overrideClaimEligibility(id: ID!, reason: String!): ClaimItem!
+    runClaimAiAssist(claimId: ID!): ClaimAiAssist!
+    applyClaimAiCategory(claimId: ID!, category: String!): ClaimItem!
   }
 `;
 
@@ -183,6 +210,10 @@ async function notifyClaimStatus(shopId: string, claimId: string, status: string
     include: { shop: true },
   });
   if (!claim?.customerEmail) return;
+  const appBase = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://aftersale.tidyflowapp.com").replace(
+    /\/$/,
+    "",
+  );
   await enqueueEmail({
     shopId,
     to: claim.customerEmail,
@@ -190,7 +221,7 @@ async function notifyClaimStatus(shopId: string, claimId: string, status: string
     data: {
       claimNumber: claim.claimNumber,
       status,
-      trackingUrl: `https://${claim.shop.shopDomain}/apps/aftersale/claim/${claim.publicToken}`,
+      trackingUrl: `${appBase}/apps/aftersale/claim/${claim.publicToken}?shop=${encodeURIComponent(claim.shop.shopDomain)}`,
       summary: claim.issueSummary,
       shopName: claim.shop.shopName ?? claim.shop.shopDomain,
     },
@@ -256,6 +287,10 @@ export const claimsResolvers = {
         createdAt: s.createdAt.toISOString(),
       }));
     },
+    aiCreditBalance: async (_: unknown, __: unknown, ctx: { request: Request }) => {
+      const merchant = await resolveMerchantContext(ctx.request);
+      return getAiCreditBalance(merchant.shopId);
+    },
   },
   Mutation: {
     createMerchantClaim: async (
@@ -282,13 +317,18 @@ export const claimsResolvers = {
         issueSummary: args.input.issueSummary,
         issueDetails: args.input.issueDetails,
       });
+      const appBase = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://aftersale.tidyflowapp.com").replace(
+        /\/$/,
+        "",
+      );
       await enqueueEmail({
         shopId: merchant.shopId,
         to: args.input.email,
         template: "claim_created",
         data: {
           claimNumber: claim.claimNumber,
-          trackingUrl: `https://${merchant.shopDomain}/apps/aftersale/claim/${claim.publicToken}`,
+          trackingUrl: `${appBase}/apps/aftersale/claim/${claim.publicToken}?shop=${encodeURIComponent(merchant.shopDomain)}`,
+          shopName: merchant.shopDomain,
         },
       });
       return mapClaim(claim.id, merchant.shopId, merchant.shopDomain);
@@ -355,6 +395,30 @@ export const claimsResolvers = {
         reason: args.reason,
       });
       return mapClaim(args.id, merchant.shopId, merchant.shopDomain);
+    },
+    runClaimAiAssist: async (
+      _: unknown,
+      args: { claimId: string },
+      ctx: { request: Request },
+    ) => {
+      const merchant = await resolveMerchantContext(ctx.request);
+      return runClaimAiAssist({
+        shopId: merchant.shopId,
+        claimId: args.claimId,
+      });
+    },
+    applyClaimAiCategory: async (
+      _: unknown,
+      args: { claimId: string; category: string },
+      ctx: { request: Request },
+    ) => {
+      const merchant = await resolveMerchantContext(ctx.request);
+      await applySuggestedClaimCategory({
+        shopId: merchant.shopId,
+        claimId: args.claimId,
+        category: args.category,
+      });
+      return mapClaim(args.claimId, merchant.shopId, merchant.shopDomain);
     },
   },
 };

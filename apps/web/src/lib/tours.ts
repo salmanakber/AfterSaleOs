@@ -57,7 +57,7 @@ export const TOURS: Record<string, TourDefinition> = {
       {
         id: "liquid",
         title: "Theme blocks & placement",
-        body: "Open Online Store → Customize → Product or Cart → Add block → Apps → Warranty register card. Or enable Warranty opt-in embed under App embeds. Style the checkbox or button to match your brand.",
+        body: "Easiest: Theme settings → App embeds → enable Warranty opt-in (auto). The checkbox appears next to Add to cart and on the cart — customize title and colors in that embed.",
         target: "cx-liquid",
         tab: "placement",
       },

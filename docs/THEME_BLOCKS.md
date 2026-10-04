@@ -1,52 +1,31 @@
 # Theme blocks — storefront placement
 
-Shopify never auto-adds theme app blocks. Merchants place or enable them in the theme editor.
+## Recommended: one App embed (auto)
 
-## Hosted app origin
+Shopify never injects theme UI without merchant consent. Closest to “automatic”:
 
-Iframes and register links always use the hosted AfterSale app (`https://aftersale.tidyflowapp.com`). Theme blocks no longer expose an “App URL” setting — the snippet resolves the host automatically. Never point embeds at `*.myshopify.com` (browsers refuse to connect).
+1. Online Store → Themes → **Customize**
+2. Theme gear → **App embeds**
+3. Enable **Warranty opt-in (auto)**
+4. Set title / colors / style → **Save**
 
-## Embed stuck on “Loading…”
+That places a clickable checkbox **next to Add to cart** on product pages and **near checkout** on the cart. No need to add a block on each template.
 
-Theme iframes must load the **hosted app**, not the shop proxy (`/apps/aftersale/...`). Proxy HTML cannot load Next.js `/_next` bundles from the shop domain.
+## Optional: manual block
 
-Embed blocks show a **visual preview card** in the theme editor (Shopify often blocks live iframes inside the editor).
+**Warranty register card** can still be added on Product or Cart if you want a specific spot. Prefer the App embed for most stores.
 
-After pulling theme changes, redeploy the theme extension from the repo root.
+## Form embeds (portal / register / claim)
 
-## Fastest path (recommended)
-
-1. Online Store → Themes → **Customize**.
-2. Left sidebar → **App embeds** (theme settings gear).
-3. Enable **Warranty opt-in embed**.
-4. In the block settings, choose style (checkbox, soft banner, or button) and set accent / background to match the brand.
-5. Open a product page in the preview — the opt-in appears near the buy form.
-
-## Product or cart block
-
-1. Customize → open the **Product** or **Cart** template.
-2. **Add block** → **Apps** → **Warranty register card**.
-3. Customize style, colors, and copy → Save.
-
-## If Apps is empty
-
-- Confirm the theme extension is released and the app is installed on that shop.
-- Theme should be Online Store 2.0 (JSON templates). Vintage themes often lack Apps.
-- On a development store: Partners → Apps → Extensions → **Development store preview**.
-- Hard-refresh the theme editor.
+These are live iframes. Theme editor shows a short note + “Preview” link — no fake Mac window chrome. Customers interact with the real form on the storefront.
 
 ## Checkout
 
-Liquid theme blocks cannot run on checkout. Use:
+Liquid cannot run on checkout payment. Use:
 
-- Product / cart opt-in (sets cart attribute `aftersale_register_intent`)
-- Thank-you page app block after purchase (see [CHECKOUT_REGISTER.md](./CHECKOUT_REGISTER.md))
+- Product / cart opt-in (auto embed)
+- Thank-you page app block after purchase
 
-## Block names
+## Hosted origin
 
-| Name in editor | Type |
-|----------------|------|
-| Warranty opt-in embed | App embed (body) |
-| Warranty register card | App block (product / cart) |
-| Warranty register / claim / lookup buttons | App blocks |
-| Register / claim / portal form embeds | Iframe app blocks |
+Links and iframes use the hosted AfterSale app. Blocks no longer expose an App URL setting.

@@ -265,6 +265,10 @@ async function notifyRepairStatus(shopId: string, repairId: string) {
     include: { claim: { include: { shop: true } } },
   });
   if (!repair?.claim.customerEmail) return;
+  const appBase = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://aftersale.tidyflowapp.com").replace(
+    /\/$/,
+    "",
+  );
   await enqueueEmail({
     shopId,
     to: repair.claim.customerEmail,
@@ -273,7 +277,7 @@ async function notifyRepairStatus(shopId: string, repairId: string) {
       claimNumber: repair.claim.claimNumber,
       repairNumber: repair.repairNumber,
       status: repair.status,
-      trackingUrl: `https://${repair.claim.shop.shopDomain}/apps/aftersale/claim/${repair.claim.publicToken}`,
+      trackingUrl: `${appBase}/apps/aftersale/claim/${repair.claim.publicToken}?shop=${encodeURIComponent(repair.claim.shop.shopDomain)}`,
       shopName: repair.claim.shop.shopName ?? repair.claim.shop.shopDomain,
     },
   });

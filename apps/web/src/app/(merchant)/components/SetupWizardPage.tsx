@@ -67,14 +67,9 @@ const STEPS = [
   { id: "done", title: "Done" },
 ] as const;
 
-function themeEditorUrl(shopDomain: string, template: "product" | "cart" = "product") {
+function appEmbedsUrl(shopDomain: string) {
   const store = shopDomain.replace(".myshopify.com", "");
-  const apiKey = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY ?? "";
-  // Opens theme editor on the product/cart template; merchant adds AfterSale under Apps.
-  if (apiKey) {
-    return `https://admin.shopify.com/store/${store}/themes/current/editor?template=${template}&addAppBlockId=${apiKey}/register-optin&target=mainSection`;
-  }
-  return `https://admin.shopify.com/store/${store}/themes/current/editor?template=${template}`;
+  return `https://admin.shopify.com/store/${store}/themes/current/editor?context=apps`;
 }
 
 function checkoutEditorUrl(shopDomain: string) {
@@ -320,47 +315,36 @@ export function SetupWizardPage() {
               {step === 4 ? (
                 <>
                   <Text as="h3" variant="headingMd">
-                    Add AfterSale on your storefront
+                    Show the warranty checkbox on your store
                   </Text>
                   <Text as="p" tone="subdued">
-                    Place a warranty checkbox or button where shoppers already buy — then a thank-you
-                    prompt after checkout.
+                    Enable one App embed — it appears next to Add to cart and again on the cart near
+                    checkout. Then add the thank-you prompt after payment.
                   </Text>
                   <div className="as-m-way-grid">
                     <div className="as-m-way-card" style={{ cursor: "default" }}>
                       <span className="as-m-way-num">01</span>
-                      <strong>Product page</strong>
-                      <p>Checkbox or styled button: “Register this product for warranty”.</p>
-                      <Button
-                        url={themeEditorUrl(shop.shopDomain, "product")}
-                        target="_blank"
-                        variant="primary"
-                      >
-                        Open product theme editor
+                      <strong>Product + cart (auto)</strong>
+                      <p>
+                        Theme gear → App embeds → enable <em>Warranty opt-in (auto)</em>. Set your
+                        own title and colors — no block to place on each page.
+                      </p>
+                      <Button url={appEmbedsUrl(shop.shopDomain)} target="_blank" variant="primary">
+                        Open App embeds
                       </Button>
                     </div>
                     <div className="as-m-way-card" style={{ cursor: "default" }}>
                       <span className="as-m-way-num">02</span>
-                      <strong>Cart</strong>
-                      <p>Same block on the cart template, or enable the App embed for product pages.</p>
-                      <Button url={themeEditorUrl(shop.shopDomain, "cart")} target="_blank">
-                        Open cart theme editor
-                      </Button>
-                    </div>
-                    <div className="as-m-way-card" style={{ cursor: "default" }}>
-                      <span className="as-m-way-num">03</span>
                       <strong>After checkout</strong>
-                      <p>Thank-you page app block: “Register this product” after the order is placed.</p>
+                      <p>
+                        Checkout editor → Thank you → add <em>AfterSale thank you</em> so customers
+                        can register after the order.
+                      </p>
                       <Button url={checkoutEditorUrl(shop.shopDomain)} target="_blank">
                         Open checkout editor
                       </Button>
                     </div>
                   </div>
-                  <Text as="p" tone="subdued">
-                    In the theme editor: <strong>Add block → Apps → Warranty register card</strong> (or
-                    enable <strong>Warranty opt-in embed</strong> under App embeds). Customize colors and
-                    style in the block settings to match your brand.
-                  </Text>
                   <InlineStack gap="200">
                     <Button onClick={() => setStep(3)}>Back</Button>
                     <Button variant="primary" onClick={() => setStep(5)}>

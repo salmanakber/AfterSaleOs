@@ -101,6 +101,11 @@ export function SettingsPage() {
       ? `https://admin.shopify.com/store/${storeHandle}/themes/current/editor?template=${template}`
       : "#";
   }
+  function appEmbedsUrl() {
+    return storeHandle
+      ? `https://admin.shopify.com/store/${storeHandle}/themes/current/editor?context=apps`
+      : "#";
+  }
   function checkoutEditorUrl() {
     return storeHandle
       ? `https://admin.shopify.com/store/${storeHandle}/settings/checkout/editor`
@@ -388,65 +393,66 @@ export function SettingsPage() {
       {activeTab === "placement" ? (
         <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-placement">
           <div className="as-m-panel-title">
-            <h3>Where the warranty checkbox / button appears</h3>
+            <h3>Show the warranty checkbox automatically</h3>
           </div>
           <p className="as-m-guide-lead">
-            Shopify does not allow custom checkout form fields on Online Store checkout. Use a
-            product or cart opt-in before payment, then a thank-you prompt after the order is placed.
+            Enable <strong>one App embed</strong> — no need to add a block on every product template.
+            The checkbox appears next to <strong>Add to cart</strong> and again near checkout on the
+            cart. Checkout itself cannot host Liquid; use the thank-you block after payment.
           </p>
+
+          <div className="as-m-liquid-guide" style={{ marginBottom: 14 }}>
+            <strong>Recommended (once)</strong>
+            <ol>
+              <li>Open App embeds in your theme editor.</li>
+              <li>
+                Turn on <strong>Warranty opt-in (auto)</strong>.
+              </li>
+              <li>
+                Set your title, colors, and style (checkbox / text+button / button) — then Save.
+              </li>
+            </ol>
+            <div style={{ marginTop: 10 }}>
+              <Button url={appEmbedsUrl()} target="_blank" variant="primary">
+                Enable warranty opt-in (App embeds)
+              </Button>
+            </div>
+          </div>
+
           <div className="as-m-way-grid">
             <div className="as-m-way-card" style={{ cursor: "default" }}>
-              <span className="as-m-way-num">Product page</span>
-              <strong>Checkbox or styled button</strong>
+              <span className="as-m-way-num">Product</span>
+              <strong>Beside Add to cart</strong>
               <p>
-                In the theme editor, add <em>Warranty register card</em> under Apps, or enable{" "}
-                <em>Warranty opt-in embed</em> in App embeds. Pick style: checkbox card, soft banner,
-                or button — and set accent color to match your brand.
+                With the App embed on, the checkbox mounts just above the Add to cart button. You
+                only customize copy and colors — no Mac-style preview chrome.
               </p>
-              <Button url={themeEditorUrl("product")} target="_blank" variant="primary">
-                Open product theme editor
+              <Button url={themeEditorUrl("product")} target="_blank">
+                Open product template
               </Button>
             </div>
             <div className="as-m-way-card" style={{ cursor: "default" }}>
               <span className="as-m-way-num">Cart</span>
-              <strong>Same block on cart</strong>
+              <strong>Beside checkout</strong>
               <p>
-                Add the Warranty register card to the cart template so shoppers can opt in before
-                checkout. Style and copy are editable in the block settings.
+                Same App embed places the checkbox near the cart checkout button so shoppers can
+                still opt in before paying.
               </p>
               <Button url={themeEditorUrl("cart")} target="_blank">
-                Open cart theme editor
+                Open cart template
               </Button>
             </div>
             <div className="as-m-way-card" style={{ cursor: "default" }}>
               <span className="as-m-way-num">After checkout</span>
               <strong>Thank-you page</strong>
               <p>
-                In Checkout → Thank you, add the <em>AfterSale thank you</em> app block. Customers see
-                “Register this product” once the order is complete.
+                Add <em>AfterSale thank you</em> so customers get a “Register this product” button
+                after the order is placed.
               </p>
               <Button url={checkoutEditorUrl()} target="_blank">
                 Open checkout editor
               </Button>
             </div>
-          </div>
-          <div className="as-m-liquid-guide">
-            <strong>Quick steps in the theme editor</strong>
-            <ol>
-              <li>
-                Online Store → Customize → open the <em>Product</em> or <em>Cart</em> template.
-              </li>
-              <li>
-                <strong>Add block</strong> → <strong>Apps</strong> → <strong>Warranty register card</strong>,
-                or open the theme gear → <strong>App embeds</strong> → enable{" "}
-                <strong>Warranty opt-in embed</strong>.
-              </li>
-              <li>
-                In the block settings, choose style (checkbox, banner, or button), accent color, and
-                labels so it matches your brand.
-              </li>
-              <li>Save the theme, then check a product page on your live storefront.</li>
-            </ol>
           </div>
         </div>
       ) : null}

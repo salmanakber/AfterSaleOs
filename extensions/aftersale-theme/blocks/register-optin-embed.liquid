@@ -1,23 +1,29 @@
 {% comment %}
-  App embed — Theme settings → App embeds → Warranty opt-in embed
-  Shows on product pages without adding a section block.
+  App embed — enable once: Theme settings → App embeds → Warranty opt-in
+  Auto-places near Add to cart on product pages and near checkout on cart.
 {% endcomment %}
 
+{% assign accent = block.settings.accent_color | default: '#111111' %}
+{% assign surface = block.settings.surface_color | default: 'transparent' %}
+{% assign radius = block.settings.corner_radius | default: 8 %}
+{% assign style = block.settings.display_style | default: 'checkbox_card' %}
+{% assign as_app_url = 'https://aftersale.tidyflowapp.com' %}
+{% assign register_url = as_app_url | append: '/apps/aftersale/register?shop=' | append: shop.permanent_domain %}
+{% assign mount_on = '' %}
+
 {% if template.name == 'product' and product %}
-  {% assign accent = block.settings.accent_color | default: '#1a1d26' %}
-  {% assign surface = block.settings.surface_color | default: '#ffffff' %}
-  {% assign radius = block.settings.corner_radius | default: 14 %}
-  {% assign style = block.settings.display_style | default: 'checkbox_card' %}
-  {% capture as_app_url %}{% render 'as-app-host', url: '' %}{% endcapture %}
-  {% assign as_app_url = as_app_url | strip %}
+  {% assign mount_on = 'product' %}
   {% assign product_q = product.title | url_encode %}
-  {% assign register_url = as_app_url | append: '/apps/aftersale/register?shop=' | append: shop.permanent_domain %}
   {% assign register_url = register_url | append: '&product=' | append: product_q %}
   {% assign register_url = register_url | append: '&product_id=' | append: product.id %}
   {% if product.selected_or_first_available_variant %}
     {% assign register_url = register_url | append: '&variant_id=' | append: product.selected_or_first_available_variant.id %}
   {% endif %}
+{% elsif template.name == 'cart' %}
+  {% assign mount_on = 'cart' %}
+{% endif %}
 
+{% if mount_on != blank %}
   <div
     id="as-optin-embed-root"
     class="as-optin as-optin--embed as-optin--{{ style }}"
@@ -25,17 +31,13 @@
     {{ block.shopify_attributes }}
     data-as-optin
     data-as-embed-mount
+    data-as-mount="{{ mount_on }}"
     data-as-style="{{ style }}"
     data-register-url="{{ register_url }}"
   >
     {% if style == 'button' %}
       <a class="as-optin__btn" href="{{ register_url }}" data-as-optin-btn>
-        <span class="as-optin__btn-icon" aria-hidden="true">
-          <svg viewBox="0 0 20 20" width="18" height="18" fill="none">
-            <path d="M4 10.5 L8 14.5 L16 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </span>
-        <span class="as-optin__btn-label">{{ block.settings.cta_label }}</span>
+        {{ block.settings.cta_label }}
       </a>
       {% if block.settings.subtitle != blank %}
         <p class="as-optin__btn-sub">{{ block.settings.subtitle }}</p>
@@ -44,16 +46,19 @@
       <div class="as-optin__banner">
         <div class="as-optin__banner-copy">
           <span class="as-optin__title">{{ block.settings.title }}</span>
-          <span class="as-optin__sub">{{ block.settings.subtitle }}</span>
+          {% if block.settings.subtitle != blank %}
+            <span class="as-optin__sub">{{ block.settings.subtitle }}</span>
+          {% endif %}
         </div>
         <a class="as-optin__cta as-optin__cta--inline" href="{{ register_url }}">
           {{ block.settings.cta_label }}
         </a>
       </div>
     {% else %}
-      <label class="as-optin__card">
+      <label class="as-optin__card" for="as-optin-check-{{ block.id }}">
         <span class="as-optin__checkwrap">
           <input
+            id="as-optin-check-{{ block.id }}"
             class="as-optin__checkbox"
             type="checkbox"
             name="attributes[aftersale_register_intent]"
@@ -61,19 +66,19 @@
             data-as-optin-check
             {% if block.settings.default_checked %}checked{% endif %}
           />
-          <span class="as-optin__box" aria-hidden="true">
-            <svg viewBox="0 0 16 16" width="12" height="12" fill="none">
-              <path d="M3 8.2 L6.2 11.5 L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
+          <span class="as-optin__box" aria-hidden="true"></span>
         </span>
         <span class="as-optin__copy">
           <span class="as-optin__title">{{ block.settings.title }}</span>
-          <span class="as-optin__sub">{{ block.settings.subtitle }}</span>
+          {% if block.settings.subtitle != blank %}
+            <span class="as-optin__sub">{{ block.settings.subtitle }}</span>
+          {% endif %}
         </span>
       </label>
       <div class="as-optin__panel" data-as-optin-panel hidden>
-        <p class="as-optin__hint">{{ block.settings.checked_hint }}</p>
+        {% if block.settings.checked_hint != blank %}
+          <p class="as-optin__hint">{{ block.settings.checked_hint }}</p>
+        {% endif %}
         <a class="as-optin__cta" href="{{ register_url }}">{{ block.settings.cta_label }}</a>
       </div>
     {% endif %}
@@ -84,18 +89,22 @@
 
 {% schema %}
 {
-  "name": "Warranty opt-in embed",
+  "name": "Warranty opt-in (auto)",
   "target": "body",
   "stylesheet": "aftersale.css",
   "settings": [
+    {
+      "type": "paragraph",
+      "content": "When enabled, shows next to Add to cart on product pages and near checkout on the cart. Customize copy and colors below — no block to add on each template."
+    },
     {
       "type": "select",
       "id": "display_style",
       "label": "Style",
       "options": [
-        { "value": "checkbox_card", "label": "Checkbox card" },
-        { "value": "soft_banner", "label": "Soft banner + button" },
-        { "value": "button", "label": "Styled button" }
+        { "value": "checkbox_card", "label": "Checkbox" },
+        { "value": "soft_banner", "label": "Text + button" },
+        { "value": "button", "label": "Button only" }
       ],
       "default": "checkbox_card"
     },
@@ -109,13 +118,13 @@
       "type": "textarea",
       "id": "subtitle",
       "label": "Supporting text",
-      "default": "Keep coverage handy after you buy."
+      "default": "Optional — keep coverage after you buy."
     },
     {
       "type": "text",
       "id": "checked_hint",
       "label": "Text when checked",
-      "default": "Great — register now or after checkout."
+      "default": "You can register now or after checkout."
     },
     {
       "type": "text",
@@ -126,19 +135,19 @@
     {
       "type": "checkbox",
       "id": "default_checked",
-      "label": "Checked by default (checkbox style)",
+      "label": "Checked by default",
       "default": false
     },
     {
       "type": "color",
       "id": "accent_color",
-      "label": "Accent color",
-      "default": "#1A1D26"
+      "label": "Accent / button color",
+      "default": "#111111"
     },
     {
       "type": "color",
       "id": "surface_color",
-      "label": "Background",
+      "label": "Background (use transparent to blend with theme)",
       "default": "#FFFFFF"
     },
     {
@@ -149,7 +158,7 @@
       "max": 24,
       "step": 2,
       "unit": "px",
-      "default": 14
+      "default": 8
     }
   ]
 }

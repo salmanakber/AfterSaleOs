@@ -1,38 +1,26 @@
-{% comment %} Embeds warranty portal via hosted app URL + editor preview. {% endcomment %}
+{% comment %} Portal form embed — live iframe {% endcomment %}
 
-{% capture as_app_url %}{% render 'as-app-host', url: '' %}{% endcapture %}
-{% assign as_app_url = as_app_url | strip %}
+{% assign as_app_url = 'https://aftersale.tidyflowapp.com' %}
 {% assign embed_src = as_app_url | append: '/apps/aftersale/portal?shop=' | append: shop.permanent_domain | append: '&embed=1' %}
 
 <div class="as-embed-block" {{ block.shopify_attributes }} data-as-embed>
-  <div class="as-embed-mock" data-as-embed-mock>
-    <div class="as-embed-mock__bar">
-      <span></span><span></span><span></span>
-      <em>Warranty portal · preview</em>
-    </div>
-    <div class="as-embed-mock__body">
-      <strong>Your warranties</strong>
-      <p>Customers look up coverage with email + order number, then open certificates and claims.</p>
-      <div class="as-embed-mock__fields">
-        <i></i><i></i>
-      </div>
-      <span class="as-embed-mock__btn">Email me a link</span>
-      <a class="as-embed-mock__link" href="{{ embed_src }}" target="_blank" rel="noopener">Open portal ↗</a>
-    </div>
-  </div>
+  {% if request.design_mode %}
+    <p class="as-embed-note">
+      Warranty portal loads on the live storefront.
+      <a href="{{ embed_src }}" target="_blank" rel="noopener">Preview portal</a>
+    </p>
+  {% endif %}
   <iframe
     class="as-embed-block__frame"
     title="{{ block.settings.title | default: 'Warranty portal' }}"
     src="{{ embed_src }}"
-    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:12px;background:#f8fafc;"
-    loading="eager"
+    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;"
+    loading="lazy"
     allow="clipboard-write"
     referrerpolicy="no-referrer-when-downgrade"
     data-as-embed-frame
   ></iframe>
 </div>
-
-<script src="{{ 'as-embed.js' | asset_url }}" defer></script>
 
 {% schema %}
 {

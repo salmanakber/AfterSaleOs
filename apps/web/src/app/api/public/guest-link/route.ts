@@ -76,7 +76,11 @@ export async function POST(request: NextRequest) {
         shopId: shop.id,
         to: payload.email!,
         template: "guest_magic_link",
-        data: { link, orderNumber: payload.orderNumber },
+        data: {
+          link,
+          orderNumber: payload.orderNumber,
+          shopName: shop.shopName ?? shop.shopDomain,
+        },
       });
       await prisma.job.update({
         where: { id: job.id },

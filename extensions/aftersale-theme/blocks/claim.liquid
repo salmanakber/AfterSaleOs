@@ -1,6 +1,5 @@
 {% comment %} AfterSale claim entry button {% endcomment %}
-{% capture as_app_url %}{% render 'as-app-host', url: '' %}{% endcapture %}
-{% assign as_app_url = as_app_url | strip %}
+{% assign as_app_url = 'https://aftersale.tidyflowapp.com' %}
 {% assign accent = block.settings.accent_color | default: '#1a1d26' %}
 {% assign product_q = '' %}
 {% if product %}
