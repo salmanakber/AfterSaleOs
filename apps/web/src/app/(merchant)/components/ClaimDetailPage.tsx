@@ -7,10 +7,8 @@ import {
   Banner,
   BlockStack,
   Button,
-  Card,
   FormLayout,
   InlineStack,
-  Layout,
   Modal,
   Page,
   Select,
@@ -19,6 +17,7 @@ import {
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 import { friendlyError } from "@/lib/merchant-errors";
+import { BrandLoader } from "./BrandLoader";
 
 type ClaimDetail = {
   id: string;
@@ -425,7 +424,9 @@ export function ClaimDetailPage() {
   if (!claim && !error) {
     return (
       <Page title="Claim">
-        <Text as="p">Loading…</Text>
+        <div style={{ padding: "48px 0" }}>
+          <BrandLoader label="Opening claim desk" compact />
+        </div>
       </Page>
     );
   }
@@ -438,238 +439,256 @@ export function ClaimDetailPage() {
     );
   }
 
+  const slaLabel = claim.slaDueAt
+    ? `SLA ${new Date(claim.slaDueAt).toLocaleString()}`
+    : "No SLA set";
+
   return (
     <Page
       title={claim.claimNumber}
       backAction={{ url: "/claims" }}
       subtitle={claim.customerEmail ?? undefined}
-      titleMetadata={<Badge>{claim.status}</Badge>}
+      titleMetadata={<Badge tone={claim.status === "COMPLETED" ? "success" : claim.status === "REJECTED" ? "critical" : "info"}>{claim.status.replaceAll("_", " ")}</Badge>}
       secondaryActions={[{ content: "Customer tracking", url: claim.trackingUrl, external: true }]}
     >
-      <Layout>
+      <div className="as-claim-desk">
         {error ? (
-          <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setError(null)}>
-              <p>{error}</p>
-            </Banner>
-          </Layout.Section>
+          <Banner tone="critical" onDismiss={() => setError(null)}>
+            <p>{error}</p>
+          </Banner>
         ) : null}
 
-        <Layout.Section variant="oneHalf">
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Customer & product
-              </Text>
+        <section className="as-claim-hero">
+          <div className="as-claim-hero-kicker">
+            <span>●</span> Claim desk
+          </div>
+          <h2>{claim.issueSummary || claim.claimNumber}</h2>
+          <p>
+            {claim.customerName || "Customer"} · {claim.customerEmail || "No email"}
+            {claim.productTitle ? ` · ${claim.productTitle}` : ""}
+          </p>
+          <div className="as-claim-hero-meta">
+            <span className="as-claim-chip">Status {claim.status.replaceAll("_", " ")}</span>
+            <span className="as-claim-chip">Order {claim.orderNumber ?? "—"}</span>
+            <span className="as-claim-chip">Serial {claim.serialNumber ?? "—"}</span>
+            <span className="as-claim-chip">{slaLabel}</span>
+            {claim.assignee ? (
+              <span className="as-claim-chip">
+                Assignee {claim.assignee.name || claim.assignee.email}
+              </span>
+            ) : (
+              <span className="as-claim-chip">Unassigned</span>
+            )}
+          </div>
+        </section>
+
+        <div className="as-claim-stat-row">
+          <div className="as-claim-stat">
+            <span>Eligibility</span>
+            <strong>{claim.eligibilityLabel}</strong>
+          </div>
+          <div className="as-claim-stat">
+            <span>Category</span>
+            <strong>{claim.issueCategory || "Not set"}</strong>
+          </div>
+          <div className="as-claim-stat">
+            <span>Workflow</span>
+            <strong>{claim.workflowStatusKey || "Default"}</strong>
+          </div>
+        </div>
+
+        <div className="as-claim-grid">
+          <div className="as-claim-tile">
+            <h3>Customer & product</h3>
+            <BlockStack gap="200">
               <Text as="p">
-                {claim.customerName ?? "—"} · {claim.customerEmail}
+                <strong>{claim.customerName ?? "—"}</strong>
+                <br />
+                {claim.customerEmail}
               </Text>
               <Text as="p">{claim.productTitle ?? "No product linked"}</Text>
               <Text as="p" tone="subdued">
                 Order {claim.orderNumber ?? "—"} · Serial {claim.serialNumber ?? "—"}
               </Text>
-              <Text as="p">
-                <strong>{claim.issueSummary}</strong>
-              </Text>
               {claim.issueDetails ? <Text as="p">{claim.issueDetails}</Text> : null}
-              <Text as="p" tone="subdued">
-                Category: {claim.issueCategory ?? "—"}
-              </Text>
             </BlockStack>
-          </Card>
-        </Layout.Section>
+          </div>
 
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack align="space-between" blockAlign="center">
-                <BlockStack gap="100">
-                  <Text as="h2" variant="headingMd">
-                    AI assist
-                  </Text>
-                  <Text as="p" tone="subdued">
-                    Suggest-only: summary, category, missing info, and a draft reply. Never approves or
-                    rejects for you.
-                    {aiCredits
-                      ? ` · ${aiCredits.remaining}/${aiCredits.limit} AI credits left this month`
-                      : null}
-                  </Text>
-                </BlockStack>
-                <Button variant="primary" loading={aiBusy} onClick={() => void runAiAssist()}>
-                  {aiAssist ? "Run again" : "Analyze claim"}
-                </Button>
-              </InlineStack>
-
-              {aiAssist ? (
-                <BlockStack gap="300">
-                  <Banner tone="info">
-                    <p>
-                      Provider: {aiAssist.provider}. Staff must review before acting — this is guidance,
-                      not a decision.
-                    </p>
-                  </Banner>
-                  <Text as="p">
-                    <strong>Summary</strong>
-                    <br />
-                    {aiAssist.summary}
-                  </Text>
-                  <InlineStack gap="200" blockAlign="center">
-                    <Text as="p">
-                      Suggested category: <strong>{aiAssist.suggestedCategory}</strong> (
-                      {Math.round(aiAssist.categoryConfidence * 100)}% confidence)
-                    </Text>
-                    <Button size="slim" loading={busy} onClick={() => void applyAiCategory()}>
-                      Apply category
-                    </Button>
-                  </InlineStack>
-                  {aiAssist.missingInfo.length > 0 ? (
-                    <BlockStack gap="100">
-                      <Text as="p" fontWeight="semibold">
-                        Missing information
-                      </Text>
-                      {aiAssist.missingInfo.map((m) => (
-                        <Text as="p" key={m} tone="subdued">
-                          · {m}
-                        </Text>
-                      ))}
-                    </BlockStack>
-                  ) : null}
-                  <BlockStack gap="100">
-                    <Text as="p" fontWeight="semibold">
-                      Suggested customer reply
-                    </Text>
-                    <Text as="p">{aiAssist.suggestedReply}</Text>
-                    <InlineStack gap="200">
-                      <Button onClick={useSuggestedReply}>Use in status note</Button>
-                      <Button onClick={() => void saveSuggestedAsInternalNote()} loading={busy}>
-                        Save as internal note
-                      </Button>
-                    </InlineStack>
-                  </BlockStack>
-                  {aiAssist.nextSteps.length > 0 ? (
-                    <BlockStack gap="100">
-                      <Text as="p" fontWeight="semibold">
-                        Next steps for your team
-                      </Text>
-                      {aiAssist.nextSteps.map((s) => (
-                        <Text as="p" key={s} tone="subdued">
-                          · {s}
-                        </Text>
-                      ))}
-                    </BlockStack>
-                  ) : null}
-                </BlockStack>
-              ) : (
-                <Text as="p" tone="subdued">
-                  Run analyze to get a fast triage brief. Uses 1 AI credit per run.
+          <div className="as-claim-tile">
+            <h3>Eligibility</h3>
+            <BlockStack gap="200">
+              <Text as="p" fontWeight="semibold">
+                {claim.eligibilityLabel}
+              </Text>
+              {claim.eligibilityReasons.map((r, i) => (
+                <Text as="p" key={i} tone="subdued">
+                  · {r}
                 </Text>
-              )}
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-
-        <Layout.Section variant="oneHalf">
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Eligibility
-              </Text>
-              <Text as="p">{claim.eligibilityLabel}</Text>
-              <BlockStack gap="100">
-                {claim.eligibilityReasons.map((r, i) => (
-                  <Text as="p" key={i} tone="subdued">
-                    · {r}
-                  </Text>
-                ))}
-              </BlockStack>
+              ))}
               {claim.eligibilityOverride ? (
                 <Badge tone="attention">Override applied</Badge>
               ) : (
                 <Button onClick={overrideEligibility}>Override eligibility</Button>
               )}
               <Text as="p" tone="subdued">
-                Eligibility never auto-rejects. Merchant decides.
+                Eligibility never auto-rejects. Your team decides.
               </Text>
             </BlockStack>
-          </Card>
-        </Layout.Section>
+          </div>
+        </div>
 
-        <Layout.Section variant="oneHalf">
-          <Card>
-            <BlockStack gap="300">
+        <div className="as-claim-ai">
+          <InlineStack align="space-between" blockAlign="center">
+            <BlockStack gap="100">
               <Text as="h2" variant="headingMd">
-                Actions
+                AI assist
               </Text>
-              <FormLayout>
-                <Select
-                  label="Status"
-                  options={[
-                    "OPEN",
-                    "IN_REVIEW",
-                    "WAITING_CUSTOMER",
-                    "APPROVED",
-                    "REJECTED",
-                    "IN_RESOLUTION",
-                    "COMPLETED",
-                    "CANCELLED",
-                  ].map((s) => ({ label: s, value: s }))}
-                  value={status}
-                  onChange={setStatus}
-                />
-                <TextField
-                  label="Customer-visible note (optional)"
-                  value={note}
-                  onChange={setNote}
-                  multiline={3}
-                  autoComplete="off"
-                />
-                <Button variant="primary" loading={busy} onClick={saveStatus}>
-                  Update status
+              <Text as="p" tone="subdued">
+                Suggest-only triage: summary, category, missing info, and a draft reply.
+                {aiCredits
+                  ? ` · ${aiCredits.remaining}/${aiCredits.limit} credits left this month`
+                  : null}
+              </Text>
+            </BlockStack>
+            <Button variant="primary" loading={aiBusy} onClick={() => void runAiAssist()}>
+              {aiAssist ? "Run again" : "Analyze claim"}
+            </Button>
+          </InlineStack>
+
+          {aiAssist ? (
+            <BlockStack gap="300">
+              <Banner tone="info">
+                <p>
+                  Provider: {aiAssist.provider}. Staff must review before acting — guidance, not a
+                  decision.
+                </p>
+              </Banner>
+              <Text as="p">
+                <strong>Summary</strong>
+                <br />
+                {aiAssist.summary}
+              </Text>
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="p">
+                  Suggested category: <strong>{aiAssist.suggestedCategory}</strong> (
+                  {Math.round(aiAssist.categoryConfidence * 100)}% confidence)
+                </Text>
+                <Button size="slim" loading={busy} onClick={() => void applyAiCategory()}>
+                  Apply category
                 </Button>
-                {workflowStatuses.length > 0 ? (
-                  <>
-                    <Select
-                      label="Workflow status"
-                      options={[
-                        { label: "Select…", value: "" },
-                        ...workflowStatuses.map((s) => ({ label: s.label, value: s.key })),
-                      ]}
-                      value={workflowKey}
-                      onChange={setWorkflowKey}
-                    />
-                    <Button onClick={applyWorkflow} loading={busy}>
-                      Apply workflow status
-                    </Button>
-                  </>
-                ) : null}
-                <Select
-                  label="Assignee"
-                  options={[
-                    { label: "Unassigned", value: "" },
-                    ...staff
-                      .filter((s) => s.active !== false)
-                      .map((s) => ({
+              </InlineStack>
+              {aiAssist.missingInfo.length > 0 ? (
+                <BlockStack gap="100">
+                  <Text as="p" fontWeight="semibold">
+                    Missing information
+                  </Text>
+                  {aiAssist.missingInfo.map((m) => (
+                    <Text as="p" key={m} tone="subdued">
+                      · {m}
+                    </Text>
+                  ))}
+                </BlockStack>
+              ) : null}
+              <BlockStack gap="100">
+                <Text as="p" fontWeight="semibold">
+                  Suggested customer reply
+                </Text>
+                <Text as="p">{aiAssist.suggestedReply}</Text>
+                <InlineStack gap="200">
+                  <Button onClick={useSuggestedReply}>Use in status note</Button>
+                  <Button onClick={() => void saveSuggestedAsInternalNote()} loading={busy}>
+                    Save as internal note
+                  </Button>
+                </InlineStack>
+              </BlockStack>
+              {aiAssist.nextSteps.length > 0 ? (
+                <BlockStack gap="100">
+                  <Text as="p" fontWeight="semibold">
+                    Next steps for your team
+                  </Text>
+                  {aiAssist.nextSteps.map((s) => (
+                    <Text as="p" key={s} tone="subdued">
+                      · {s}
+                    </Text>
+                  ))}
+                </BlockStack>
+              ) : null}
+            </BlockStack>
+          ) : (
+            <Text as="p" tone="subdued">
+              Run analyze for a fast triage brief. Uses 1 AI credit per run.
+            </Text>
+          )}
+        </div>
+
+        <div className="as-claim-grid">
+          <div className="as-claim-tile">
+            <h3>Update status</h3>
+            <FormLayout>
+              <Select
+                label="Status"
+                options={[
+                  "OPEN",
+                  "IN_REVIEW",
+                  "WAITING_CUSTOMER",
+                  "APPROVED",
+                  "REJECTED",
+                  "IN_RESOLUTION",
+                  "COMPLETED",
+                  "CANCELLED",
+                ].map((s) => ({ label: s.replaceAll("_", " "), value: s }))}
+                value={status}
+                onChange={setStatus}
+              />
+              <TextField
+                label="Customer-visible note (optional)"
+                value={note}
+                onChange={setNote}
+                multiline={3}
+                autoComplete="off"
+              />
+              <Button variant="primary" loading={busy} onClick={saveStatus}>
+                Update status
+              </Button>
+              {workflowStatuses.length > 0 ? (
+                <>
+                  <Select
+                    label="Workflow status"
+                    options={[
+                      { label: "Select…", value: "" },
+                      ...workflowStatuses.map((s) => ({ label: s.label, value: s.key })),
+                    ]}
+                    value={workflowKey}
+                    onChange={setWorkflowKey}
+                  />
+                  <Button onClick={applyWorkflow} loading={busy}>
+                    Apply workflow status
+                  </Button>
+                </>
+              ) : null}
+              <Select
+                label="Assignee"
+                options={[
+                  { label: "Unassigned", value: "" },
+                  ...staff
+                    .filter((s) => s.active !== false)
+                    .map((s) => ({
                       label: s.name ? `${s.name} (${s.email})` : s.email,
                       value: s.id,
                     })),
-                  ]}
-                  value={assigneeId}
-                  onChange={setAssigneeId}
-                />
-                <Button onClick={saveAssignee} loading={busy}>
-                  Save assignee
-                </Button>
-              </FormLayout>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+                ]}
+                value={assigneeId}
+                onChange={setAssigneeId}
+              />
+              <Button onClick={saveAssignee} loading={busy}>
+                Save assignee
+              </Button>
+            </FormLayout>
+          </div>
 
-        <Layout.Section variant="oneHalf">
-          <Card>
+          <div className="as-claim-tile">
+            <h3>Resolve</h3>
             <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Resolve
-              </Text>
               <Button onClick={createRepair} loading={busy}>
                 Create repair
               </Button>
@@ -721,13 +740,10 @@ export function ClaimDetailPage() {
               />
               <Select
                 label="Supplier claim status"
-                options={[
-                  "NOT_FILED",
-                  "FILED",
-                  "ACCEPTED",
-                  "REJECTED",
-                  "REIMBURSED",
-                ].map((s) => ({ label: s.replaceAll("_", " "), value: s }))}
+                options={["NOT_FILED", "FILED", "ACCEPTED", "REJECTED", "REIMBURSED"].map((s) => ({
+                  label: s.replaceAll("_", " "),
+                  value: s,
+                }))}
                 value={supplierStatus}
                 onChange={setSupplierStatus}
               />
@@ -738,17 +754,19 @@ export function ClaimDetailPage() {
                 Manage suppliers
               </Button>
             </BlockStack>
-          </Card>
-        </Layout.Section>
+          </div>
+        </div>
 
-        <Layout.Section variant="oneHalf">
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Timeline
+        <div className="as-claim-tile">
+          <h3>Timeline</h3>
+          <BlockStack gap="300">
+            {claim.notes.length === 0 ? (
+              <Text as="p" tone="subdued">
+                No notes yet. Add an internal note or update status to start the timeline.
               </Text>
-              {claim.notes.map((n) => (
-                <BlockStack gap="050" key={n.id}>
+            ) : (
+              claim.notes.map((n) => (
+                <div key={n.id} className="as-claim-note" data-internal={n.isInternal ? "true" : "false"}>
                   <InlineStack gap="200">
                     <Badge tone={n.isInternal ? "attention" : undefined}>
                       {n.isInternal ? "Internal" : n.authorType}
@@ -758,45 +776,41 @@ export function ClaimDetailPage() {
                     </Text>
                   </InlineStack>
                   <Text as="p">{n.body}</Text>
-                </BlockStack>
-              ))}
-              <TextField
-                label="Internal note"
-                value={internalNote}
-                onChange={setInternalNote}
-                multiline={3}
-                autoComplete="off"
-              />
-              <Button onClick={saveNote} loading={busy}>
-                Add internal note
-              </Button>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+                </div>
+              ))
+            )}
+            <TextField
+              label="Internal note"
+              value={internalNote}
+              onChange={setInternalNote}
+              multiline={3}
+              autoComplete="off"
+            />
+            <Button onClick={saveNote} loading={busy}>
+              Add internal note
+            </Button>
+          </BlockStack>
+        </div>
 
         {claim.attachments.length > 0 ? (
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="200">
-                <Text as="h2" variant="headingMd">
-                  Attachments
-                </Text>
-                {claim.attachments.map((a) => (
-                  <InlineStack key={a.id} gap="200">
-                    <Text as="span">{a.fileName}</Text>
-                    <Badge>{a.scanStatus}</Badge>
-                    {a.downloadUrl ? (
-                      <Button url={a.downloadUrl} external variant="plain">
-                        Open
-                      </Button>
-                    ) : null}
-                  </InlineStack>
-                ))}
-              </BlockStack>
-            </Card>
-          </Layout.Section>
+          <div className="as-claim-tile">
+            <h3>Attachments</h3>
+            <BlockStack gap="200">
+              {claim.attachments.map((a) => (
+                <InlineStack key={a.id} gap="200" blockAlign="center">
+                  <Text as="span">{a.fileName}</Text>
+                  <Badge>{a.scanStatus}</Badge>
+                  {a.downloadUrl ? (
+                    <Button url={a.downloadUrl} external variant="plain">
+                      Open
+                    </Button>
+                  ) : null}
+                </InlineStack>
+              ))}
+            </BlockStack>
+          </div>
         ) : null}
-      </Layout>
+      </div>
 
       <Modal
         open={overrideOpen}

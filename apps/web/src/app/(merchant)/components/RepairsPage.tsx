@@ -223,7 +223,19 @@ export function RepairDetailPage() {
   if (!repair && !error) {
     return (
       <Page title="Repair">
-        <Text as="p">Loading…</Text>
+        <div style={{ padding: "32px 0" }}>
+          <div className="as-loader as-loader--compact" role="status">
+            <div className="as-loader-mark" aria-hidden>
+              <span className="as-loader-ring" />
+              <span className="as-loader-ring as-loader-ring-b" />
+              <span className="as-loader-core">A</span>
+            </div>
+            <p className="as-loader-label">Loading repairs</p>
+            <div className="as-loader-bar" aria-hidden>
+              <span />
+            </div>
+          </div>
+        </div>
       </Page>
     );
   }

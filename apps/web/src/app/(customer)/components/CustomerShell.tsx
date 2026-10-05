@@ -98,10 +98,8 @@ export function CustomerShell({
             displayBrand
           )}
         </h1>
-        <p className="as-lede">
-          <strong>{title}</strong>
-          {lede ? <span> — {lede}</span> : null}
-        </p>
+        <h2 className="as-hero-title">{title}</h2>
+        {lede ? <p className="as-hero-sub">{lede}</p> : null}
       </header>
 
       {steps && steps.length > 0 && !embed ? (

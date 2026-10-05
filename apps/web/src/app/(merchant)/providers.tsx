@@ -2,11 +2,12 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { AppProvider, Banner, Frame, Spinner } from "@shopify/polaris";
+import { AppProvider, Banner, Frame } from "@shopify/polaris";
 import enTranslations from "@shopify/polaris/locales/en.json";
 import { getSessionToken, clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
 import { rememberShopParams, getRememberedShop, appHref } from "@/lib/shop-context";
 import { AppNav } from "./components/AppNav";
+import { BrandLoader } from "./components/BrandLoader";
 import { TourProvider } from "./components/ProductTour";
 
 declare global {
@@ -116,7 +117,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     return (
       <AppProvider i18n={enTranslations}>
         <div className="as-m-boot">
-          <Spinner accessibilityLabel="Loading AfterSale OS" size="large" />
+          <BrandLoader label="Starting AfterSale OS" />
         </div>
       </AppProvider>
     );

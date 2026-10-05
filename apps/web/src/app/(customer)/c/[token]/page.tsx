@@ -171,7 +171,23 @@ function CertificateInner() {
 
 export default function CertificatePage() {
   return (
-    <Suspense fallback={<div className="as-shell">Loading…</div>}>
+    <Suspense
+      fallback={
+        <div className="as-shell">
+          <div className="as-loader" role="status">
+            <div className="as-loader-mark" aria-hidden>
+              <span className="as-loader-ring" />
+              <span className="as-loader-ring as-loader-ring-b" />
+              <span className="as-loader-core">A</span>
+            </div>
+            <p className="as-loader-label">Loading certificate</p>
+            <div className="as-loader-bar" aria-hidden>
+              <span />
+            </div>
+          </div>
+        </div>
+      }
+    >
       <CertificateInner />
     </Suspense>
   );

@@ -108,6 +108,7 @@ export async function createClaim(params: {
   warrantyUnitId?: string;
   certificateToken?: string;
   orderNumber?: string;
+  orderLineItemId?: string;
   serialNumber?: string;
   issueCategory?: string;
   issueSummary: string;
@@ -129,6 +130,37 @@ export async function createClaim(params: {
       warrantyId = w.id;
       warrantyUnitId = w.warrantyUnitId;
       customerId = w.customerId ?? undefined;
+    }
+  }
+
+  if (!warrantyId && params.orderLineItemId) {
+    const unit = await prisma.warrantyUnit.findFirst({
+      where: {
+        shopId: params.shopId,
+        orderLineItemId: params.orderLineItemId,
+      },
+      include: {
+        warranties: {
+          where: { status: { not: "VOID" } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+        orderLineItem: {
+          include: {
+            order: { include: { customer: true } },
+          },
+        },
+      },
+    });
+    if (unit) {
+      warrantyUnitId = unit.id;
+      const w = unit.warranties[0];
+      if (w) {
+        warrantyId = w.id;
+        customerId = w.customerId ?? undefined;
+      }
+      const orderCustomer = unit.orderLineItem?.order?.customer;
+      if (!customerId && orderCustomer) customerId = orderCustomer.id;
     }
   }
 
@@ -162,6 +194,32 @@ export async function createClaim(params: {
       warrantyId = w.id;
       warrantyUnitId = w.warrantyUnitId;
       customerId = w.customerId ?? undefined;
+    }
+  }
+
+  // Attach (or create) a warranty unit so the claim shows product + order.
+  if (!warrantyUnitId && params.orderLineItemId) {
+    const line = await prisma.orderLineItem.findFirst({
+      where: { id: params.orderLineItemId, shopId: params.shopId },
+      include: { order: { include: { customer: true } } },
+    });
+    if (line) {
+      let unit = await prisma.warrantyUnit.findFirst({
+        where: { shopId: params.shopId, orderLineItemId: line.id },
+        orderBy: { unitIndex: "asc" },
+      });
+      if (!unit) {
+        unit = await prisma.warrantyUnit.create({
+          data: {
+            shopId: params.shopId,
+            orderLineItemId: line.id,
+            unitIndex: 0,
+            serialNumber: params.serialNumber?.trim() || undefined,
+          },
+        });
+      }
+      warrantyUnitId = unit.id;
+      if (!customerId && line.order.customerId) customerId = line.order.customerId;
     }
   }
 

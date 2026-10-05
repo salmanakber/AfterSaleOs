@@ -104,9 +104,37 @@ export const claimsTypeDefs = /* GraphQL */ `
     email: String!
     customerName: String
     warrantyId: ID
+    orderNumber: String
+    orderLineItemId: ID
+    serialNumber: String
     issueCategory: String
     issueSummary: String!
     issueDetails: String
+  }
+
+  type MerchantOrderLineItem {
+    id: ID!
+    title: String!
+    sku: String
+    quantity: Int!
+    hasWarranty: Boolean!
+    warrantyId: ID
+    serialNumber: String
+  }
+
+  type MerchantOrderCustomer {
+    id: ID
+    email: String
+    name: String
+  }
+
+  type MerchantOrderOption {
+    id: ID!
+    orderNumber: String!
+    email: String
+    processedAt: String
+    customer: MerchantOrderCustomer
+    lineItems: [MerchantOrderLineItem!]!
   }
 
   extend type Query {
@@ -114,6 +142,7 @@ export const claimsTypeDefs = /* GraphQL */ `
     claim(id: ID!): ClaimItem
     staffMembers: [ClaimStaff!]!
     aiCreditBalance: AiCreditBalance!
+    searchOrders(query: String, limit: Int): [MerchantOrderOption!]!
   }
 
   extend type Mutation {
@@ -291,6 +320,82 @@ export const claimsResolvers = {
       const merchant = await resolveMerchantContext(ctx.request);
       return getAiCreditBalance(merchant.shopId);
     },
+    searchOrders: async (
+      _: unknown,
+      args: { query?: string; limit?: number },
+      ctx: { request: Request },
+    ) => {
+      const merchant = await resolveMerchantContext(ctx.request);
+      const limit = Math.min(args.limit ?? 20, 40);
+      const q = (args.query ?? "").trim();
+      const where: Record<string, unknown> = { shopId: merchant.shopId };
+      if (q) {
+        where.OR = [
+          { orderNumber: { contains: q, mode: "insensitive" } },
+          { email: { contains: q, mode: "insensitive" } },
+          { customer: { email: { contains: q, mode: "insensitive" } } },
+          {
+            customer: {
+              OR: [
+                { firstName: { contains: q, mode: "insensitive" } },
+                { lastName: { contains: q, mode: "insensitive" } },
+              ],
+            },
+          },
+        ];
+      }
+      const orders = await prisma.order.findMany({
+        where,
+        orderBy: { processedAt: "desc" },
+        take: limit,
+        include: {
+          customer: true,
+          lineItems: {
+            include: {
+              warrantyUnits: {
+                include: {
+                  warranties: {
+                    where: { status: { not: "VOID" } },
+                    orderBy: { createdAt: "desc" },
+                    take: 1,
+                  },
+                },
+                take: 1,
+              },
+            },
+          },
+        },
+      });
+      return orders.map((o) => {
+        const name = o.customer
+          ? [o.customer.firstName, o.customer.lastName].filter(Boolean).join(" ") || null
+          : null;
+        return {
+          id: o.id,
+          orderNumber: o.orderNumber,
+          email: o.email ?? o.customer?.email ?? null,
+          processedAt: o.processedAt?.toISOString() ?? o.createdAt.toISOString(),
+          customer: {
+            id: o.customer?.id ?? null,
+            email: o.email ?? o.customer?.email ?? null,
+            name,
+          },
+          lineItems: o.lineItems.map((li) => {
+            const unit = li.warrantyUnits[0];
+            const warranty = unit?.warranties[0];
+            return {
+              id: li.id,
+              title: li.title,
+              sku: li.sku,
+              quantity: li.quantity,
+              hasWarranty: Boolean(warranty),
+              warrantyId: warranty?.id ?? null,
+              serialNumber: unit?.serialNumber ?? null,
+            };
+          }),
+        };
+      });
+    },
   },
   Mutation: {
     createMerchantClaim: async (
@@ -300,6 +405,9 @@ export const claimsResolvers = {
           email: string;
           customerName?: string;
           warrantyId?: string;
+          orderNumber?: string;
+          orderLineItemId?: string;
+          serialNumber?: string;
           issueCategory?: string;
           issueSummary: string;
           issueDetails?: string;
@@ -313,6 +421,9 @@ export const claimsResolvers = {
         email: args.input.email,
         customerName: args.input.customerName,
         warrantyId: args.input.warrantyId,
+        orderNumber: args.input.orderNumber,
+        orderLineItemId: args.input.orderLineItemId,
+        serialNumber: args.input.serialNumber,
         issueCategory: args.input.issueCategory,
         issueSummary: args.input.issueSummary,
         issueDetails: args.input.issueDetails,

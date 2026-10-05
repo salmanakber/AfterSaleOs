@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { publicApiUrl } from "@/lib/public-api";
+import { BrandLoader } from "../../../../components/BrandLoader";
 import { CustomerShell } from "../../../../components/CustomerShell";
 
 type ClaimView = {
@@ -57,7 +58,7 @@ function TrackInner() {
   if (!claim) {
     return (
       <div className="as-shell">
-        <p className="as-muted">Loading claim…</p>
+        <BrandLoader label="Loading claim status" />
       </div>
     );
   }
@@ -75,69 +76,96 @@ function TrackInner() {
     <CustomerShell
       brand={claim.shopName || "AfterSale"}
       title="Claim tracking"
-      lede="Live status and updates from the merchant team."
+      lede="Live status and updates from the care team — refresh anytime."
     >
-      <div className="as-status-rail" aria-label="Claim progress">
-        {RAIL.map((step, i) => (
-          <span key={step} data-active={activeIdx >= i && activeIdx >= 0 ? "true" : "false"}>
-            {step.replaceAll("_", " ")}
-          </span>
-        ))}
-      </div>
-
-      <div className="as-warranty-row" style={{ marginBottom: 12 }}>
-        <div>
-          <h2 className="as-warranty-title" style={{ marginBottom: 4 }}>
-            {claim.claimNumber}
-          </h2>
-          {claim.productTitle ? <p className="as-muted">{claim.productTitle}</p> : null}
+      <div className="as-stack">
+        <div className="as-status-rail" aria-label="Claim progress">
+          {RAIL.map((step, i) => (
+            <span key={step} data-active={activeIdx >= i && activeIdx >= 0 ? "true" : "false"}>
+              {step.replaceAll("_", " ")}
+            </span>
+          ))}
         </div>
-        <span className={badge}>{claim.status.replaceAll("_", " ")}</span>
-      </div>
 
-      <p style={{ marginTop: 0, fontSize: "1.05rem" }}>{claim.issueSummary}</p>
-      {claim.issueDetails ? <p className="as-muted">{claim.issueDetails}</p> : null}
+        <div className="as-track-card">
+          <div className="as-warranty-row">
+            <div>
+              <h2 className="as-warranty-title" style={{ marginBottom: 4 }}>
+                {claim.claimNumber}
+              </h2>
+              {claim.productTitle ? <p className="as-muted">{claim.productTitle}</p> : null}
+            </div>
+            <span className={badge}>{claim.status.replaceAll("_", " ")}</span>
+          </div>
 
-      <div className="as-meta">
-        {claim.eligibilityResult ? (
-          <span>Eligibility · {claim.eligibilityResult.replaceAll("_", " ")}</span>
+          <p style={{ margin: 0, fontSize: "1.08rem", fontWeight: 650 }}>{claim.issueSummary}</p>
+          {claim.issueDetails ? <p className="as-muted" style={{ margin: 0 }}>{claim.issueDetails}</p> : null}
+
+          <div className="as-track-meta">
+            {claim.eligibilityResult ? (
+              <span className="as-chip">
+                Eligibility · {claim.eligibilityResult.replaceAll("_", " ")}
+              </span>
+            ) : null}
+            <span className="as-chip">Opened {new Date(claim.createdAt).toLocaleDateString()}</span>
+            <span className="as-chip">Updated {new Date(claim.updatedAt).toLocaleString()}</span>
+          </div>
+        </div>
+
+        {claim.notes.length > 0 ? (
+          <div>
+            <div className="as-section-head">
+              <h2>Updates</h2>
+            </div>
+            <ul className="as-timeline">
+              {claim.notes.map((n, i) => (
+                <li key={i}>
+                  <p style={{ margin: 0 }}>{n.body}</p>
+                  <p className="as-muted" style={{ margin: "4px 0 0" }}>
+                    {new Date(n.createdAt).toLocaleString()}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="as-empty">
+            <strong>No updates yet</strong>
+            <p className="as-muted">You’ll see messages here when the team posts an update.</p>
+          </div>
+        )}
+
+        {claim.attachments.length > 0 ? (
+          <div>
+            <div className="as-section-head">
+              <h2>Attachments</h2>
+            </div>
+            <div className="as-stack">
+              {claim.attachments.map((a, i) => (
+                <div key={i} className="as-line-row">
+                  <strong>{a.fileName}</strong>
+                  <span className="as-muted" style={{ fontSize: 12 }}>
+                    {a.contentType || "File"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         ) : null}
-        <span>Updated {new Date(claim.updatedAt).toLocaleString()}</span>
       </div>
-
-      {claim.notes.length > 0 ? (
-        <div style={{ marginTop: 8 }}>
-          <p className="as-section-title">Updates</p>
-          <ul className="as-timeline">
-            {claim.notes.map((n, i) => (
-              <li key={i}>
-                <p style={{ margin: 0 }}>{n.body}</p>
-                <p className="as-muted" style={{ margin: "4px 0 0" }}>
-                  {new Date(n.createdAt).toLocaleString()}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {claim.attachments.length > 0 ? (
-        <div style={{ marginTop: 18 }}>
-          <p className="as-section-title">Attachments</p>
-          <ul className="as-stack" style={{ paddingLeft: 18, margin: 0 }}>
-            {claim.attachments.map((a, i) => (
-              <li key={i}>{a.fileName}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </CustomerShell>
   );
 }
 
 export default function ClaimTrackPage() {
   return (
-    <Suspense fallback={<div className="as-shell">Loading…</div>}>
+    <Suspense
+      fallback={
+        <div className="as-shell">
+          <BrandLoader label="Opening claim" />
+        </div>
+      }
+    >
       <TrackInner />
     </Suspense>
   );

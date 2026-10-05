@@ -3,6 +3,7 @@
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { customerPageUrl, publicApiUrl } from "@/lib/public-api";
+import { BrandLoader } from "../../../components/BrandLoader";
 import { CustomerShell } from "../../../components/CustomerShell";
 
 type WarrantyRow = {
@@ -172,6 +173,14 @@ function PortalInner() {
 
   const open = Boolean(warranties);
 
+  if (loading && !open) {
+    return (
+      <div className="as-shell">
+        <BrandLoader label="Opening your portal" />
+      </div>
+    );
+  }
+
   return (
     <CustomerShell
       title="Your warranties"
@@ -197,34 +206,25 @@ function PortalInner() {
 
           {orders && orders.length > 0 ? (
             <section className="as-stack">
-              <h2 className="as-warranty-title" style={{ margin: 0 }}>
-                Your orders
-              </h2>
-              <p className="as-muted" style={{ marginTop: 0 }}>
-                Pick a product to register — no extra email confirmation for items from these orders.
-              </p>
+              <div className="as-section-head">
+                <div>
+                  <h2>Your orders</h2>
+                  <p className="as-muted" style={{ margin: "4px 0 0" }}>
+                    Pick a product to register — no extra confirmation for items from these orders.
+                  </p>
+                </div>
+              </div>
               {orders.map((o) => (
                 <article className="as-card" key={o.id}>
                   <div className="as-warranty-row">
-                    <h3 className="as-warranty-title" style={{ fontSize: "1rem" }}>
+                    <h3 className="as-warranty-title" style={{ fontSize: "1.05rem" }}>
                       Order {o.orderNumber}
                     </h3>
-                    <span className="as-muted" style={{ fontSize: 12 }}>
-                      {new Date(o.processedAt).toLocaleDateString()}
-                    </span>
+                    <span className="as-chip">{new Date(o.processedAt).toLocaleDateString()}</span>
                   </div>
-                  <div className="as-stack" style={{ gap: 8, marginTop: 8 }}>
+                  <div className="as-stack" style={{ gap: 8, marginTop: 10 }}>
                     {o.lineItems.map((li) => (
-                      <div
-                        key={li.id}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: 12,
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                        }}
-                      >
+                      <div key={li.id} className="as-line-row">
                         <div>
                           <strong>{li.title}</strong>
                           <div className="as-muted" style={{ fontSize: 12 }}>
@@ -233,11 +233,11 @@ function PortalInner() {
                           </div>
                         </div>
                         {li.hasWarranty && li.certificateToken ? (
-                          <a className="as-btn as-btn-secondary" href={customerPageUrl(`/c/${li.certificateToken}`)}>
+                          <a className="as-btn as-btn-secondary" href={customerPageUrl(`/c/${li.certificateToken}`)} style={{ width: "auto" }}>
                             Certificate
                           </a>
                         ) : (
-                          <a className="as-btn" href={registerHref(li, o.orderNumber)}>
+                          <a className="as-btn" href={registerHref(li, o.orderNumber)} style={{ width: "auto" }}>
                             Register
                           </a>
                         )}
@@ -250,9 +250,9 @@ function PortalInner() {
           ) : null}
 
           <section className="as-stack">
-            <h2 className="as-warranty-title" style={{ margin: 0 }}>
-              Active warranties
-            </h2>
+            <div className="as-section-head">
+              <h2>Active warranties</h2>
+            </div>
             {warranties!.length === 0 ? (
               <div className="as-empty">
                 <strong>No warranties on file yet</strong>
@@ -333,12 +333,8 @@ export default function PortalPage() {
   return (
     <Suspense
       fallback={
-        <div className="as-shell as-shell-embed" style={{ padding: 24 }}>
-          <div className="as-panel">
-            <p className="as-muted" style={{ margin: 0 }}>
-              Opening your warranty portal…
-            </p>
-          </div>
+        <div className="as-shell">
+          <BrandLoader label="Opening your portal" />
         </div>
       }
     >

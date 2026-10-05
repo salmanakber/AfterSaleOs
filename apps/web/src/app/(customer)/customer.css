@@ -205,10 +205,116 @@
 .as-shell {
   position: relative;
   z-index: 1;
-  width: min(760px, calc(100% - 32px));
+  width: min(880px, calc(100% - 32px));
   margin: 0 auto;
   padding: 28px 0 80px;
   animation: as-rise 0.55s ease-out both;
+}
+
+/* Premium brand loader */
+.as-loader {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 40px 16px;
+  text-align: center;
+}
+
+.as-loader--compact {
+  padding: 16px;
+  gap: 10px;
+}
+
+.as-loader-mark {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+}
+
+.as-loader-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--as-ink);
+  border-right-color: color-mix(in srgb, var(--as-ink) 25%, transparent);
+  animation: as-loader-spin 0.9s linear infinite;
+}
+
+.as-loader-ring-b {
+  inset: 8px;
+  border-top-color: var(--as-primary);
+  border-right-color: color-mix(in srgb, var(--as-primary) 25%, transparent);
+  animation-direction: reverse;
+  animation-duration: 1.25s;
+}
+
+.as-loader-core {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, var(--as-ink), color-mix(in srgb, var(--as-ink) 70%, var(--as-primary)));
+  color: #fff;
+  font-family: var(--as-font-display), Fraunces, Georgia, serif;
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow: 0 10px 24px var(--as-primary-soft);
+  animation: as-loader-pulse 1.6s ease-in-out infinite;
+}
+
+.as-loader-label {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--as-muted);
+}
+
+.as-loader-bar {
+  width: 120px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--as-border);
+  overflow: hidden;
+}
+
+.as-loader-bar span {
+  display: block;
+  height: 100%;
+  width: 40%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--as-ink), var(--as-primary));
+  animation: as-loader-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes as-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes as-loader-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes as-loader-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
 }
 
 .as-topbar {
@@ -295,8 +401,16 @@
 
 .as-hero {
   display: grid;
-  gap: 12px;
-  margin-bottom: 22px;
+  gap: 14px;
+  margin-bottom: 24px;
+  padding: 22px 22px 20px;
+  border-radius: calc(var(--as-radius) + 4px);
+  border: 1px solid color-mix(in srgb, var(--as-primary) 18%, var(--as-border));
+  background:
+    radial-gradient(700px 220px at 0% 0%, var(--as-primary-soft), transparent 55%),
+    linear-gradient(180deg, color-mix(in srgb, var(--as-surface) 92%, transparent), var(--as-panel));
+  box-shadow: var(--as-shadow);
+  backdrop-filter: blur(12px);
 }
 
 .as-kicker {
@@ -306,8 +420,8 @@
   width: fit-content;
   padding: 6px 12px;
   border-radius: 999px;
-  background: var(--as-toggle-bg);
-  border: 1px solid var(--as-border);
+  background: color-mix(in srgb, var(--as-primary) 10%, var(--as-surface));
+  border: 1px solid color-mix(in srgb, var(--as-primary) 28%, var(--as-border));
   color: var(--as-primary);
   font-size: 0.76rem;
   font-weight: 700;
@@ -325,10 +439,10 @@
 
 .as-brand {
   font-family: var(--as-font-display), Fraunces, Georgia, serif;
-  font-size: clamp(2.35rem, 5.4vw, 3.35rem);
+  font-size: clamp(2.5rem, 6vw, 3.6rem);
   font-weight: 650;
   line-height: 1.02;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.045em;
   color: var(--as-ink);
   margin: 0;
 }
@@ -339,15 +453,31 @@
 
 .as-lede {
   margin: 0;
-  max-width: 36rem;
+  max-width: 38rem;
   color: var(--as-muted);
-  font-size: 1.06rem;
+  font-size: 1.08rem;
   line-height: 1.55;
 }
 
 .as-lede strong {
   color: var(--as-ink);
   font-weight: 650;
+}
+
+.as-hero-title {
+  margin: 0;
+  font-family: var(--as-font-display), Fraunces, Georgia, serif;
+  font-size: clamp(1.35rem, 2.8vw, 1.7rem);
+  letter-spacing: -0.03em;
+  color: var(--as-ink);
+}
+
+.as-hero-sub {
+  margin: 0;
+  color: var(--as-muted);
+  font-size: 0.98rem;
+  line-height: 1.5;
+  max-width: 36rem;
 }
 
 .as-steps {
@@ -412,13 +542,18 @@
   border: 1px solid var(--as-border);
   border-radius: var(--as-radius);
   box-shadow: var(--as-shadow);
-  padding: 24px;
+  padding: 26px;
   animation: as-rise 0.65s ease-out 0.06s both;
 }
 
+.as-stack {
+  display: grid;
+  gap: 14px;
+}
+
 .as-card {
-  background: var(--as-surface);
-  border: 1px solid var(--as-border);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--as-surface) 96%, var(--as-primary-tint)), var(--as-surface));
+  border: 1px solid color-mix(in srgb, var(--as-primary) 12%, var(--as-border));
   border-radius: 18px;
   padding: 18px;
   margin-top: 0;
@@ -428,7 +563,65 @@
 .as-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--as-shadow);
-  border-color: color-mix(in srgb, var(--as-primary) 28%, var(--as-border));
+  border-color: color-mix(in srgb, var(--as-primary) 32%, var(--as-border));
+}
+
+.as-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.as-section-head h2 {
+  margin: 0;
+  font-family: var(--as-font-display), Fraunces, Georgia, serif;
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+}
+
+.as-line-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--as-primary) 5%, var(--as-surface));
+  border: 1px solid color-mix(in srgb, var(--as-primary) 10%, var(--as-border));
+}
+
+.as-track-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--as-primary) 16%, var(--as-border));
+  background:
+    radial-gradient(500px 160px at 100% 0%, var(--as-primary-soft), transparent 60%),
+    var(--as-surface);
+}
+
+.as-track-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.as-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--as-ink);
+  background: var(--as-primary-tint);
+  border: 1px solid color-mix(in srgb, var(--as-primary) 22%, var(--as-border));
 }
 
 .as-muted {
@@ -555,11 +748,6 @@
 .as-badge-void {
   background: color-mix(in srgb, var(--as-status-rejected) 16%, transparent);
   color: var(--as-status-rejected);
-}
-
-.as-stack {
-  display: grid;
-  gap: 12px;
 }
 
 .as-link {
