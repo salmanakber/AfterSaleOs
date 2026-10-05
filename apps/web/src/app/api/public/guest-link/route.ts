@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma, shopRepository, requestGuestMagicLink } from "@aftersale/db";
+import {
+  prisma,
+  shopRepository,
+  requestGuestMagicLink,
+  getPortalWarranties,
+  getPortalOrdersForEmail,
+  sendTransactionalEmail,
+} from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
 import { verifyAppProxySignature, shopDomainFromProxy } from "@/lib/app-proxy";
 import { rateLimit } from "@/lib/rate-limit";
@@ -8,7 +15,9 @@ import { enqueueEmail } from "@/lib/queue";
 export const runtime = "nodejs";
 
 /**
- * Guest magic link (§4.12): always returns the same message (anti-enumeration).
+ * Guest portal access: always returns the same public message (anti-enumeration).
+ * When email+order match, also returns portal payload so the UI can open immediately
+ * (does not wait for email). Email is still attempted when Resend is configured.
  */
 export async function POST(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
@@ -20,79 +29,129 @@ export async function POST(request: NextRequest) {
   const body = (await request.json()) as { email?: string; orderNumber?: string; shop?: string };
   const shopParam =
     shopDomainFromProxy(sp) ?? body.shop ?? request.headers.get("x-aftersale-shop") ?? sp.get("shop");
+
+  const generic = {
+    ok: true as const,
+    message: "If we find a matching order, you will receive an email shortly.",
+  };
+
   if (!shopParam || !body.email || !body.orderNumber) {
-    // Still generic — don't reveal validation specifics beyond missing fields for UX
-    return NextResponse.json(
-      { ok: true, message: "If we find a matching order, you will receive an email shortly." },
-      { status: 200 },
-    );
+    return NextResponse.json(generic, { status: 200 });
   }
 
   const shop = await shopRepository.findByDomain(normalizeShopDomain(shopParam));
   if (!shop) {
-    return NextResponse.json(
-      { ok: true, message: "If we find a matching order, you will receive an email shortly." },
-      { status: 200 },
-    );
+    return NextResponse.json(generic, { status: 200 });
   }
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const allowed = await rateLimit({
     key: `magic:${shop.id}:${ip}`,
-    limit: 5,
+    limit: 8,
     windowSeconds: 900,
   });
   if (!allowed) {
-    return NextResponse.json(
-      { ok: true, message: "If we find a matching order, you will receive an email shortly." },
-      { status: 200 },
-    );
+    return NextResponse.json(generic, { status: 200 });
   }
 
-  await requestGuestMagicLink({
+  const result = await requestGuestMagicLink({
     shopId: shop.id,
     email: body.email,
     orderNumber: body.orderNumber,
   });
 
-  // Send any pending guest_magic_link jobs for this email immediately when possible
-  const pending = await prisma.job.findMany({
+  if (!result.token) {
+    return NextResponse.json(generic, { status: 200 });
+  }
+
+  const appUrl = (process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
+  const link = `${appUrl}/apps/aftersale/portal?shop=${encodeURIComponent(shop.shopDomain)}&token=${encodeURIComponent(result.token)}`;
+
+  // Prefer direct send so email works even if Redis/worker is down
+  let emailSent = false;
+  let emailReason: string | undefined;
+  try {
+    const direct = await sendTransactionalEmail({
+      shopId: shop.id,
+      to: body.email.trim().toLowerCase(),
+      template: "guest_magic_link",
+      data: {
+        link,
+        orderNumber: result.orderNumber,
+        shopName: shop.shopName ?? shop.shopDomain,
+      },
+    });
+    emailSent = direct.sent;
+    emailReason = direct.reason;
+  } catch (err) {
+    emailReason = err instanceof Error ? err.message : "send_failed";
+    console.warn("direct magic link email failed", err);
+  }
+
+  if (!emailSent) {
+    try {
+      await enqueueEmail({
+        shopId: shop.id,
+        to: body.email.trim().toLowerCase(),
+        template: "guest_magic_link",
+        data: {
+          link,
+          orderNumber: result.orderNumber,
+          shopName: shop.shopName ?? shop.shopDomain,
+        },
+      });
+    } catch (err) {
+      console.warn("queue magic link email failed", err);
+    }
+  }
+
+  await prisma.job.updateMany({
     where: {
       shopId: shop.id,
       type: "guest_magic_link",
       status: "PENDING",
     },
-    orderBy: { createdAt: "desc" },
-    take: 3,
+    data: {
+      status: "COMPLETED",
+      finishedAt: new Date(),
+      result: { sent: emailSent, reason: emailReason ?? null },
+    },
   });
 
-  const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
-  for (const job of pending) {
-    const payload = job.payload as { email?: string; token?: string; orderNumber?: string } | null;
-    if (!payload?.token || payload.email?.toLowerCase() !== body.email.trim().toLowerCase()) continue;
-    const link = `${appUrl}/portal/session?token=${encodeURIComponent(payload.token)}&shop=${encodeURIComponent(shop.shopDomain)}`;
-    try {
-      await enqueueEmail({
-        shopId: shop.id,
-        to: payload.email!,
-        template: "guest_magic_link",
-        data: {
-          link,
-          orderNumber: payload.orderNumber,
-          shopName: shop.shopName ?? shop.shopDomain,
-        },
-      });
-      await prisma.job.update({
-        where: { id: job.id },
-        data: { status: "COMPLETED", finishedAt: new Date(), result: { sent: true } },
-      });
-    } catch (err) {
-      console.warn("magic link email enqueue failed", err);
-    }
-  }
+  const warranties = await getPortalWarranties({
+    shopId: shop.id,
+    email: body.email.trim().toLowerCase(),
+    orderNumber: result.orderNumber,
+  });
+  const orders = await getPortalOrdersForEmail({
+    shopId: shop.id,
+    email: body.email.trim().toLowerCase(),
+  });
 
   return NextResponse.json({
-    ok: true,
-    message: "If we find a matching order, you will receive an email shortly.",
+    ...generic,
+    emailSent,
+    emailHint: emailSent
+      ? "We also emailed you a secure link."
+      : emailReason === "missing_resend_api_key" || emailReason === "missing_resend_from_email"
+        ? "Email delivery is not configured on the server yet — your portal is open below."
+        : "If email is delayed, use the portal below.",
+    portal: {
+      token: result.token,
+      email: body.email.trim().toLowerCase(),
+      shopDomain: shop.shopDomain,
+      warranties: warranties.map((w) => ({
+        id: w.id,
+        status: w.status,
+        startAt: w.startAt?.toISOString() ?? null,
+        endAt: w.endAt?.toISOString() ?? null,
+        certificateToken: w.certificateToken,
+        productTitle: w.warrantyUnit.orderLineItem.title,
+        orderNumber: w.warrantyUnit.orderLineItem.order.orderNumber,
+        serialNumber: w.warrantyUnit.serialNumber,
+        ruleName: w.ruleVersion.rule.name,
+      })),
+      orders,
+    },
   });
 }

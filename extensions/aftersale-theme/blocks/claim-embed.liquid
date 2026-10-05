@@ -1,4 +1,4 @@
-{% comment %} Claim form embed — live iframe {% endcomment %}
+{% comment %} Claim form embed {% endcomment %}
 
 {% assign as_app_url = 'https://aftersale.tidyflowapp.com' %}
 {% assign product_q = '' %}
@@ -12,20 +12,23 @@
 
 <div class="as-embed-block" {{ block.shopify_attributes }} data-as-embed>
   {% if request.design_mode %}
-    <p class="as-embed-note">
-      Claim form loads on the live storefront.
-      <a href="{{ embed_src }}" target="_blank" rel="noopener">Preview form</a>
-    </p>
+    <div class="as-block-preview">
+      <strong>File a warranty claim</strong>
+      <p>Customers describe the issue and track status after submit.</p>
+      <span class="as-block-preview__field">Email</span>
+      <span class="as-block-preview__field">Issue summary</span>
+      <span class="as-block-preview__btn">Submit claim</span>
+      <a class="as-block-preview__link" href="{{ embed_src }}" target="_blank" rel="noopener">Open live preview ↗</a>
+    </div>
   {% endif %}
   <iframe
-    class="as-embed-block__frame"
+    class="as-embed-block__frame{% if request.design_mode %} as-embed-block__frame--editor{% endif %}"
     title="{{ block.settings.title | default: 'File a claim' }}"
     src="{{ embed_src }}"
     style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;"
     loading="lazy"
     allow="clipboard-write"
     referrerpolicy="no-referrer-when-downgrade"
-    data-as-embed-frame
   ></iframe>
 </div>
 
@@ -35,6 +38,10 @@
   "target": "section",
   "stylesheet": "aftersale.css",
   "settings": [
+    {
+      "type": "paragraph",
+      "content": "Embedded claim form. Use “Open live preview” in the theme editor to test clicks."
+    },
     {
       "type": "text",
       "id": "title",

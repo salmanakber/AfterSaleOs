@@ -13,13 +13,16 @@ function RegisterInner() {
   const variantId = params.get("variant_id") ?? "";
   const qr = params.get("qr") ?? "";
   const embed = params.get("embed") === "1";
+  const auto = params.get("auto") === "1";
+  const prefillEmail = params.get("email") ?? "";
+  const prefillOrder = params.get("order") ?? "";
 
-  const [mode, setMode] = useState<"shopify" | "outside">("shopify");
-  const [email, setEmail] = useState("");
+  const [mode, setMode] = useState<"shopify" | "outside">(auto ? "shopify" : "shopify");
+  const [email, setEmail] = useState(prefillEmail);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [serial, setSerial] = useState("");
-  const [orderNumber, setOrderNumber] = useState("");
+  const [orderNumber, setOrderNumber] = useState(prefillOrder);
   const [purchaseDate, setPurchaseDate] = useState("");
   const [sellerName, setSellerName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -119,6 +122,11 @@ function RegisterInner() {
       {!shop ? (
         <div className="as-alert as-alert-error">
           This registration page needs a shop link. Open it from your store, QR code, or theme embed.
+        </div>
+      ) : null}
+      {auto ? (
+        <div className="as-alert as-alert-ok">
+          Registering from your order — no extra email verification needed for this purchase.
         </div>
       ) : null}
       <div className="as-tabs as-no-print">

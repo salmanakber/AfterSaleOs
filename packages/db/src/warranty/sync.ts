@@ -13,6 +13,8 @@ type ShopifyOrderPayload = {
   processed_at?: string | null;
   created_at?: string;
   cancelled_at?: string | null;
+  note_attributes?: Array<{ name?: string; value?: string }>;
+  attributes?: Record<string, string> | Array<{ name?: string; value?: string }>;
   customer?: {
     id?: number | string;
     email?: string;
@@ -32,6 +34,29 @@ type ShopifyOrderPayload = {
   }>;
   fulfillments?: Array<{ created_at?: string; status?: string }>;
 };
+
+function orderWantsWarrantyRegistration(order: ShopifyOrderPayload): boolean {
+  const notes = order.note_attributes ?? [];
+  for (const n of notes) {
+    if (
+      n?.name === "aftersale_register_intent" &&
+      String(n.value ?? "").toLowerCase() === "yes"
+    ) {
+      return true;
+    }
+  }
+  if (order.attributes && !Array.isArray(order.attributes)) {
+    return String(order.attributes.aftersale_register_intent ?? "").toLowerCase() === "yes";
+  }
+  if (Array.isArray(order.attributes)) {
+    return order.attributes.some(
+      (a) =>
+        a?.name === "aftersale_register_intent" &&
+        String(a.value ?? "").toLowerCase() === "yes",
+    );
+  }
+  return false;
+}
 
 function gidNum(id: number | string | null | undefined): string | null {
   if (id == null) return null;
@@ -165,6 +190,25 @@ export async function syncOrderFromWebhook(shopId: string, payload: unknown) {
       deliveredAt: dbOrder.deliveredAt,
       timeZone: shop.timezone,
       source: "ORDER",
+    });
+  }
+
+  // Product-page / cart checkbox → cart attribute aftersale_register_intent=yes
+  // Warranties are already created from rules above (no email confirmation).
+  if (orderWantsWarrantyRegistration(order)) {
+    await prisma.activityLog.create({
+      data: {
+        shopId,
+        actorType: "customer",
+        action: "warranty.opt_in_checkout",
+        entityType: "order",
+        entityId: dbOrder.id,
+        meta: {
+          orderNumber: dbOrder.orderNumber,
+          email: dbOrder.email,
+          source: "aftersale_register_intent",
+        },
+      },
     });
   }
 

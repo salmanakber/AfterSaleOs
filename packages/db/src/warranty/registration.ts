@@ -415,54 +415,113 @@ export function generateGuestToken() {
 }
 
 /**
- * Guest portal access (§4.12): identical response whether or not order exists (anti-enumeration).
+ * Guest portal access (§4.12): identical public message whether or not order exists.
+ * Returns a session token when a match is found so the UI can open immediately
+ * (email is still sent when Resend is configured).
  */
 export async function requestGuestMagicLink(params: {
   shopId: string;
   email: string;
   orderNumber: string;
-}): Promise<{ accepted: true }> {
+}): Promise<{ accepted: true; token: string | null; orderNumber: string | null }> {
   const email = params.email.trim().toLowerCase();
-  const orderNumber = params.orderNumber.trim();
+  const rawOrder = params.orderNumber.trim();
+  const normalized = rawOrder.replace(/^#/, "").trim();
 
   const order = await prisma.order.findFirst({
     where: {
       shopId: params.shopId,
-      orderNumber: { equals: orderNumber, mode: "insensitive" },
-      OR: [{ email }, { customer: { email } }],
+      OR: [
+        { orderNumber: { equals: rawOrder, mode: "insensitive" } },
+        { orderNumber: { equals: normalized, mode: "insensitive" } },
+        { orderNumber: { equals: `#${normalized}`, mode: "insensitive" } },
+        { orderNumber: { endsWith: normalized, mode: "insensitive" } },
+      ],
+      AND: [
+        {
+          OR: [{ email }, { customer: { email } }],
+        },
+      ],
     },
   });
 
-  // Always behave the same; only create token when match exists
-  if (order) {
-    const token = generateGuestToken();
-    await prisma.guestAccessToken.create({
-      data: {
-        shopId: params.shopId,
-        email,
-        orderNumber: order.orderNumber,
-        tokenHash: hashToken(token),
-        expiresAt: new Date(Date.now() + 15 * 60_000),
-      },
-    });
-    // Return token only via email in production — here we store and email worker sends it.
-    // Attach plaintext token on a side channel for the email job:
-    await prisma.job.create({
-      data: {
-        shopId: params.shopId,
-        type: "guest_magic_link",
-        status: "PENDING",
-        payload: {
-          email,
-          orderNumber: order.orderNumber,
-          token,
-          expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
-        },
-      },
-    });
+  if (!order) {
+    return { accepted: true, token: null, orderNumber: null };
   }
 
-  return { accepted: true };
+  const token = generateGuestToken();
+  await prisma.guestAccessToken.create({
+    data: {
+      shopId: params.shopId,
+      email,
+      orderNumber: order.orderNumber,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+    },
+  });
+  await prisma.job.create({
+    data: {
+      shopId: params.shopId,
+      type: "guest_magic_link",
+      status: "PENDING",
+      payload: {
+        email,
+        orderNumber: order.orderNumber,
+        token,
+        expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+      },
+    },
+  });
+
+  return { accepted: true, token, orderNumber: order.orderNumber };
+}
+
+/** List orders for an email after a valid guest session (no extra email verify). */
+export async function getPortalOrdersForEmail(params: { shopId: string; email: string }) {
+  const email = params.email.toLowerCase();
+  const orders = await prisma.order.findMany({
+    where: {
+      shopId: params.shopId,
+      OR: [{ email }, { customer: { email } }],
+      cancelledAt: null,
+    },
+    orderBy: { processedAt: "desc" },
+    take: 25,
+    include: {
+      lineItems: {
+        select: {
+          id: true,
+          title: true,
+          quantity: true,
+          shopifyProductId: true,
+          shopifyVariantId: true,
+          warrantyUnits: {
+            select: {
+              id: true,
+              warranties: { select: { id: true, status: true, certificateToken: true }, take: 3 },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return orders.map((o) => ({
+    id: o.id,
+    orderNumber: o.orderNumber,
+    processedAt: o.processedAt?.toISOString() ?? o.createdAt.toISOString(),
+    lineItems: o.lineItems.map((li) => ({
+      id: li.id,
+      title: li.title,
+      quantity: li.quantity,
+      shopifyProductId: li.shopifyProductId,
+      shopifyVariantId: li.shopifyVariantId,
+      hasWarranty: li.warrantyUnits.some((u) => u.warranties.some((w) => w.status !== "VOID")),
+      certificateToken:
+        li.warrantyUnits.flatMap((u) => u.warranties).find((w) => w.status !== "VOID")
+          ?.certificateToken ?? null,
+    })),
+  }));
 }
 
 export async function consumeGuestToken(token: string) {

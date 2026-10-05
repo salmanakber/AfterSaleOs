@@ -24,6 +24,7 @@ export {
   requestGuestMagicLink,
   consumeGuestToken,
   getPortalWarranties,
+  getPortalOrdersForEmail,
   hashToken,
   generateGuestToken,
 } from "./registration";

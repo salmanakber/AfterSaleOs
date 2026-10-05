@@ -1,24 +1,30 @@
-{% comment %} Portal form embed — live iframe {% endcomment %}
+{% comment %} Portal form embed — live iframe + editor preview {% endcomment %}
 
 {% assign as_app_url = 'https://aftersale.tidyflowapp.com' %}
 {% assign embed_src = as_app_url | append: '/apps/aftersale/portal?shop=' | append: shop.permanent_domain | append: '&embed=1' %}
+{% if customer and customer.email != blank %}
+  {% assign embed_src = embed_src | append: '&email=' | append: customer.email %}
+{% endif %}
 
 <div class="as-embed-block" {{ block.shopify_attributes }} data-as-embed>
   {% if request.design_mode %}
-    <p class="as-embed-note">
-      Warranty portal loads on the live storefront.
-      <a href="{{ embed_src }}" target="_blank" rel="noopener">Preview portal</a>
-    </p>
+    <div class="as-block-preview">
+      <strong>Warranty portal</strong>
+      <p>Customers look up coverage with email + order number, then register products from their orders.</p>
+      <span class="as-block-preview__field">Email</span>
+      <span class="as-block-preview__field">Order number</span>
+      <span class="as-block-preview__btn">Open my warranties</span>
+      <a class="as-block-preview__link" href="{{ embed_src }}" target="_blank" rel="noopener">Open live preview ↗</a>
+    </div>
   {% endif %}
   <iframe
-    class="as-embed-block__frame"
+    class="as-embed-block__frame{% if request.design_mode %} as-embed-block__frame--editor{% endif %}"
     title="{{ block.settings.title | default: 'Warranty portal' }}"
     src="{{ embed_src }}"
     style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;"
     loading="lazy"
     allow="clipboard-write"
     referrerpolicy="no-referrer-when-downgrade"
-    data-as-embed-frame
   ></iframe>
 </div>
 
@@ -28,6 +34,10 @@
   "target": "section",
   "stylesheet": "aftersale.css",
   "settings": [
+    {
+      "type": "paragraph",
+      "content": "Shows the customer warranty portal. In the theme editor, use “Open live preview”. On the live storefront the form is fully interactive."
+    },
     {
       "type": "text",
       "id": "title",

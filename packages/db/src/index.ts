@@ -19,3 +19,4 @@ export * from "./claims";
 export * from "./resolutions";
 export * from "./merchant-ops";
 export * from "./ai";
+export * from "./email";

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { consumeGuestToken, getPortalWarranties, prisma } from "@aftersale/db";
+import {
+  consumeGuestToken,
+  getPortalWarranties,
+  getPortalOrdersForEmail,
+  prisma,
+} from "@aftersale/db";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
-/** Exchange guest token → portal warranty list (one-time token). */
+/** Exchange guest token → portal warranty + order list (one-time token). */
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as { token?: string };
   if (!body.token) {
@@ -25,6 +30,10 @@ export async function POST(request: NextRequest) {
     email: row.email,
     orderNumber: row.orderNumber,
   });
+  const orders = await getPortalOrdersForEmail({
+    shopId: row.shopId,
+    email: row.email,
+  });
 
   const shopRow = await prisma.shop.findUnique({ where: { id: row.shopId } });
 
@@ -38,6 +47,7 @@ export async function POST(request: NextRequest) {
         }
       : null,
     email: row.email,
+    orders,
     warranties: warranties.map((w) => ({
       id: w.id,
       status: w.status,

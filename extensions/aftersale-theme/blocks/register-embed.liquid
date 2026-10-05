@@ -1,4 +1,4 @@
-{% comment %} Register form embed — live iframe; merchants control placement & height {% endcomment %}
+{% comment %} Register form embed {% endcomment %}
 
 {% assign as_app_url = 'https://aftersale.tidyflowapp.com' %}
 {% assign product_q = '' %}
@@ -12,23 +12,29 @@
     {% assign embed_src = embed_src | append: '&variant_id=' | append: product.selected_or_first_available_variant.id %}
   {% endif %}
 {% endif %}
+{% if customer and customer.email != blank %}
+  {% assign embed_src = embed_src | append: '&email=' | append: customer.email %}
+{% endif %}
 
 <div class="as-embed-block" {{ block.shopify_attributes }} data-as-embed>
   {% if request.design_mode %}
-    <p class="as-embed-note">
-      Registration form loads on the live storefront.
-      <a href="{{ embed_src }}" target="_blank" rel="noopener">Preview form</a>
-    </p>
+    <div class="as-block-preview">
+      <strong>Register for warranty</strong>
+      <p>Customers activate coverage for this product.</p>
+      <span class="as-block-preview__field">Email</span>
+      <span class="as-block-preview__field">Order number</span>
+      <span class="as-block-preview__btn">Register product</span>
+      <a class="as-block-preview__link" href="{{ embed_src }}" target="_blank" rel="noopener">Open live preview ↗</a>
+    </div>
   {% endif %}
   <iframe
-    class="as-embed-block__frame"
+    class="as-embed-block__frame{% if request.design_mode %} as-embed-block__frame--editor{% endif %}"
     title="{{ block.settings.title | default: 'Register warranty' }}"
     src="{{ embed_src }}"
     style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;"
     loading="lazy"
     allow="clipboard-write"
     referrerpolicy="no-referrer-when-downgrade"
-    data-as-embed-frame
   ></iframe>
 </div>
 
@@ -38,6 +44,10 @@
   "target": "section",
   "stylesheet": "aftersale.css",
   "settings": [
+    {
+      "type": "paragraph",
+      "content": "Embedded registration form. Theme editor shows a preview card — open live preview to click through."
+    },
     {
       "type": "text",
       "id": "title",

@@ -5,30 +5,76 @@ import { useSearchParams } from "next/navigation";
 import { customerPageUrl, publicApiUrl } from "@/lib/public-api";
 import { CustomerShell } from "../../../components/CustomerShell";
 
+type WarrantyRow = {
+  id: string;
+  status: string;
+  productTitle: string;
+  orderNumber: string;
+  serialNumber: string | null;
+  certificateToken: string;
+  startAt: string | null;
+  endAt: string | null;
+  ruleName?: string;
+};
+
+type OrderRow = {
+  id: string;
+  orderNumber: string;
+  processedAt: string;
+  lineItems: Array<{
+    id: string;
+    title: string;
+    quantity: number;
+    shopifyProductId: string | null;
+    shopifyVariantId: string | null;
+    hasWarranty: boolean;
+    certificateToken: string | null;
+  }>;
+};
+
+const CACHE_KEY = "aftersale.portal.v1";
+
 function PortalInner() {
   const params = useSearchParams();
   const shop = params.get("shop") ?? "";
   const token = params.get("token");
   const embed = params.get("embed") === "1";
+  const prefillEmail = params.get("email") ?? "";
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(prefillEmail);
   const [orderNumber, setOrderNumber] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [warranties, setWarranties] = useState<
-    | Array<{
-        id: string;
-        status: string;
-        productTitle: string;
-        orderNumber: string;
-        serialNumber: string | null;
-        certificateToken: string;
-        startAt: string | null;
-        endAt: string | null;
-        ruleName: string;
-      }>
-    | null
-  >(null);
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  const [warranties, setWarranties] = useState<WarrantyRow[] | null>(null);
+  const [orders, setOrders] = useState<OrderRow[] | null>(null);
+
+  useEffect(() => {
+    if (prefillEmail) setEmail(prefillEmail);
+  }, [prefillEmail]);
+
+  // Restore cached session for this shop
+  useEffect(() => {
+    if (!shop || token) return;
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        shop?: string;
+        email?: string;
+        warranties?: WarrantyRow[];
+        orders?: OrderRow[];
+        at?: number;
+      };
+      if (parsed.shop !== shop) return;
+      if (!parsed.at || Date.now() - parsed.at > 1000 * 60 * 60 * 12) return;
+      setSessionEmail(parsed.email ?? null);
+      setWarranties(parsed.warranties ?? []);
+      setOrders(parsed.orders ?? []);
+    } catch {
+      /* ignore */
+    }
+  }, [shop, token]);
 
   useEffect(() => {
     if (!token) return;
@@ -43,7 +89,11 @@ function PortalInner() {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Invalid link");
-        if (!cancelled) setWarranties(json.warranties ?? []);
+        if (cancelled) return;
+        setSessionEmail(json.email ?? null);
+        setWarranties(json.warranties ?? []);
+        setOrders(json.orders ?? null);
+        cachePortal(shop, json.email, json.warranties ?? [], json.orders ?? []);
       } catch (err) {
         if (!cancelled) setMessage(err instanceof Error ? err.message : "Could not open portal");
       } finally {
@@ -53,7 +103,23 @@ function PortalInner() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, shop]);
+
+  function cachePortal(
+    shopDomain: string,
+    em: string | null | undefined,
+    w: WarrantyRow[],
+    o: OrderRow[],
+  ) {
+    try {
+      localStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({ shop: shopDomain, email: em, warranties: w, orders: o, at: Date.now() }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function requestLink(e: FormEvent) {
     e.preventDefault();
@@ -71,7 +137,15 @@ function PortalInner() {
         body: JSON.stringify({ email, orderNumber, shop }),
       });
       const json = await res.json();
-      setMessage(json.message ?? "If we find a matching order, you will receive an email shortly.");
+      if (json.portal?.warranties) {
+        setSessionEmail(json.portal.email);
+        setWarranties(json.portal.warranties);
+        setOrders(json.portal.orders ?? []);
+        cachePortal(shop, json.portal.email, json.portal.warranties, json.portal.orders ?? []);
+        setMessage(json.emailHint ?? "Portal opened.");
+      } else {
+        setMessage(json.message ?? "If we find a matching order, you will receive an email shortly.");
+      }
     } finally {
       setLoading(false);
     }
@@ -85,74 +159,148 @@ function PortalInner() {
     return "as-badge as-badge-pending";
   }
 
+  function registerHref(item: OrderRow["lineItems"][number], orderNum: string) {
+    return customerPageUrl("/apps/aftersale/register", shop, {
+      product: item.title,
+      product_id: item.shopifyProductId ?? "",
+      variant_id: item.shopifyVariantId ?? "",
+      order: orderNum,
+      email: sessionEmail ?? email,
+      auto: "1",
+    });
+  }
+
+  const open = Boolean(warranties);
+
   return (
     <CustomerShell
       title="Your warranties"
-      lede="Certificates, coverage dates, and claim entry in one calm place."
+      lede="Find coverage, register products from your orders, or start a claim."
       shopDomain={shop}
       embed={embed}
-      steps={warranties ? ["Verify", "Open portal", "Manage"] : ["Verify", "Email link", "Open portal"]}
-      activeStep={warranties ? 2 : 0}
+      steps={open ? ["Verify", "Your orders", "Manage"] : ["Verify", "Open portal", "Manage"]}
+      activeStep={open ? 1 : 0}
       footer={
-        <a className="as-link" href={customerPageUrl("/apps/aftersale/register", shop)}>
-          Register another product →
+        <a
+          className="as-link"
+          href={customerPageUrl("/apps/aftersale/register", shop, {
+            email: sessionEmail || email || undefined,
+          })}
+        >
+          Register a product not in your orders →
         </a>
       }
     >
-      {warranties ? (
+      {open ? (
         <div className="as-stack">
-          {warranties.length === 0 ? (
-            <div className="as-empty">
-              <strong>No warranties yet</strong>
-              <p className="as-muted">This order doesn’t have active coverage on file.</p>
-            </div>
-          ) : (
-            warranties.map((w) => (
-              <article className="as-card" key={w.id}>
-                <div className="as-warranty-row">
-                  <h2 className="as-warranty-title">{w.productTitle}</h2>
-                  <span className={badgeClass(w.status)}>{w.status.replaceAll("_", " ")}</span>
-                </div>
-                <div className="as-meta">
-                  <span>
-                    Order <strong>{w.orderNumber}</strong>
-                  </span>
-                  {w.serialNumber ? (
-                    <span>
-                      Serial <strong>{w.serialNumber}</strong>
+          {message ? <div className="as-alert as-alert-ok">{message}</div> : null}
+
+          {orders && orders.length > 0 ? (
+            <section className="as-stack">
+              <h2 className="as-warranty-title" style={{ margin: 0 }}>
+                Your orders
+              </h2>
+              <p className="as-muted" style={{ marginTop: 0 }}>
+                Pick a product to register — no extra email confirmation for items from these orders.
+              </p>
+              {orders.map((o) => (
+                <article className="as-card" key={o.id}>
+                  <div className="as-warranty-row">
+                    <h3 className="as-warranty-title" style={{ fontSize: "1rem" }}>
+                      Order {o.orderNumber}
+                    </h3>
+                    <span className="as-muted" style={{ fontSize: 12 }}>
+                      {new Date(o.processedAt).toLocaleDateString()}
                     </span>
-                  ) : null}
-                  <span>{w.ruleName}</span>
-                </div>
-                <div className="as-meta">
-                  <span>
-                    {w.startAt ? new Date(w.startAt).toLocaleDateString() : "Pending start"}
-                    {" → "}
-                    {w.endAt ? new Date(w.endAt).toLocaleDateString() : "Lifetime"}
-                  </span>
-                </div>
-                <div className="as-actions" style={{ marginTop: 8 }}>
-                  <a className="as-btn as-btn-secondary" href={customerPageUrl(`/c/${w.certificateToken}`)}>
-                    View certificate
-                  </a>
-                  <a
-                    className="as-btn as-btn-ghost"
-                    href={customerPageUrl("/apps/aftersale/claim", shop, {
-                      certificate: w.certificateToken,
-                    })}
-                  >
-                    Start a claim
-                  </a>
-                </div>
-              </article>
-            ))
-          )}
+                  </div>
+                  <div className="as-stack" style={{ gap: 8, marginTop: 8 }}>
+                    {o.lineItems.map((li) => (
+                      <div
+                        key={li.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div>
+                          <strong>{li.title}</strong>
+                          <div className="as-muted" style={{ fontSize: 12 }}>
+                            Qty {li.quantity}
+                            {li.hasWarranty ? " · Covered" : " · Not registered yet"}
+                          </div>
+                        </div>
+                        {li.hasWarranty && li.certificateToken ? (
+                          <a className="as-btn as-btn-secondary" href={customerPageUrl(`/c/${li.certificateToken}`)}>
+                            Certificate
+                          </a>
+                        ) : (
+                          <a className="as-btn" href={registerHref(li, o.orderNumber)}>
+                            Register
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </section>
+          ) : null}
+
+          <section className="as-stack">
+            <h2 className="as-warranty-title" style={{ margin: 0 }}>
+              Active warranties
+            </h2>
+            {warranties!.length === 0 ? (
+              <div className="as-empty">
+                <strong>No warranties on file yet</strong>
+                <p className="as-muted">Register a product from your orders above.</p>
+              </div>
+            ) : (
+              warranties!.map((w) => (
+                <article className="as-card" key={w.id}>
+                  <div className="as-warranty-row">
+                    <h3 className="as-warranty-title" style={{ fontSize: "1rem" }}>
+                      {w.productTitle}
+                    </h3>
+                    <span className={badgeClass(w.status)}>{w.status.replaceAll("_", " ")}</span>
+                  </div>
+                  <div className="as-meta">
+                    <span>
+                      Order <strong>{w.orderNumber}</strong>
+                    </span>
+                    {w.serialNumber ? (
+                      <span>
+                        Serial <strong>{w.serialNumber}</strong>
+                      </span>
+                    ) : null}
+                    {w.ruleName ? <span>{w.ruleName}</span> : null}
+                  </div>
+                  <div className="as-actions" style={{ marginTop: 8 }}>
+                    <a className="as-btn as-btn-secondary" href={customerPageUrl(`/c/${w.certificateToken}`)}>
+                      View certificate
+                    </a>
+                    <a
+                      className="as-btn as-btn-ghost"
+                      href={customerPageUrl("/apps/aftersale/claim", shop, {
+                        certificate: w.certificateToken,
+                      })}
+                    >
+                      Start a claim
+                    </a>
+                  </div>
+                </article>
+              ))
+            )}
+          </section>
         </div>
       ) : (
         <form onSubmit={requestLink}>
           <p className="as-muted" style={{ marginTop: 0 }}>
-            Enter the email and order number from your purchase. We’ll send a one-time secure link —
-            no password needed.
+            Enter the email and order number from your purchase. We’ll open your portal right away when
+            they match — and email a secure link when mail is configured.
           </p>
           <label className="as-label">Email</label>
           <input
@@ -173,7 +321,7 @@ function PortalInner() {
           />
           {message ? <div className="as-alert as-alert-ok">{message}</div> : null}
           <button className="as-btn" disabled={loading || !shop} type="submit">
-            {loading ? "Sending…" : "Email me a link"}
+            {loading ? "Opening…" : "Open my warranties"}
           </button>
         </form>
       )}
