@@ -16,6 +16,7 @@ import {
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
+import { PageEmpty, PageLoading } from "./PageLoading";
 
 type Supplier = {
   id: string;
@@ -76,6 +77,8 @@ export function SuppliersPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -87,6 +90,7 @@ export function SuppliersPage() {
   const [linkMonths, setLinkMonths] = useState("");
 
   const load = useCallback(() => {
+    setLoading(true);
     gqlRequest<{
       suppliers: Supplier[];
       supplierClaims: SupplierClaim[];
@@ -100,8 +104,10 @@ export function SuppliersPage() {
         setProducts(d.products);
         if (!linkSupplierId && d.suppliers[0]) setLinkSupplierId(d.suppliers[0].id);
         if (!linkProductId && d.products[0]) setLinkProductId(d.products[0].shopifyProductId);
+        setHasLoaded(true);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed"))
+      .finally(() => setLoading(false));
   }, [linkSupplierId, linkProductId]);
 
   useEffect(() => {
@@ -167,160 +173,184 @@ export function SuppliersPage() {
     .reduce((s, c) => s + (c.amountCents ?? 0), 0);
 
   return (
-    <Page title="Suppliers" subtitle="Cost recovery tracking">
-      <Layout>
+    <Page
+      title="Suppliers"
+      subtitle={hasLoaded ? `${suppliers.length} suppliers` : "Loading…"}
+    >
+      <div className="as-m-ops-surface">
         {error ? (
-          <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setError(null)}>
-              {error}
-            </Banner>
-          </Layout.Section>
+          <Banner tone="critical" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
         ) : null}
 
-        <Layout.Section>
-          <InlineStack gap="400">
-            <Text as="p">
-              Recoverable: <strong>${(recoverable / 100).toFixed(2)}</strong>
-            </Text>
-            <Text as="p">
-              Recovered: <strong>${(recovered / 100).toFixed(2)}</strong>
-            </Text>
-          </InlineStack>
-        </Layout.Section>
+        <div className="as-m-ops-banner">
+          <div>
+            <p className="as-m-ops-kicker">Operations</p>
+            <h2>Supplier recovery</h2>
+            <p>
+              Recoverable ${(recoverable / 100).toFixed(2)} · Recovered $
+              {(recovered / 100).toFixed(2)}
+            </p>
+          </div>
+          <Button onClick={load} loading={loading && hasLoaded} disabled={loading && !hasLoaded}>
+            Refresh
+          </Button>
+        </div>
 
-        <Layout.Section variant="oneHalf">
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Add supplier
-              </Text>
-              <FormLayout>
-                <TextField label="Name" value={name} onChange={setName} autoComplete="off" />
-                <TextField label="Email" value={email} onChange={setEmail} autoComplete="off" />
-                <TextField label="Phone" value={phone} onChange={setPhone} autoComplete="off" />
-                <TextField
-                  label="Notes"
-                  value={notes}
-                  onChange={setNotes}
-                  multiline={2}
-                  autoComplete="off"
-                />
-                <Button variant="primary" loading={busy} onClick={create}>
-                  Create supplier
-                </Button>
-              </FormLayout>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+        {loading && !hasLoaded ? (
+          <PageLoading label="Loading suppliers" />
+        ) : (
+          <Layout>
+            <Layout.Section variant="oneHalf">
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Add supplier
+                  </Text>
+                  <FormLayout>
+                    <TextField label="Name" value={name} onChange={setName} autoComplete="off" />
+                    <TextField label="Email" value={email} onChange={setEmail} autoComplete="off" />
+                    <TextField label="Phone" value={phone} onChange={setPhone} autoComplete="off" />
+                    <TextField
+                      label="Notes"
+                      value={notes}
+                      onChange={setNotes}
+                      multiline={2}
+                      autoComplete="off"
+                    />
+                    <Button variant="primary" loading={busy} onClick={create}>
+                      Create supplier
+                    </Button>
+                  </FormLayout>
+                </BlockStack>
+              </Card>
+            </Layout.Section>
 
-        <Layout.Section variant="oneHalf">
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Link product
-              </Text>
-              <FormLayout>
-                <Select
-                  label="Supplier"
-                  options={suppliers.map((s) => ({ label: s.name, value: s.id }))}
-                  value={linkSupplierId}
-                  onChange={setLinkSupplierId}
-                />
-                <Select
-                  label="Product"
-                  options={products.map((p) => ({
-                    label: p.title,
-                    value: p.shopifyProductId,
-                  }))}
-                  value={linkProductId}
-                  onChange={setLinkProductId}
-                />
-                <TextField
-                  label="Supplier warranty (months)"
-                  type="number"
-                  value={linkMonths}
-                  onChange={setLinkMonths}
-                  autoComplete="off"
-                />
-                <Button loading={busy} onClick={linkProduct}>
-                  Save link
-                </Button>
-              </FormLayout>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+            <Layout.Section variant="oneHalf">
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Link product
+                  </Text>
+                  <FormLayout>
+                    <Select
+                      label="Supplier"
+                      options={
+                        suppliers.length
+                          ? suppliers.map((s) => ({ label: s.name, value: s.id }))
+                          : [{ label: "No suppliers yet", value: "" }]
+                      }
+                      value={linkSupplierId}
+                      onChange={setLinkSupplierId}
+                    />
+                    <Select
+                      label="Product"
+                      options={
+                        products.length
+                          ? products.map((p) => ({
+                              label: p.title,
+                              value: p.shopifyProductId,
+                            }))
+                          : [{ label: "No products yet", value: "" }]
+                      }
+                      value={linkProductId}
+                      onChange={setLinkProductId}
+                    />
+                    <TextField
+                      label="Supplier warranty (months)"
+                      type="number"
+                      value={linkMonths}
+                      onChange={setLinkMonths}
+                      autoComplete="off"
+                    />
+                    <Button loading={busy} onClick={linkProduct}>
+                      Save link
+                    </Button>
+                  </FormLayout>
+                </BlockStack>
+              </Card>
+            </Layout.Section>
 
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Suppliers
-              </Text>
-              <DataTable
-                columnContentTypes={["text", "text", "text", "numeric", "numeric", "text"]}
-                headings={["Name", "Email", "Phone", "Products", "Claims", "Active"]}
-                rows={suppliers.map((s) => [
-                  s.name,
-                  s.email ?? "—",
-                  s.phone ?? "—",
-                  String(s.productCount),
-                  String(s.claimCount),
-                  s.active ? "Yes" : "No",
-                ])}
-              />
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Suppliers
+                  </Text>
+                  {suppliers.length === 0 ? (
+                    <PageEmpty title="No suppliers yet" body="Add a supplier to start tracking recovery." />
+                  ) : (
+                    <DataTable
+                      columnContentTypes={["text", "text", "text", "numeric", "numeric", "text"]}
+                      headings={["Name", "Email", "Phone", "Products", "Claims", "Active"]}
+                      rows={suppliers.map((s) => [
+                        s.name,
+                        s.email ?? "—",
+                        s.phone ?? "—",
+                        String(s.productCount),
+                        String(s.claimCount),
+                        s.active ? "Yes" : "No",
+                      ])}
+                    />
+                  )}
+                </BlockStack>
+              </Card>
+            </Layout.Section>
 
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Product links
-              </Text>
-              <DataTable
-                columnContentTypes={["text", "text", "text"]}
-                headings={["Product", "Supplier", "Supplier warranty"]}
-                rows={links.map((l) => [
-                  l.productTitle ?? l.shopifyProductId,
-                  l.supplierName,
-                  l.supplierWarrantyMonths != null ? `${l.supplierWarrantyMonths} mo` : "—",
-                ])}
-              />
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Product links
+                  </Text>
+                  <DataTable
+                    columnContentTypes={["text", "text", "text"]}
+                    headings={["Product", "Supplier", "Supplier warranty"]}
+                    rows={links.map((l) => [
+                      l.productTitle ?? l.shopifyProductId,
+                      l.supplierName,
+                      l.supplierWarrantyMonths != null ? `${l.supplierWarrantyMonths} mo` : "—",
+                    ])}
+                  />
+                </BlockStack>
+              </Card>
+            </Layout.Section>
 
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Supplier claims
-              </Text>
-              <DataTable
-                columnContentTypes={["text", "text", "text", "text", "text"]}
-                headings={["Claim", "Supplier", "Amount", "Status", "Notes"]}
-                rows={claims.map((c) => [
-                  <Button key={c.id} url={`/claims/${c.claimId}`} variant="plain">
-                    {c.claimNumber ?? c.claimId}
-                  </Button>,
-                  c.supplierName,
-                  c.amountCents != null
-                    ? `${(c.amountCents / 100).toFixed(2)} ${c.currency}`
-                    : "—",
-                  c.status,
-                  c.notes ?? "—",
-                ])}
-              />
-              {claims.length === 0 ? (
-                <Text as="p" tone="subdued">
-                  Mark claims as recoverable from the claim detail page.
-                </Text>
-              ) : null}
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-      </Layout>
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">
+                    Supplier claims
+                  </Text>
+                  {claims.length === 0 ? (
+                    <PageEmpty
+                      title="No supplier claims"
+                      body="Mark claims as recoverable from the claim detail Resolve tab."
+                    />
+                  ) : (
+                    <DataTable
+                      columnContentTypes={["text", "text", "text", "text", "text"]}
+                      headings={["Claim", "Supplier", "Amount", "Status", "Notes"]}
+                      rows={claims.map((c) => [
+                        <Button key={c.id} url={`/claims/${c.claimId}`} variant="plain">
+                          {c.claimNumber ?? c.claimId}
+                        </Button>,
+                        c.supplierName,
+                        c.amountCents != null
+                          ? `${(c.amountCents / 100).toFixed(2)} ${c.currency}`
+                          : "—",
+                        c.status,
+                        c.notes ?? "—",
+                      ])}
+                    />
+                  )}
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+          </Layout>
+        )}
+      </div>
     </Page>
   );
 }

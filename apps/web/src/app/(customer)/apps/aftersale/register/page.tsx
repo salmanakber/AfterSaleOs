@@ -3,6 +3,7 @@
 import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { customerPageUrl, publicApiUrl } from "@/lib/public-api";
+import { BrandLoader } from "../../../components/BrandLoader";
 import { CustomerShell } from "../../../components/CustomerShell";
 
 function RegisterInner() {
@@ -17,14 +18,11 @@ function RegisterInner() {
   const prefillEmail = params.get("email") ?? "";
   const prefillOrder = params.get("order") ?? "";
 
-  const [mode, setMode] = useState<"shopify" | "outside">(auto ? "shopify" : "shopify");
   const [email, setEmail] = useState(prefillEmail);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [serial, setSerial] = useState("");
   const [orderNumber, setOrderNumber] = useState(prefillOrder);
-  const [purchaseDate, setPurchaseDate] = useState("");
-  const [sellerName, setSellerName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [cert, setCert] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,12 +47,10 @@ function RegisterInner() {
           lastName,
           serialNumber: serial || undefined,
           orderNumber: orderNumber || undefined,
-          purchaseDate: purchaseDate || undefined,
-          sellerName: sellerName || undefined,
           productTitle: productTitle || undefined,
           shopifyProductId: productId || undefined,
           shopifyVariantId: variantId || undefined,
-          outsideShopify: mode === "outside",
+          outsideShopify: false,
           source: qr ? "qr" : "form",
         }),
       });
@@ -107,7 +103,7 @@ function RegisterInner() {
       lede={
         productTitle
           ? `Activate coverage for ${productTitle}.`
-          : "Activate coverage in under a minute."
+          : "Enter your order details to activate coverage."
       }
       shopDomain={shop}
       embed={embed}
@@ -129,24 +125,6 @@ function RegisterInner() {
           Registering from your order — no extra email verification needed for this purchase.
         </div>
       ) : null}
-      <div className="as-tabs as-no-print">
-        <button
-          type="button"
-          className="as-tab"
-          data-active={mode === "shopify"}
-          onClick={() => setMode("shopify")}
-        >
-          Bought here
-        </button>
-        <button
-          type="button"
-          className="as-tab"
-          data-active={mode === "outside"}
-          onClick={() => setMode("outside")}
-        >
-          Bought elsewhere
-        </button>
-      </div>
 
       <form onSubmit={onSubmit}>
         <label className="as-label">Email</label>
@@ -170,6 +148,15 @@ function RegisterInner() {
           </div>
         </div>
 
+        <label className="as-label">Order number</label>
+        <input
+          className="as-input"
+          value={orderNumber}
+          onChange={(e) => setOrderNumber(e.target.value)}
+          placeholder="#1001"
+          required
+        />
+
         <label className="as-label">Serial number</label>
         <input
           className="as-input"
@@ -177,43 +164,6 @@ function RegisterInner() {
           onChange={(e) => setSerial(e.target.value)}
           placeholder="If your product requires one"
         />
-
-        {mode === "shopify" ? (
-          <>
-            <label className="as-label">Order number</label>
-            <input
-              className="as-input"
-              value={orderNumber}
-              onChange={(e) => setOrderNumber(e.target.value)}
-              placeholder="#1001"
-            />
-          </>
-        ) : (
-          <>
-            <div className="as-field-grid">
-              <div>
-                <label className="as-label">Purchase date</label>
-                <input
-                  className="as-input"
-                  type="date"
-                  value={purchaseDate}
-                  onChange={(e) => setPurchaseDate(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="as-label">Seller / store</label>
-                <input
-                  className="as-input"
-                  value={sellerName}
-                  onChange={(e) => setSellerName(e.target.value)}
-                />
-              </div>
-            </div>
-            <p className="as-muted" style={{ marginTop: -4 }}>
-              Outside purchases may need a quick merchant verification.
-            </p>
-          </>
-        )}
 
         {error ? <div className="as-alert as-alert-error">{error}</div> : null}
 
@@ -225,21 +175,15 @@ function RegisterInner() {
   );
 }
 
-function CustomerLoading({ label }: { label: string }) {
-  return (
-    <div className="as-shell as-shell-embed" style={{ padding: 24 }}>
-      <div className="as-panel">
-        <p className="as-muted" style={{ margin: 0 }}>
-          {label}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 export default function RegisterPage() {
   return (
-    <Suspense fallback={<CustomerLoading label="Opening registration…" />}>
+    <Suspense
+      fallback={
+        <div className="as-shell">
+          <BrandLoader label="Opening registration" />
+        </div>
+      }
+    >
       <RegisterInner />
     </Suspense>
   );

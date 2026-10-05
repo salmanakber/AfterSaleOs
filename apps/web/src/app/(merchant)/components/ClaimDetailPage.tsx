@@ -17,7 +17,9 @@ import {
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 import { friendlyError } from "@/lib/merchant-errors";
+import { appHref } from "@/lib/shop-context";
 import { BrandLoader } from "./BrandLoader";
+import { useMerchantAuth } from "../providers";
 
 type ClaimDetail = {
   id: string;
@@ -64,6 +66,7 @@ const DETAIL = `#graphql
 
 export function ClaimDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { navigate } = useMerchantAuth();
   const [claim, setClaim] = useState<ClaimDetail | null>(null);
   const [staff, setStaff] = useState<{ id: string; name: string | null; email: string; active?: boolean }[]>([]);
   const [workflowStatuses, setWorkflowStatuses] = useState<WorkflowStatus[]>([]);
@@ -98,6 +101,7 @@ export function ClaimDetailPage() {
   const [aiCredits, setAiCredits] = useState<{ used: number; limit: number; remaining: number } | null>(
     null,
   );
+  const [deskTab, setDeskTab] = useState<"overview" | "work" | "resolve">("overview");
 
   const load = useCallback(() => {
     gqlRequest<{
@@ -327,7 +331,7 @@ export function ClaimDetailPage() {
         }`,
         { input: { claimId: id, technicianId: assigneeId || null } },
       );
-      window.location.href = `/repairs/${data.createRepair.id}`;
+      navigate(`/repairs/${data.createRepair.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Repair failed");
       setBusy(false);
@@ -424,7 +428,7 @@ export function ClaimDetailPage() {
   if (!claim && !error) {
     return (
       <Page title="Claim">
-        <div style={{ padding: "48px 0" }}>
+        <div className="as-m-page-loading">
           <BrandLoader label="Opening claim desk" compact />
         </div>
       </Page>
@@ -439,6 +443,15 @@ export function ClaimDetailPage() {
     );
   }
 
+  const statusTone =
+    claim.status === "COMPLETED" || claim.status === "APPROVED"
+      ? "ok"
+      : claim.status === "REJECTED" || claim.status === "CANCELLED"
+        ? "bad"
+        : claim.status === "WAITING_CUSTOMER"
+          ? "warn"
+          : undefined;
+
   const slaLabel = claim.slaDueAt
     ? `SLA ${new Date(claim.slaDueAt).toLocaleString()}`
     : "No SLA set";
@@ -446,9 +459,21 @@ export function ClaimDetailPage() {
   return (
     <Page
       title={claim.claimNumber}
-      backAction={{ url: "/claims" }}
+      backAction={{ url: appHref("/claims") }}
       subtitle={claim.customerEmail ?? undefined}
-      titleMetadata={<Badge tone={claim.status === "COMPLETED" ? "success" : claim.status === "REJECTED" ? "critical" : "info"}>{claim.status.replaceAll("_", " ")}</Badge>}
+      titleMetadata={
+        <Badge
+          tone={
+            claim.status === "COMPLETED"
+              ? "success"
+              : claim.status === "REJECTED"
+                ? "critical"
+                : "info"
+          }
+        >
+          {claim.status.replaceAll("_", " ")}
+        </Badge>
+      }
       secondaryActions={[{ content: "Customer tracking", url: claim.trackingUrl, external: true }]}
     >
       <div className="as-claim-desk">
@@ -459,26 +484,39 @@ export function ClaimDetailPage() {
         ) : null}
 
         <section className="as-claim-hero">
-          <div className="as-claim-hero-kicker">
-            <span>●</span> Claim desk
+          <div className="as-claim-hero-top">
+            <div>
+              <div className="as-claim-hero-kicker">
+                <span>●</span> Claim desk
+              </div>
+              <p className="as-claim-number">{claim.claimNumber}</p>
+              <h2>{claim.issueSummary || "Untitled claim"}</h2>
+              <p>
+                {claim.customerName || "Customer"} · {claim.customerEmail || "No email"}
+                {claim.productTitle ? ` · ${claim.productTitle}` : ""}
+              </p>
+            </div>
+            <div className="as-claim-hero-actions">
+              <Button url={claim.trackingUrl} external>
+                Open tracking
+              </Button>
+              <Button variant="primary" loading={aiBusy} onClick={() => void runAiAssist()}>
+                {aiAssist ? "Re-analyze" : "AI assist"}
+              </Button>
+            </div>
           </div>
-          <h2>{claim.issueSummary || claim.claimNumber}</h2>
-          <p>
-            {claim.customerName || "Customer"} · {claim.customerEmail || "No email"}
-            {claim.productTitle ? ` · ${claim.productTitle}` : ""}
-          </p>
           <div className="as-claim-hero-meta">
-            <span className="as-claim-chip">Status {claim.status.replaceAll("_", " ")}</span>
+            <span className="as-claim-chip" data-tone={statusTone}>
+              {claim.status.replaceAll("_", " ")}
+            </span>
             <span className="as-claim-chip">Order {claim.orderNumber ?? "—"}</span>
             <span className="as-claim-chip">Serial {claim.serialNumber ?? "—"}</span>
             <span className="as-claim-chip">{slaLabel}</span>
-            {claim.assignee ? (
-              <span className="as-claim-chip">
-                Assignee {claim.assignee.name || claim.assignee.email}
-              </span>
-            ) : (
-              <span className="as-claim-chip">Unassigned</span>
-            )}
+            <span className="as-claim-chip">
+              {claim.assignee
+                ? `Assignee ${claim.assignee.name || claim.assignee.email}`
+                : "Unassigned"}
+            </span>
           </div>
         </section>
 
@@ -497,317 +535,397 @@ export function ClaimDetailPage() {
           </div>
         </div>
 
-        <div className="as-claim-grid">
-          <div className="as-claim-tile">
-            <h3>Customer & product</h3>
-            <BlockStack gap="200">
-              <Text as="p">
-                <strong>{claim.customerName ?? "—"}</strong>
-                <br />
-                {claim.customerEmail}
-              </Text>
-              <Text as="p">{claim.productTitle ?? "No product linked"}</Text>
-              <Text as="p" tone="subdued">
-                Order {claim.orderNumber ?? "—"} · Serial {claim.serialNumber ?? "—"}
-              </Text>
-              {claim.issueDetails ? <Text as="p">{claim.issueDetails}</Text> : null}
-            </BlockStack>
-          </div>
-
-          <div className="as-claim-tile">
-            <h3>Eligibility</h3>
-            <BlockStack gap="200">
-              <Text as="p" fontWeight="semibold">
-                {claim.eligibilityLabel}
-              </Text>
-              {claim.eligibilityReasons.map((r, i) => (
-                <Text as="p" key={i} tone="subdued">
-                  · {r}
-                </Text>
-              ))}
-              {claim.eligibilityOverride ? (
-                <Badge tone="attention">Override applied</Badge>
-              ) : (
-                <Button onClick={overrideEligibility}>Override eligibility</Button>
-              )}
-              <Text as="p" tone="subdued">
-                Eligibility never auto-rejects. Your team decides.
-              </Text>
-            </BlockStack>
-          </div>
+        <div className="as-claim-tabs" role="tablist" aria-label="Claim sections">
+          {(
+            [
+              ["overview", "Overview"],
+              ["work", "Update & notes"],
+              ["resolve", "Resolve"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className="as-claim-tab"
+              role="tab"
+              data-active={deskTab === key}
+              aria-selected={deskTab === key}
+              onClick={() => setDeskTab(key)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
-        <div className="as-claim-ai">
-          <InlineStack align="space-between" blockAlign="center">
-            <BlockStack gap="100">
-              <Text as="h2" variant="headingMd">
-                AI assist
-              </Text>
-              <Text as="p" tone="subdued">
-                Suggest-only triage: summary, category, missing info, and a draft reply.
-                {aiCredits
-                  ? ` · ${aiCredits.remaining}/${aiCredits.limit} credits left this month`
-                  : null}
-              </Text>
-            </BlockStack>
-            <Button variant="primary" loading={aiBusy} onClick={() => void runAiAssist()}>
-              {aiAssist ? "Run again" : "Analyze claim"}
-            </Button>
-          </InlineStack>
-
-          {aiAssist ? (
-            <BlockStack gap="300">
-              <Banner tone="info">
-                <p>
-                  Provider: {aiAssist.provider}. Staff must review before acting — guidance, not a
-                  decision.
-                </p>
-              </Banner>
-              <Text as="p">
-                <strong>Summary</strong>
-                <br />
-                {aiAssist.summary}
-              </Text>
-              <InlineStack gap="200" blockAlign="center">
-                <Text as="p">
-                  Suggested category: <strong>{aiAssist.suggestedCategory}</strong> (
-                  {Math.round(aiAssist.categoryConfidence * 100)}% confidence)
-                </Text>
-                <Button size="slim" loading={busy} onClick={() => void applyAiCategory()}>
-                  Apply category
-                </Button>
-              </InlineStack>
-              {aiAssist.missingInfo.length > 0 ? (
-                <BlockStack gap="100">
-                  <Text as="p" fontWeight="semibold">
-                    Missing information
+        {deskTab === "overview" ? (
+          <div className="as-claim-workspace">
+            <div className="as-claim-desk" style={{ gap: 14 }}>
+              <div className="as-claim-grid">
+                <div className="as-claim-tile">
+                  <h3>Customer & product</h3>
+                  <p className="as-claim-issue">{claim.customerName ?? "—"}</p>
+                  <Text as="p" tone="subdued">
+                    {claim.customerEmail}
                   </Text>
-                  {aiAssist.missingInfo.map((m) => (
-                    <Text as="p" key={m} tone="subdued">
-                      · {m}
-                    </Text>
-                  ))}
-                </BlockStack>
-              ) : null}
-              <BlockStack gap="100">
-                <Text as="p" fontWeight="semibold">
-                  Suggested customer reply
-                </Text>
-                <Text as="p">{aiAssist.suggestedReply}</Text>
-                <InlineStack gap="200">
-                  <Button onClick={useSuggestedReply}>Use in status note</Button>
-                  <Button onClick={() => void saveSuggestedAsInternalNote()} loading={busy}>
-                    Save as internal note
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-              {aiAssist.nextSteps.length > 0 ? (
-                <BlockStack gap="100">
                   <Text as="p" fontWeight="semibold">
-                    Next steps for your team
+                    {claim.productTitle ?? "No product linked"}
                   </Text>
-                  {aiAssist.nextSteps.map((s) => (
-                    <Text as="p" key={s} tone="subdued">
-                      · {s}
-                    </Text>
-                  ))}
-                </BlockStack>
-              ) : null}
-            </BlockStack>
-          ) : (
-            <Text as="p" tone="subdued">
-              Run analyze for a fast triage brief. Uses 1 AI credit per run.
-            </Text>
-          )}
-        </div>
-
-        <div className="as-claim-grid">
-          <div className="as-claim-tile">
-            <h3>Update status</h3>
-            <FormLayout>
-              <Select
-                label="Status"
-                options={[
-                  "OPEN",
-                  "IN_REVIEW",
-                  "WAITING_CUSTOMER",
-                  "APPROVED",
-                  "REJECTED",
-                  "IN_RESOLUTION",
-                  "COMPLETED",
-                  "CANCELLED",
-                ].map((s) => ({ label: s.replaceAll("_", " "), value: s }))}
-                value={status}
-                onChange={setStatus}
-              />
-              <TextField
-                label="Customer-visible note (optional)"
-                value={note}
-                onChange={setNote}
-                multiline={3}
-                autoComplete="off"
-              />
-              <Button variant="primary" loading={busy} onClick={saveStatus}>
-                Update status
-              </Button>
-              {workflowStatuses.length > 0 ? (
-                <>
-                  <Select
-                    label="Workflow status"
-                    options={[
-                      { label: "Select…", value: "" },
-                      ...workflowStatuses.map((s) => ({ label: s.label, value: s.key })),
-                    ]}
-                    value={workflowKey}
-                    onChange={setWorkflowKey}
-                  />
-                  <Button onClick={applyWorkflow} loading={busy}>
-                    Apply workflow status
-                  </Button>
-                </>
-              ) : null}
-              <Select
-                label="Assignee"
-                options={[
-                  { label: "Unassigned", value: "" },
-                  ...staff
-                    .filter((s) => s.active !== false)
-                    .map((s) => ({
-                      label: s.name ? `${s.name} (${s.email})` : s.email,
-                      value: s.id,
-                    })),
-                ]}
-                value={assigneeId}
-                onChange={setAssigneeId}
-              />
-              <Button onClick={saveAssignee} loading={busy}>
-                Save assignee
-              </Button>
-            </FormLayout>
-          </div>
-
-          <div className="as-claim-tile">
-            <h3>Resolve</h3>
-            <BlockStack gap="300">
-              <Button onClick={createRepair} loading={busy}>
-                Create repair
-              </Button>
-              <Select
-                label="Replacement warranty mode"
-                options={[
-                  { label: "Inherit remaining term", value: "INHERIT_REMAINING" },
-                  { label: "Restart warranty", value: "RESTART" },
-                ]}
-                value={warrantyMode}
-                onChange={setWarrantyMode}
-              />
-              <Button onClick={createReplacement} loading={busy}>
-                Create replacement draft order
-              </Button>
-              <TextField
-                label="Refund amount"
-                type="number"
-                value={refundAmount}
-                onChange={setRefundAmount}
-                prefix="$"
-                autoComplete="off"
-              />
-              <TextField
-                label="Refund reason"
-                value={refundReason}
-                onChange={setRefundReason}
-                autoComplete="off"
-              />
-              <Button onClick={recordRefundAction} loading={busy}>
-                Record refund
-              </Button>
-              <Select
-                label="Supplier (recoverable)"
-                options={[
-                  { label: suppliers.length ? "Select supplier" : "No suppliers yet", value: "" },
-                  ...suppliers.map((s) => ({ label: s.name, value: s.id })),
-                ]}
-                value={supplierId}
-                onChange={setSupplierId}
-              />
-              <TextField
-                label="Recoverable amount"
-                type="number"
-                value={supplierAmount}
-                onChange={setSupplierAmount}
-                prefix="$"
-                autoComplete="off"
-              />
-              <Select
-                label="Supplier claim status"
-                options={["NOT_FILED", "FILED", "ACCEPTED", "REJECTED", "REIMBURSED"].map((s) => ({
-                  label: s.replaceAll("_", " "),
-                  value: s,
-                }))}
-                value={supplierStatus}
-                onChange={setSupplierStatus}
-              />
-              <Button onClick={markSupplierRecoverable} loading={busy}>
-                Save supplier recovery
-              </Button>
-              <Button url="/suppliers" variant="plain">
-                Manage suppliers
-              </Button>
-            </BlockStack>
-          </div>
-        </div>
-
-        <div className="as-claim-tile">
-          <h3>Timeline</h3>
-          <BlockStack gap="300">
-            {claim.notes.length === 0 ? (
-              <Text as="p" tone="subdued">
-                No notes yet. Add an internal note or update status to start the timeline.
-              </Text>
-            ) : (
-              claim.notes.map((n) => (
-                <div key={n.id} className="as-claim-note" data-internal={n.isInternal ? "true" : "false"}>
-                  <InlineStack gap="200">
-                    <Badge tone={n.isInternal ? "attention" : undefined}>
-                      {n.isInternal ? "Internal" : n.authorType}
-                    </Badge>
-                    <Text as="span" tone="subdued" variant="bodySm">
-                      {new Date(n.createdAt).toLocaleString()}
-                    </Text>
-                  </InlineStack>
-                  <Text as="p">{n.body}</Text>
+                  <Text as="p" tone="subdued">
+                    Order {claim.orderNumber ?? "—"} · Serial {claim.serialNumber ?? "—"}
+                  </Text>
+                  {claim.issueDetails ? <Text as="p">{claim.issueDetails}</Text> : null}
                 </div>
-              ))
-            )}
-            <TextField
-              label="Internal note"
-              value={internalNote}
-              onChange={setInternalNote}
-              multiline={3}
-              autoComplete="off"
-            />
-            <Button onClick={saveNote} loading={busy}>
-              Add internal note
-            </Button>
-          </BlockStack>
-        </div>
 
-        {claim.attachments.length > 0 ? (
-          <div className="as-claim-tile">
-            <h3>Attachments</h3>
-            <BlockStack gap="200">
-              {claim.attachments.map((a) => (
-                <InlineStack key={a.id} gap="200" blockAlign="center">
-                  <Text as="span">{a.fileName}</Text>
-                  <Badge>{a.scanStatus}</Badge>
-                  {a.downloadUrl ? (
-                    <Button url={a.downloadUrl} external variant="plain">
-                      Open
-                    </Button>
-                  ) : null}
+                <div className="as-claim-tile">
+                  <h3>Eligibility</h3>
+                  <p className="as-claim-issue">{claim.eligibilityLabel}</p>
+                  {claim.eligibilityReasons.map((r, i) => (
+                    <Text as="p" key={i} tone="subdued">
+                      · {r}
+                    </Text>
+                  ))}
+                  {claim.eligibilityOverride ? (
+                    <Badge tone="attention">Override applied</Badge>
+                  ) : (
+                    <Button onClick={overrideEligibility}>Override eligibility</Button>
+                  )}
+                  <Text as="p" tone="subdued">
+                    Eligibility never auto-rejects. Your team decides.
+                  </Text>
+                </div>
+              </div>
+
+              <div className="as-claim-ai">
+                <InlineStack align="space-between" blockAlign="center">
+                  <BlockStack gap="100">
+                    <Text as="h2" variant="headingMd">
+                      AI assist
+                    </Text>
+                    <Text as="p" tone="subdued">
+                      Suggest-only triage — never approves or rejects for you.
+                      {aiCredits
+                        ? ` · ${aiCredits.remaining}/${aiCredits.limit} credits left`
+                        : null}
+                    </Text>
+                  </BlockStack>
+                  <Button variant="primary" loading={aiBusy} onClick={() => void runAiAssist()}>
+                    {aiAssist ? "Run again" : "Analyze claim"}
+                  </Button>
                 </InlineStack>
-              ))}
-            </BlockStack>
+
+                {aiAssist ? (
+                  <BlockStack gap="300">
+                    <Banner tone="info">
+                      <p>
+                        Provider: {aiAssist.provider}. Staff must review before acting.
+                      </p>
+                    </Banner>
+                    <Text as="p">
+                      <strong>Summary</strong>
+                      <br />
+                      {aiAssist.summary}
+                    </Text>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="p">
+                        Suggested category: <strong>{aiAssist.suggestedCategory}</strong> (
+                        {Math.round(aiAssist.categoryConfidence * 100)}%)
+                      </Text>
+                      <Button size="slim" loading={busy} onClick={() => void applyAiCategory()}>
+                        Apply category
+                      </Button>
+                    </InlineStack>
+                    {aiAssist.missingInfo.length > 0 ? (
+                      <BlockStack gap="100">
+                        <Text as="p" fontWeight="semibold">
+                          Missing information
+                        </Text>
+                        {aiAssist.missingInfo.map((m) => (
+                          <Text as="p" key={m} tone="subdued">
+                            · {m}
+                          </Text>
+                        ))}
+                      </BlockStack>
+                    ) : null}
+                    <BlockStack gap="100">
+                      <Text as="p" fontWeight="semibold">
+                        Suggested customer reply
+                      </Text>
+                      <Text as="p">{aiAssist.suggestedReply}</Text>
+                      <InlineStack gap="200">
+                        <Button
+                          onClick={() => {
+                            useSuggestedReply();
+                            setDeskTab("work");
+                          }}
+                        >
+                          Use in status note
+                        </Button>
+                        <Button onClick={() => void saveSuggestedAsInternalNote()} loading={busy}>
+                          Save as internal note
+                        </Button>
+                      </InlineStack>
+                    </BlockStack>
+                    {aiAssist.nextSteps.length > 0 ? (
+                      <BlockStack gap="100">
+                        <Text as="p" fontWeight="semibold">
+                          Next steps
+                        </Text>
+                        {aiAssist.nextSteps.map((s) => (
+                          <Text as="p" key={s} tone="subdued">
+                            · {s}
+                          </Text>
+                        ))}
+                      </BlockStack>
+                    ) : null}
+                  </BlockStack>
+                ) : (
+                  <Text as="p" tone="subdued">
+                    Run analyze for a fast triage brief. Uses 1 AI credit per run.
+                  </Text>
+                )}
+              </div>
+
+              {claim.attachments.length > 0 ? (
+                <div className="as-claim-tile">
+                  <h3>Attachments</h3>
+                  <BlockStack gap="200">
+                    {claim.attachments.map((a) => (
+                      <InlineStack key={a.id} gap="200" blockAlign="center">
+                        <Text as="span">{a.fileName}</Text>
+                        <Badge>{a.scanStatus}</Badge>
+                        {a.downloadUrl ? (
+                          <Button url={a.downloadUrl} external variant="plain">
+                            Open
+                          </Button>
+                        ) : null}
+                      </InlineStack>
+                    ))}
+                  </BlockStack>
+                </div>
+              ) : null}
+            </div>
+
+            <aside className="as-claim-side">
+              <div className="as-claim-tile">
+                <h3>Quick actions</h3>
+                <BlockStack gap="200">
+                  <Button variant="primary" onClick={() => setDeskTab("work")}>
+                    Update status
+                  </Button>
+                  <Button onClick={() => setDeskTab("resolve")}>Start resolution</Button>
+                  <Button onClick={createRepair} loading={busy}>
+                    Create repair
+                  </Button>
+                </BlockStack>
+              </div>
+              <div className="as-claim-tile">
+                <h3>Recent notes</h3>
+                {claim.notes.length === 0 ? (
+                  <Text as="p" tone="subdued">
+                    No notes yet.
+                  </Text>
+                ) : (
+                  claim.notes.slice(-3).reverse().map((n) => (
+                    <div
+                      key={n.id}
+                      className="as-claim-note"
+                      data-internal={n.isInternal ? "true" : "false"}
+                    >
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {new Date(n.createdAt).toLocaleString()}
+                      </Text>
+                      <Text as="p">{n.body}</Text>
+                    </div>
+                  ))
+                )}
+              </div>
+            </aside>
+          </div>
+        ) : null}
+
+        {deskTab === "work" ? (
+          <div className="as-claim-workspace">
+            <div className="as-claim-tile">
+              <h3>Update status</h3>
+              <FormLayout>
+                <Select
+                  label="Status"
+                  options={[
+                    "OPEN",
+                    "IN_REVIEW",
+                    "WAITING_CUSTOMER",
+                    "APPROVED",
+                    "REJECTED",
+                    "IN_RESOLUTION",
+                    "COMPLETED",
+                    "CANCELLED",
+                  ].map((s) => ({ label: s.replaceAll("_", " "), value: s }))}
+                  value={status}
+                  onChange={setStatus}
+                />
+                <TextField
+                  label="Customer-visible note (optional)"
+                  value={note}
+                  onChange={setNote}
+                  multiline={3}
+                  autoComplete="off"
+                />
+                <Button variant="primary" loading={busy} onClick={saveStatus}>
+                  Update status
+                </Button>
+                {workflowStatuses.length > 0 ? (
+                  <>
+                    <Select
+                      label="Workflow status"
+                      options={[
+                        { label: "Select…", value: "" },
+                        ...workflowStatuses.map((s) => ({ label: s.label, value: s.key })),
+                      ]}
+                      value={workflowKey}
+                      onChange={setWorkflowKey}
+                    />
+                    <Button onClick={applyWorkflow} loading={busy}>
+                      Apply workflow status
+                    </Button>
+                  </>
+                ) : null}
+                <Select
+                  label="Assignee"
+                  options={[
+                    { label: "Unassigned", value: "" },
+                    ...staff
+                      .filter((s) => s.active !== false)
+                      .map((s) => ({
+                        label: s.name ? `${s.name} (${s.email})` : s.email,
+                        value: s.id,
+                      })),
+                  ]}
+                  value={assigneeId}
+                  onChange={setAssigneeId}
+                />
+                <Button onClick={saveAssignee} loading={busy}>
+                  Save assignee
+                </Button>
+              </FormLayout>
+            </div>
+
+            <div className="as-claim-tile">
+              <h3>Timeline</h3>
+              <BlockStack gap="300">
+                {claim.notes.length === 0 ? (
+                  <Text as="p" tone="subdued">
+                    No notes yet. Add an internal note or update status to start the timeline.
+                  </Text>
+                ) : (
+                  claim.notes.map((n) => (
+                    <div
+                      key={n.id}
+                      className="as-claim-note"
+                      data-internal={n.isInternal ? "true" : "false"}
+                    >
+                      <InlineStack gap="200">
+                        <Badge tone={n.isInternal ? "attention" : undefined}>
+                          {n.isInternal ? "Internal" : n.authorType}
+                        </Badge>
+                        <Text as="span" tone="subdued" variant="bodySm">
+                          {new Date(n.createdAt).toLocaleString()}
+                        </Text>
+                      </InlineStack>
+                      <Text as="p">{n.body}</Text>
+                    </div>
+                  ))
+                )}
+                <TextField
+                  label="Internal note"
+                  value={internalNote}
+                  onChange={setInternalNote}
+                  multiline={3}
+                  autoComplete="off"
+                />
+                <Button onClick={saveNote} loading={busy}>
+                  Add internal note
+                </Button>
+              </BlockStack>
+            </div>
+          </div>
+        ) : null}
+
+        {deskTab === "resolve" ? (
+          <div className="as-claim-tile">
+            <h3>Resolution tools</h3>
+            <div className="as-claim-grid">
+              <BlockStack gap="300">
+                <Text as="p" tone="subdued">
+                  Repair, replace, refund, or recover from a supplier — all from this claim.
+                </Text>
+                <Button onClick={createRepair} loading={busy} variant="primary">
+                  Create repair
+                </Button>
+                <Select
+                  label="Replacement warranty mode"
+                  options={[
+                    { label: "Inherit remaining term", value: "INHERIT_REMAINING" },
+                    { label: "Restart warranty", value: "RESTART" },
+                  ]}
+                  value={warrantyMode}
+                  onChange={setWarrantyMode}
+                />
+                <Button onClick={createReplacement} loading={busy}>
+                  Create replacement draft order
+                </Button>
+              </BlockStack>
+              <BlockStack gap="300">
+                <TextField
+                  label="Refund amount"
+                  type="number"
+                  value={refundAmount}
+                  onChange={setRefundAmount}
+                  prefix="$"
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Refund reason"
+                  value={refundReason}
+                  onChange={setRefundReason}
+                  autoComplete="off"
+                />
+                <Button onClick={recordRefundAction} loading={busy}>
+                  Record refund
+                </Button>
+                <Select
+                  label="Supplier (recoverable)"
+                  options={[
+                    { label: suppliers.length ? "Select supplier" : "No suppliers yet", value: "" },
+                    ...suppliers.map((s) => ({ label: s.name, value: s.id })),
+                  ]}
+                  value={supplierId}
+                  onChange={setSupplierId}
+                />
+                <TextField
+                  label="Recoverable amount"
+                  type="number"
+                  value={supplierAmount}
+                  onChange={setSupplierAmount}
+                  prefix="$"
+                  autoComplete="off"
+                />
+                <Select
+                  label="Supplier claim status"
+                  options={["NOT_FILED", "FILED", "ACCEPTED", "REJECTED", "REIMBURSED"].map((s) => ({
+                    label: s.replaceAll("_", " "),
+                    value: s,
+                  }))}
+                  value={supplierStatus}
+                  onChange={setSupplierStatus}
+                />
+                <Button onClick={markSupplierRecoverable} loading={busy}>
+                  Save supplier recovery
+                </Button>
+                <Button url={appHref("/suppliers")} variant="plain">
+                  Manage suppliers
+                </Button>
+              </BlockStack>
+            </div>
           </div>
         ) : null}
       </div>

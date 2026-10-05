@@ -4,19 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Badge,
   Banner,
-  BlockStack,
   Button,
-  Card,
   DataTable,
   InlineStack,
-  Layout,
   Modal,
   Page,
-  Text,
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 import { friendlyError } from "@/lib/merchant-errors";
+import { PageEmpty, PageLoading } from "./PageLoading";
 
 type Reg = {
   id: string;
@@ -57,11 +54,18 @@ export function RegistrationsPage() {
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const load = useCallback(() => {
+    setLoading(true);
     gqlRequest<{ registrations: Reg[] }>(QUERY)
-      .then((d) => setRows(d.registrations))
-      .catch((e) => setError(friendlyError(e)));
+      .then((d) => {
+        setRows(d.registrations);
+        setHasLoaded(true);
+      })
+      .catch((e) => setError(friendlyError(e)))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -104,73 +108,80 @@ export function RegistrationsPage() {
   }
 
   return (
-    <Page title="Registrations" subtitle="Pending verification and serial reviews">
-      <Layout>
+    <Page
+      title="Registrations"
+      subtitle={hasLoaded ? `${rows.length} total` : "Loading…"}
+    >
+      <div className="as-m-ops-surface">
         {error ? (
-          <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setError(null)}>
-              <p>{error}</p>
-            </Banner>
-          </Layout.Section>
+          <Banner tone="critical" onDismiss={() => setError(null)}>
+            <p>{error}</p>
+          </Banner>
         ) : null}
         {success ? (
-          <Layout.Section>
-            <Banner tone="success" onDismiss={() => setSuccess(null)}>
-              <p>{success}</p>
-            </Banner>
-          </Layout.Section>
+          <Banner tone="success" onDismiss={() => setSuccess(null)}>
+            <p>{success}</p>
+          </Banner>
         ) : null}
-        <Layout.Section>
-          <Card>
-            {rows.length === 0 ? (
-              <BlockStack gap="200">
-                <Text as="p" tone="subdued">
-                  No registrations yet.
-                </Text>
-                <Text as="p" tone="subdued">
-                  Customers register via the storefront app proxy, theme embed blocks, or QR codes.
-                </Text>
-              </BlockStack>
-            ) : (
-              <DataTable
-                columnContentTypes={["text", "text", "text", "text", "text", "text", "text"]}
-                headings={["Email", "Product", "Serial", "Source", "Status", "When", ""]}
-                rows={rows.map((r) => [
-                  r.email ?? "—",
-                  r.productTitle ?? "—",
-                  r.serialNumber ?? "—",
-                  r.source,
-                  <Badge
-                    key={r.id}
-                    tone={
-                      r.status === "APPROVED"
-                        ? "success"
-                        : r.status === "REJECTED"
-                          ? "critical"
-                          : "attention"
-                    }
-                  >
-                    {r.status}
-                  </Badge>,
-                  new Date(r.createdAt).toLocaleString(),
-                  r.status === "PENDING_VERIFICATION" || r.status === "NEEDS_REVIEW" ? (
-                    <InlineStack key={`a-${r.id}`} gap="200">
-                      <Button size="slim" onClick={() => approve(r.id)} loading={busy}>
-                        Approve
-                      </Button>
-                      <Button size="slim" tone="critical" onClick={() => openReject(r.id)}>
-                        Reject
-                      </Button>
-                    </InlineStack>
-                  ) : (
-                    "—"
-                  ),
-                ])}
-              />
-            )}
-          </Card>
-        </Layout.Section>
-      </Layout>
+
+        <div className="as-m-ops-banner">
+          <div>
+            <p className="as-m-ops-kicker">Coverage</p>
+            <h2>Registration review</h2>
+            <p>Approve or reject customer product registrations that need verification.</p>
+          </div>
+          <Button onClick={load} loading={loading && hasLoaded} disabled={loading && !hasLoaded}>
+            Refresh
+          </Button>
+        </div>
+
+        <div className="as-m-ops-card">
+          {loading && !hasLoaded ? (
+            <PageLoading label="Loading registrations" />
+          ) : rows.length === 0 ? (
+            <PageEmpty
+              title="No registrations yet"
+              body="Customers register via the storefront portal, theme blocks, or QR codes."
+            />
+          ) : (
+            <DataTable
+              columnContentTypes={["text", "text", "text", "text", "text", "text", "text"]}
+              headings={["Email", "Product", "Serial", "Source", "Status", "When", ""]}
+              rows={rows.map((r) => [
+                r.email ?? "—",
+                r.productTitle ?? "—",
+                r.serialNumber ?? "—",
+                r.source,
+                <Badge
+                  key={r.id}
+                  tone={
+                    r.status === "APPROVED"
+                      ? "success"
+                      : r.status === "REJECTED"
+                        ? "critical"
+                        : "attention"
+                  }
+                >
+                  {r.status}
+                </Badge>,
+                new Date(r.createdAt).toLocaleString(),
+                r.status === "PENDING_VERIFICATION" || r.status === "NEEDS_REVIEW" ? (
+                  <InlineStack key={`a-${r.id}`} gap="200">
+                    <Button size="slim" onClick={() => approve(r.id)} loading={busy}>
+                      Approve
+                    </Button>
+                    <Button size="slim" tone="critical" onClick={() => openReject(r.id)}>
+                      Reject
+                    </Button>
+                  </InlineStack>
+                ) : (
+                  "—"
+                ),
+              ])}
+            />
+          )}
+        </div>
+      </div>
 
       <Modal
         open={rejectOpen}

@@ -2,14 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  Badge,
   Banner,
   BlockStack,
   Button,
-  Card,
   FormLayout,
   InlineStack,
-  Layout,
   Page,
   Select,
   Text,
@@ -17,6 +14,9 @@ import {
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 import { useParams } from "next/navigation";
+import { appHref } from "@/lib/shop-context";
+import { PageEmpty, PageLoading } from "./PageLoading";
+import { BrandLoader } from "./BrandLoader";
 
 type Repair = {
   id: string;
@@ -74,11 +74,18 @@ export function RepairsListPage() {
   const [rows, setRows] = useState<Repair[]>([]);
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const load = useCallback(() => {
+    setLoading(true);
     gqlRequest<{ repairs: Repair[] }>(LIST, { status: status || null })
-      .then((d) => setRows(d.repairs))
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+      .then((d) => {
+        setRows(d.repairs);
+        setHasLoaded(true);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed"))
+      .finally(() => setLoading(false));
   }, [status]);
 
   useEffect(() => {
@@ -91,67 +98,72 @@ export function RepairsListPage() {
   }));
 
   return (
-    <Page title="Repairs" subtitle={`${rows.length} open board`}>
-      <Layout>
+    <Page title="Repairs" subtitle={hasLoaded ? `${rows.length} on the board` : "Loading…"}>
+      <div className="as-m-ops-surface">
         {error ? (
-          <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setError(null)}>
-              {error}
-            </Banner>
-          </Layout.Section>
+          <Banner tone="critical" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
         ) : null}
-        <Layout.Section>
-          <InlineStack gap="300" blockAlign="end">
-            <div style={{ minWidth: 220 }}>
+
+        <div className="as-m-ops-banner">
+          <div>
+            <p className="as-m-ops-kicker">Operations</p>
+            <h2>Repair board</h2>
+            <p>Move repairs across stages from intake to ship-back.</p>
+          </div>
+          <div className="as-m-ops-toolbar">
+            <div style={{ minWidth: 200 }}>
               <Select
                 label="Filter status"
+                labelHidden
                 options={[
-                  { label: "All", value: "" },
+                  { label: "All statuses", value: "" },
                   ...STATUSES.map((s) => ({ label: s.replaceAll("_", " "), value: s })),
                 ]}
                 value={status}
                 onChange={setStatus}
+                disabled={loading && !hasLoaded}
               />
             </div>
-            <Button onClick={load}>Refresh</Button>
-          </InlineStack>
-        </Layout.Section>
-        <Layout.Section>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-              gap: 12,
-            }}
-          >
+            <Button onClick={load} loading={loading && hasLoaded} disabled={loading && !hasLoaded}>
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        {loading && !hasLoaded ? (
+          <PageLoading label="Loading repairs" />
+        ) : rows.length === 0 ? (
+          <PageEmpty
+            title="No repairs yet"
+            body="Create a repair from a claim’s Resolve tab to populate this board."
+            action={<Button url={appHref("/claims")}>Open claims</Button>}
+          />
+        ) : (
+          <div className={`as-m-board${loading ? " as-m-list-refreshing" : ""}`}>
             {byStatus.map((col) => (
-              <Card key={col.status}>
-                <BlockStack gap="200">
-                  <Text as="h3" variant="headingSm">
-                    {col.status.replaceAll("_", " ")} ({col.items.length})
+              <div key={col.status} className="as-m-board-col">
+                <h4>
+                  {col.status.replaceAll("_", " ")} · {col.items.length}
+                </h4>
+                {col.items.length === 0 ? (
+                  <Text as="p" tone="subdued" variant="bodySm">
+                    Empty
                   </Text>
-                  {col.items.length === 0 ? (
-                    <Text as="p" tone="subdued">
-                      —
-                    </Text>
-                  ) : (
-                    col.items.map((r) => (
-                      <BlockStack gap="050" key={r.id}>
-                        <Button url={`/repairs/${r.id}`} variant="plain">
-                          {r.repairNumber}
-                        </Button>
-                        <Text as="p" tone="subdued" variant="bodySm">
-                          {r.claimNumber ?? r.claimId}
-                        </Text>
-                      </BlockStack>
-                    ))
-                  )}
-                </BlockStack>
-              </Card>
+                ) : (
+                  col.items.map((r) => (
+                    <a key={r.id} className="as-m-board-item" href={appHref(`/repairs/${r.id}`)}>
+                      <strong>{r.repairNumber}</strong>
+                      <span>{r.claimNumber ?? "Claim"}</span>
+                    </a>
+                  ))
+                )}
+              </div>
             ))}
           </div>
-        </Layout.Section>
-      </Layout>
+        )}
+      </div>
     </Page>
   );
 }
@@ -171,14 +183,19 @@ export function RepairDetailPage() {
   const [technicianId, setTechnicianId] = useState("");
 
   const load = useCallback(() => {
-    gqlRequest<{ repair: Repair | null; staffMembers: typeof staff }>(DETAIL, { id })
+    gqlRequest<{
+      repair: Repair | null;
+      staffMembers: typeof staff;
+    }>(DETAIL, { id })
       .then((d) => {
         if (!d.repair) throw new Error("Repair not found");
         setRepair(d.repair);
         setStatus(d.repair.status);
         setDiagnosis(d.repair.diagnosis ?? "");
         setNotes(d.repair.notes ?? "");
-        setCost(d.repair.repairCostCents != null ? String(d.repair.repairCostCents / 100) : "");
+        setCost(
+          d.repair.repairCostCents != null ? (d.repair.repairCostCents / 100).toFixed(2) : "",
+        );
         setShippingIn(d.repair.shippingIn ?? "");
         setShippingOut(d.repair.shippingOut ?? "");
         setTechnicianId(d.repair.technician?.id ?? "");
@@ -193,15 +210,16 @@ export function RepairDetailPage() {
 
   async function save() {
     setBusy(true);
+    setError(null);
     try {
       await gqlRequest(
         `#graphql
-        mutation U($id: ID!, $input: UpdateRepairInput!) {
-          updateRepair(id: $id, input: $input) { id status }
+        mutation U($input: UpdateRepairInput!) {
+          updateRepair(input: $input) { id }
         }`,
         {
-          id,
           input: {
+            id,
             status,
             diagnosis: diagnosis || null,
             notes: notes || null,
@@ -223,22 +241,13 @@ export function RepairDetailPage() {
   if (!repair && !error) {
     return (
       <Page title="Repair">
-        <div style={{ padding: "32px 0" }}>
-          <div className="as-loader as-loader--compact" role="status">
-            <div className="as-loader-mark" aria-hidden>
-              <span className="as-loader-ring" />
-              <span className="as-loader-ring as-loader-ring-b" />
-              <span className="as-loader-core">A</span>
-            </div>
-            <p className="as-loader-label">Loading repairs</p>
-            <div className="as-loader-bar" aria-hidden>
-              <span />
-            </div>
-          </div>
+        <div className="as-m-page-loading">
+          <BrandLoader label="Opening repair" compact />
         </div>
       </Page>
     );
   }
+
   if (!repair) {
     return (
       <Page title="Repair">
@@ -250,76 +259,55 @@ export function RepairDetailPage() {
   return (
     <Page
       title={repair.repairNumber}
-      backAction={{ url: "/repairs" }}
-      titleMetadata={<Badge>{repair.status.replaceAll("_", " ")}</Badge>}
-      secondaryActions={[{ content: "Open claim", url: `/claims/${repair.claimId}` }]}
+      backAction={{ url: appHref("/repairs") }}
+      subtitle={repair.claimNumber ?? undefined}
+      secondaryActions={[{ content: "Open claim", url: appHref(`/claims/${repair.claimId}`) }]}
     >
-      <Layout>
+      <div className="as-m-ops-surface">
         {error ? (
-          <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setError(null)}>
-              {error}
-            </Banner>
-          </Layout.Section>
+          <Banner tone="critical" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
         ) : null}
-        <Layout.Section>
-          <Card>
-            <FormLayout>
-              <Select
-                label="Status"
-                options={STATUSES.map((s) => ({ label: s.replaceAll("_", " "), value: s }))}
-                value={status}
-                onChange={setStatus}
-              />
-              <Select
-                label="Technician"
-                options={[
-                  { label: "Unassigned", value: "" },
-                  ...staff
-                    .filter((s) => s.active !== false)
-                    .map((s) => ({
+        <div className="as-m-ops-card">
+          <FormLayout>
+            <Select
+              label="Status"
+              options={STATUSES.map((s) => ({ label: s.replaceAll("_", " "), value: s }))}
+              value={status}
+              onChange={setStatus}
+            />
+            <Select
+              label="Technician"
+              options={[
+                { label: "Unassigned", value: "" },
+                ...staff
+                  .filter((s) => s.active !== false)
+                  .map((s) => ({
                     label: s.name ? `${s.name} (${s.email})` : s.email,
                     value: s.id,
                   })),
-                ]}
-                value={technicianId}
-                onChange={setTechnicianId}
-              />
-              <TextField
-                label="Diagnosis"
-                value={diagnosis}
-                onChange={setDiagnosis}
-                multiline={3}
-                autoComplete="off"
-              />
-              <TextField label="Notes" value={notes} onChange={setNotes} multiline={3} autoComplete="off" />
-              <TextField
-                label="Repair cost"
-                type="number"
-                value={cost}
-                onChange={setCost}
-                prefix="$"
-                autoComplete="off"
-              />
-              <TextField
-                label="Shipping in"
-                value={shippingIn}
-                onChange={setShippingIn}
-                autoComplete="off"
-              />
-              <TextField
-                label="Shipping out"
-                value={shippingOut}
-                onChange={setShippingOut}
-                autoComplete="off"
-              />
-              <Button variant="primary" loading={busy} onClick={save}>
-                Save repair
-              </Button>
-            </FormLayout>
-          </Card>
-        </Layout.Section>
-      </Layout>
+              ]}
+              value={technicianId}
+              onChange={setTechnicianId}
+            />
+            <TextField label="Diagnosis" value={diagnosis} onChange={setDiagnosis} multiline={3} autoComplete="off" />
+            <TextField label="Notes" value={notes} onChange={setNotes} multiline={3} autoComplete="off" />
+            <TextField label="Repair cost" type="number" value={cost} onChange={setCost} prefix="$" autoComplete="off" />
+            <InlineStack gap="300">
+              <div style={{ flex: 1 }}>
+                <TextField label="Shipping in" value={shippingIn} onChange={setShippingIn} autoComplete="off" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <TextField label="Shipping out" value={shippingOut} onChange={setShippingOut} autoComplete="off" />
+              </div>
+            </InlineStack>
+            <Button variant="primary" loading={busy} onClick={save}>
+              Save repair
+            </Button>
+          </FormLayout>
+        </div>
+      </div>
     </Page>
   );
 }

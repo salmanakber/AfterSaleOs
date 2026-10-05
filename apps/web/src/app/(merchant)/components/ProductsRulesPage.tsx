@@ -18,6 +18,7 @@ import {
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 import { TourTrigger, useOptionalTour } from "./ProductTour";
+import { PageEmpty, PageLoading } from "./PageLoading";
 
 type Rule = {
   id: string;
@@ -126,16 +127,21 @@ export function ProductsRulesPage() {
   const [serialBulk, setSerialBulk] = useState("");
   const [serialListId, setSerialListId] = useState("");
   const [editSerialListId, setEditSerialListId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const load = useCallback(() => {
+    setLoading(true);
     gqlRequest<{ warrantyRules: Rule[]; products: Product[]; serialLists: SerialList[] }>(RULES_QUERY)
       .then((d) => {
         setRules(d.warrantyRules);
         setProducts(d.products);
         setSerialLists(d.serialLists);
         if (d.serialLists[0]) setSerialListId(d.serialLists[0].id);
+        setHasLoaded(true);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"));
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -328,27 +334,42 @@ export function ProductsRulesPage() {
   return (
     <Page
       title="Products & Rules"
+      subtitle={hasLoaded ? `${rules.length} rules · ${products.length} products` : "Loading…"}
       primaryAction={{ content: "Create rule", onAction: () => setOpen(true) }}
       secondaryActions={
         tour ? [{ content: "Take a tour", onAction: () => tour.startTour("rules", { force: true }) }] : undefined
       }
     >
-      <Layout>
+      <div className="as-m-ops-surface">
         {error ? (
-          <Layout.Section>
-            <Banner tone="critical" title="Error" onDismiss={() => setError(null)}>
-              <p>{error}</p>
-            </Banner>
-          </Layout.Section>
+          <Banner tone="critical" title="Error" onDismiss={() => setError(null)}>
+            <p>{error}</p>
+          </Banner>
         ) : null}
         {success ? (
-          <Layout.Section>
-            <Banner tone="success" onDismiss={() => setSuccess(null)}>
-              <p>{success}</p>
-            </Banner>
-          </Layout.Section>
+          <Banner tone="success" onDismiss={() => setSuccess(null)}>
+            <p>{success}</p>
+          </Banner>
         ) : null}
 
+        <div className="as-m-ops-banner">
+          <div>
+            <p className="as-m-ops-kicker">Coverage</p>
+            <h2>Products & warranty rules</h2>
+            <p>Define coverage terms, assign them to products, and manage serial lists.</p>
+          </div>
+          <InlineStack gap="200">
+            <TourTrigger tourId="rules" label="Tour" />
+            <Button onClick={load} loading={loading && hasLoaded} disabled={loading && !hasLoaded}>
+              Refresh
+            </Button>
+          </InlineStack>
+        </div>
+
+        {loading && !hasLoaded ? (
+          <PageLoading label="Loading rules" />
+        ) : (
+      <Layout>
         <Layout.Section>
           <Card>
             <div data-tour="rules-panel">
@@ -357,12 +378,15 @@ export function ProductsRulesPage() {
                 Warranty rules
               </Text>
               {rules.length === 0 ? (
-                <Text as="p" tone="subdued">
-                  No rules yet. Create a default rule so new orders receive warranties.
-                </Text>
+                <PageEmpty
+                  title="No rules yet"
+                  body="Create a default rule so new orders receive warranties."
+                  action={<Button onClick={() => setOpen(true)}>Create rule</Button>}
+                />
               ) : (
                 rules.map((r) => (
-                  <InlineStack key={r.id} align="space-between" blockAlign="center">
+                  <div key={r.id} className="as-m-rule-card">
+                  <InlineStack align="space-between" blockAlign="center">
                     <BlockStack gap="100">
                       <InlineStack gap="200">
                         <Text as="span" fontWeight="semibold">
@@ -379,6 +403,7 @@ export function ProductsRulesPage() {
                     </BlockStack>
                     <Button onClick={() => openEdit(r)}>Edit</Button>
                   </InlineStack>
+                  </div>
                 ))
               )}
             </BlockStack>
@@ -441,6 +466,8 @@ export function ProductsRulesPage() {
           </Card>
         </Layout.Section>
       </Layout>
+        )}
+      </div>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Create warranty rule" primaryAction={{ content: "Create", onAction: createRule, loading: saving }} secondaryActions={[{ content: "Cancel", onAction: () => setOpen(false) }]}>
         <Modal.Section>{formFields}</Modal.Section>

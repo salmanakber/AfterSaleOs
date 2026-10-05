@@ -19,6 +19,7 @@ import {
 import { theme } from "@aftersale/shared";
 import { gqlRequest } from "@/lib/graphql";
 import { friendlyError } from "@/lib/merchant-errors";
+import { BrandLoader } from "./BrandLoader";
 
 type Warranty = {
   id: string;
@@ -120,6 +121,8 @@ export function WarrantiesPage() {
   const [extendReason, setExtendReason] = useState("Goodwill extension");
   const [lookback, setLookback] = useState("12");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const [mEmail, setMEmail] = useState("");
   const [mTitle, setMTitle] = useState("");
@@ -128,6 +131,7 @@ export function WarrantiesPage() {
   const [mReason, setMReason] = useState("Manual coverage");
 
   const load = useCallback(() => {
+    setLoading(true);
     gqlRequest<{
       warranties: { total: number; nodes: Warranty[] };
       jobs: Job[];
@@ -139,8 +143,10 @@ export function WarrantiesPage() {
         setJobs(d.jobs);
         setRules(d.warrantyRules);
         if (!mRuleId && d.warrantyRules[0]) setMRuleId(d.warrantyRules[0].id);
+        setHasLoaded(true);
       })
-      .catch((e) => setError(friendlyError(e)));
+      .catch((e) => setError(friendlyError(e)))
+      .finally(() => setLoading(false));
   }, [query, status, mRuleId]);
 
   useEffect(() => {
@@ -268,10 +274,18 @@ export function WarrantiesPage() {
   return (
     <Page
       title="Warranties"
-      subtitle={`${total} total`}
+      subtitle={hasLoaded ? `${total} total` : "Loading…"}
       primaryAction={{ content: "Create manual", onAction: () => setManualOpen(true) }}
       secondaryActions={[{ content: "Run backfill", onAction: () => setBackfillOpen(true) }]}
     >
+      <div className="as-m-ops-surface">
+        <div className="as-m-ops-banner">
+          <div>
+            <p className="as-m-ops-kicker">Coverage</p>
+            <h2>Warranty records</h2>
+            <p>Search coverage, extend or void warranties, and run order backfills.</p>
+          </div>
+        </div>
       <Layout>
         {error ? (
           <Layout.Section>
@@ -339,10 +353,16 @@ export function WarrantiesPage() {
                   value={status}
                   onChange={setStatus}
                 />
-                <Button onClick={load}>Refresh</Button>
+                <Button onClick={load} loading={loading && hasLoaded} disabled={loading && !hasLoaded}>
+                  Refresh
+                </Button>
               </InlineStack>
 
-              {nodes.length === 0 ? (
+              {loading && !hasLoaded ? (
+                <div style={{ padding: "36px 0" }}>
+                  <BrandLoader label="Loading warranties" compact />
+                </div>
+              ) : nodes.length === 0 ? (
                 <BlockStack gap="200">
                   <Text as="p" tone="subdued">
                     No warranties match this view yet.
@@ -353,6 +373,7 @@ export function WarrantiesPage() {
                   </Text>
                 </BlockStack>
               ) : (
+                <div className={loading ? "as-m-list-refreshing" : undefined}>
                 <DataTable
                   columnContentTypes={[
                     "text",
@@ -378,11 +399,13 @@ export function WarrantiesPage() {
                   ]}
                   rows={rows}
                 />
+                </div>
               )}
             </BlockStack>
           </Card>
         </Layout.Section>
       </Layout>
+      </div>
 
       <Modal
         open={backfillOpen}

@@ -15,6 +15,7 @@ import {
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
+import { appHref } from "@/lib/shop-context";
 
 type OrderOption = {
   id: string;
@@ -119,7 +120,7 @@ export default function NewClaimPage() {
           },
         },
       );
-      router.push(`/claims/${data.createMerchantClaim.id}`);
+      router.push(appHref(`/claims/${data.createMerchantClaim.id}`));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
       setLoading(false);
@@ -129,7 +130,7 @@ export default function NewClaimPage() {
   return (
     <Page
       title="Create claim"
-      backAction={{ url: "/claims" }}
+      backAction={{ url: appHref("/claims") }}
       subtitle="Start from an order to auto-fill the customer and product"
     >
       <Layout>

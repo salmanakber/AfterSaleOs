@@ -18,6 +18,8 @@ import {
 import { gqlRequest } from "@/lib/graphql";
 import { friendlyError } from "@/lib/merchant-errors";
 import { appHref } from "@/lib/shop-context";
+import { BrandLoader } from "./BrandLoader";
+import { PageEmpty } from "./PageLoading";
 
 type ClaimRow = {
   id: string;
@@ -56,28 +58,43 @@ export function ClaimsListPage() {
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 280);
+    return () => clearTimeout(t);
+  }, [query]);
 
   const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
     gqlRequest<{ claims: { total: number; nodes: ClaimRow[] } }>(LIST, {
       status: status || null,
-      query: query || null,
+      query: debouncedQuery || null,
     })
       .then((d) => {
         setNodes(d.claims.nodes);
         setTotal(d.claims.total);
+        setHasLoaded(true);
       })
-      .catch((e) => setError(friendlyError(e)));
-  }, [status, query]);
+      .catch((e) => setError(friendlyError(e)))
+      .finally(() => setLoading(false));
+  }, [status, debouncedQuery]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  const showInitialLoader = loading && !hasLoaded;
+  const showEmpty = hasLoaded && !loading && nodes.length === 0;
+
   return (
     <Page
       title="Claims"
-      subtitle={`${total} total`}
+      subtitle={hasLoaded ? `${total} total` : "Loading…"}
       primaryAction={{ content: "New claim", url: appHref("/claims/new") }}
     >
       <Layout>
@@ -89,9 +106,16 @@ export function ClaimsListPage() {
           </Layout.Section>
         ) : null}
         <Layout.Section>
+          <div className="as-m-ops-banner" style={{ marginBottom: 14 }}>
+            <div>
+              <p className="as-m-ops-kicker">Operations</p>
+              <h2>Claims inbox</h2>
+              <p>Search, filter, and open claims without losing your place.</p>
+            </div>
+          </div>
           <Card>
             <BlockStack gap="300">
-              <InlineStack gap="300">
+              <InlineStack gap="300" blockAlign="end">
                 <div style={{ flex: 1 }}>
                   <TextField
                     label="Search"
@@ -102,6 +126,7 @@ export function ClaimsListPage() {
                     placeholder="Claim #, email, summary…"
                     clearButton
                     onClearButtonClick={() => setQuery("")}
+                    disabled={showInitialLoader}
                   />
                 </div>
                 <Select
@@ -119,43 +144,56 @@ export function ClaimsListPage() {
                   ]}
                   value={status}
                   onChange={setStatus}
+                  disabled={showInitialLoader}
                 />
-                <Button onClick={load}>Refresh</Button>
+                <Button onClick={load} loading={loading && hasLoaded} disabled={showInitialLoader}>
+                  Refresh
+                </Button>
               </InlineStack>
 
-              {nodes.length === 0 ? (
-                <BlockStack gap="200">
-                  <Text as="p" tone="subdued">
-                    No claims match this view yet.
-                  </Text>
-                  <Text as="p" tone="subdued">
-                    Customers submit via Customer pages → claim form, theme claim block, or you can
-                    create one with New claim. Publish a warranty rule first so eligibility has coverage
-                    to check.
-                  </Text>
-                  <InlineStack gap="200">
-                    <Button url={appHref("/claims/new")}>New claim</Button>
-                    <Button url={appHref("/settings")}>Customer pages</Button>
-                  </InlineStack>
-                </BlockStack>
-              ) : (
-                <DataTable
-                  columnContentTypes={["text", "text", "text", "text", "text", "text", "text"]}
-                  headings={["Claim", "Customer", "Product", "Summary", "Eligibility", "Status", "Opened"]}
-                  rows={nodes.map((c) => [
-                    <Button key={c.id} variant="plain" url={appHref(`/claims/${c.id}`)}>
-                      {c.claimNumber}
-                    </Button>,
-                    c.customerEmail ?? "—",
-                    c.productTitle ?? "—",
-                    c.issueSummary ?? "—",
-                    c.eligibilityLabel,
-                    <Badge key={`s-${c.id}`} tone={tone(c.status)}>
-                      {c.status}
-                    </Badge>,
-                    new Date(c.createdAt).toLocaleDateString(),
-                  ])}
+              {showInitialLoader ? (
+                <div style={{ padding: "36px 0" }}>
+                  <BrandLoader label="Loading claims" compact />
+                </div>
+              ) : showEmpty ? (
+                <PageEmpty
+                  title="No claims match this view yet"
+                  body="Customers submit via Customer pages → claim form, or create one with New claim."
+                  action={
+                    <>
+                      <Button url={appHref("/claims/new")}>New claim</Button>
+                      <Button url={appHref("/settings")}>Customer pages</Button>
+                    </>
+                  }
                 />
+              ) : (
+                <div className={loading ? "as-m-list-refreshing" : undefined}>
+                  <DataTable
+                    columnContentTypes={["text", "text", "text", "text", "text", "text", "text"]}
+                    headings={[
+                      "Claim",
+                      "Customer",
+                      "Product",
+                      "Summary",
+                      "Eligibility",
+                      "Status",
+                      "Opened",
+                    ]}
+                    rows={nodes.map((c) => [
+                      <Button key={c.id} variant="plain" url={appHref(`/claims/${c.id}`)}>
+                        {c.claimNumber}
+                      </Button>,
+                      c.customerEmail ?? "—",
+                      c.productTitle ?? "—",
+                      c.issueSummary ?? "—",
+                      c.eligibilityLabel,
+                      <Badge key={`s-${c.id}`} tone={tone(c.status)}>
+                        {c.status}
+                      </Badge>,
+                      new Date(c.createdAt).toLocaleDateString(),
+                    ])}
+                  />
+                </div>
               )}
             </BlockStack>
           </Card>

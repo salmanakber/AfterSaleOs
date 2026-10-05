@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { NavMenu } from "@shopify/app-bridge-react";
@@ -30,7 +31,7 @@ function pathActive(pathname: string | null, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/** Shopify admin NavMenu + minimal in-app sidebar. */
+/** Shopify admin NavMenu + in-app sidebar (client navigation keeps shell mounted). */
 export function AppNav() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -67,10 +68,15 @@ export function AppNav() {
         data-tour="sidebar"
       >
         <div className="as-m-sidebar-head">
-          <a className="as-m-sidebar-brand" href={appHref("/")} onClick={() => setMobileOpen(false)}>
+          <Link
+            className="as-m-sidebar-brand"
+            href={appHref("/")}
+            onClick={() => setMobileOpen(false)}
+            prefetch
+          >
             <span className="as-m-sidebar-mark">AS</span>
             {!collapsed ? <span className="as-m-sidebar-name">AfterSale</span> : null}
-          </a>
+          </Link>
           <button
             type="button"
             className="as-m-sidebar-collapse"
@@ -89,17 +95,18 @@ export function AppNav() {
               <div key={group} className="as-m-sidebar-group">
                 {!collapsed ? <div className="as-m-sidebar-label">{group}</div> : null}
                 {items.map((item) => (
-                  <a
+                  <Link
                     key={item.href}
                     href={appHref(item.href)}
                     className="as-m-sidebar-link"
                     data-active={pathActive(pathname, item.href)}
                     title={item.label}
+                    prefetch
                     onClick={() => setMobileOpen(false)}
                   >
                     <span className="as-m-sidebar-dot" aria-hidden />
                     {!collapsed ? <span>{item.label}</span> : null}
-                  </a>
+                  </Link>
                 ))}
               </div>
             );
