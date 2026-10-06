@@ -1,8 +1,10 @@
 "use client";
 
+const SYSTEM_LOGO = "/images/logo.png";
+
 /** Customer-facing branded loader. */
 export function BrandLoader({
-  label = "Opening AfterSale…",
+  label = "Loading…",
   compact = false,
 }: {
   label?: string;
@@ -13,7 +15,10 @@ export function BrandLoader({
       <div className="as-loader-mark" aria-hidden>
         <span className="as-loader-ring" />
         <span className="as-loader-ring as-loader-ring-b" />
-        <span className="as-loader-core">A</span>
+        <span className="as-loader-core as-loader-core--logo">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={SYSTEM_LOGO} alt="" />
+        </span>
       </div>
       <p className="as-loader-label">{label}</p>
       <div className="as-loader-bar" aria-hidden>

@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { publicApiUrl } from "@/lib/public-api";
 import { ThemeToggle } from "./ThemeToggle";
 
+const SYSTEM_LOGO = "/images/logo.png";
+
 export function CustomerShell({
   brand = "AfterSale",
   title,
@@ -87,7 +89,8 @@ export function CustomerShell({
   }, [shopDomain, brand, skipHostedBrand]);
 
   const displayBrand = shopName && shopName !== "AfterSale" ? shopName : brand;
-  const showDefaultMark = !logoUrl && (!displayBrand || displayBrand === "AfterSale");
+  const isSystemBrand = !displayBrand || displayBrand === "AfterSale";
+  const resolvedLogo = logoUrl || (isSystemBrand ? SYSTEM_LOGO : null);
   const brandStyle = {
     ["--as-accent"]: accent,
     ["--as-primary"]: accent,
@@ -128,13 +131,15 @@ export function CustomerShell({
       {!embed ? (
         <div className="as-topbar as-no-print">
           <div className="as-mark-lockup">
-            {logoUrl ? (
+            {resolvedLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt="" className="as-brand-logo" />
+              <img src={resolvedLogo} alt={displayBrand} className="as-brand-logo" />
             ) : (
-              <span className="as-mark">A</span>
+              <span className="as-mark-text">{displayBrand}</span>
             )}
-            <span className="as-mark-text">{displayBrand === "AfterSale" ? "AfterSale" : displayBrand}</span>
+            {!isSystemBrand && resolvedLogo ? (
+              <span className="as-mark-text">{displayBrand}</span>
+            ) : null}
           </div>
           <ThemeToggle />
         </div>
@@ -143,16 +148,15 @@ export function CustomerShell({
       <header className={`as-hero${heroClass}`}>
         <div className="as-kicker">
           <span className="as-kicker-dot" />
-          {displayBrand === "AfterSale" ? "Warranty & care" : `${displayBrand} · Warranty & care`}
+          {isSystemBrand ? "Warranty & care" : `${displayBrand} · Warranty & care`}
         </div>
         <h1 className="as-brand">
-          {logoUrl && !skipHostedBrand ? (
+          {resolvedLogo && !skipHostedBrand ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={displayBrand} className="as-brand-logo-lg" />
-          ) : showDefaultMark ? (
-            <>
-              After<span>Sale</span>
-            </>
+            <img src={resolvedLogo} alt={displayBrand} className="as-brand-logo-lg" />
+          ) : skipHostedBrand && isSystemBrand ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={SYSTEM_LOGO} alt="AfterSale" className="as-brand-logo-lg" />
           ) : (
             displayBrand
           )}

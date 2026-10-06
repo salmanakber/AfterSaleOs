@@ -73,9 +73,14 @@ export function AppNav() {
             href={appHref("/")}
             onClick={() => setMobileOpen(false)}
             prefetch
+            aria-label="AfterSale home"
           >
-            <span className="as-m-sidebar-mark">AS</span>
-            {!collapsed ? <span className="as-m-sidebar-name">AfterSale</span> : null}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/logo.png"
+              alt="AfterSale"
+              className={`as-m-sidebar-logo${collapsed ? " is-collapsed" : ""}`}
+            />
           </Link>
           <button
             type="button"

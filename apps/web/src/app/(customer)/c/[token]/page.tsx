@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { customerPageUrl, publicApiUrl } from "@/lib/public-api";
+import { BrandLoader } from "../../components/BrandLoader";
 import { ThemeToggle } from "../../components/ThemeToggle";
 
 type Cert = {
@@ -49,8 +50,8 @@ function CertificateInner() {
       <div className="as-shell">
         <div className="as-topbar as-no-print">
           <div className="as-mark-lockup">
-            <span className="as-mark">A</span>
-            <span className="as-mark-text">AfterSale OS</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/logo.png" alt="AfterSale" className="as-brand-logo" />
           </div>
           <ThemeToggle />
         </div>
@@ -64,7 +65,7 @@ function CertificateInner() {
   if (!cert) {
     return (
       <div className="as-shell">
-        <p className="as-muted">Loading certificate…</p>
+        <BrandLoader label="Loading certificate" />
       </div>
     );
   }
@@ -82,7 +83,8 @@ function CertificateInner() {
     <div className="as-shell">
       <div className="as-topbar as-no-print">
         <div className="as-mark-lockup">
-          <span className="as-mark">A</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/logo.png" alt="AfterSale" className="as-brand-logo" />
           <span className="as-mark-text">Warranty certificate</span>
         </div>
         <ThemeToggle />
@@ -94,18 +96,8 @@ function CertificateInner() {
           // eslint-disable-next-line @next/next/no-img-element
           <img className="as-cert-logo" src={cert.shop.brandingLogoUrl} alt="" />
         ) : (
-          <div
-            style={{
-              position: "relative",
-              fontFamily: "var(--as-font-display), Fraunces, Georgia, serif",
-              fontSize: "1.05rem",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              opacity: 0.92,
-            }}
-          >
-            {cert.shop.shopName ?? "AfterSale"}
-          </div>
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="as-cert-logo" src="/images/logo.png" alt={cert.shop.shopName ?? "AfterSale"} />
         )}
         <h1>Warranty Certificate</h1>
         <p className="as-muted">
@@ -174,17 +166,7 @@ export default function CertificatePage() {
     <Suspense
       fallback={
         <div className="as-shell">
-          <div className="as-loader" role="status">
-            <div className="as-loader-mark" aria-hidden>
-              <span className="as-loader-ring" />
-              <span className="as-loader-ring as-loader-ring-b" />
-              <span className="as-loader-core">A</span>
-            </div>
-            <p className="as-loader-label">Loading certificate</p>
-            <div className="as-loader-bar" aria-hidden>
-              <span />
-            </div>
-          </div>
+          <BrandLoader label="Loading certificate" />
         </div>
       }
     >
