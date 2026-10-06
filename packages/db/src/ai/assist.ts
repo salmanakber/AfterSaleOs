@@ -255,6 +255,23 @@ Rules:
   await usageRepository.increment(input.shopId, AI_METRIC, 1);
   const bal = await getAiCreditBalance(input.shopId);
 
+  const result: ClaimAiAssistResult = {
+    ...parsed,
+    provider,
+    model,
+    creditsUsed: 1,
+    creditsRemaining: bal.remaining,
+    creditsLimit: bal.limit,
+  };
+
+  await prisma.claim.update({
+    where: { id: claim.id },
+    data: {
+      aiAssistJson: result as object,
+      aiAssistAt: new Date(),
+    },
+  });
+
   await prisma.aiProcessingLog.create({
     data: {
       shopId: input.shopId,
@@ -295,14 +312,7 @@ Rules:
     })
     .catch(() => undefined);
 
-  return {
-    ...parsed,
-    provider,
-    model,
-    creditsUsed: 1,
-    creditsRemaining: bal.remaining,
-    creditsLimit: bal.limit,
-  };
+  return result;
 }
 
 /** Apply suggested category onto the claim (staff action — not automatic). */

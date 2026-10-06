@@ -1,19 +1,28 @@
-{% comment %} Portal form embed — live iframe + editor preview {% endcomment %}
+{% comment %} Portal form embed — 100% parent width; theme-local colors only {% endcomment %}
 
 {% assign as_app_url = 'https://aftersale.tidyflowapp.com' %}
-{% assign embed_src = as_app_url | append: '/apps/aftersale/portal?shop=' | append: shop.permanent_domain | append: '&embed=1' %}
+{% assign accent = block.settings.accent_color | default: '#0f172a' %}
+{% assign surface = block.settings.surface_color | default: 'transparent' %}
+{% assign radius = block.settings.corner_radius | default: 0 %}
+{% assign embed_src = as_app_url | append: '/apps/aftersale/portal?shop=' | append: shop.permanent_domain | append: '&embed=1&theme=local' %}
+{% assign embed_src = embed_src | append: '&accent=' | append: accent | url_encode %}
 {% if customer and customer.email != blank %}
   {% assign embed_src = embed_src | append: '&email=' | append: customer.email %}
 {% endif %}
 
-<div class="as-embed-block" {{ block.shopify_attributes }} data-as-embed>
+<div
+  class="as-embed-block"
+  {{ block.shopify_attributes }}
+  data-as-embed
+  style="--as-embed-radius: {{ radius }}px; --as-embed-surface: {{ surface }}; width:100%;"
+>
   {% if request.design_mode %}
-    <div class="as-block-preview">
+    <div class="as-block-preview" style="border-radius: {{ radius }}px;">
       <strong>Warranty portal</strong>
-      <p>Customers look up coverage with email + order number, then register products from their orders.</p>
+      <p>Customers look up coverage with email + order number, then register products from their orders. Styling comes from this block — not your AfterSale hosted brand kit.</p>
       <span class="as-block-preview__field">Email</span>
       <span class="as-block-preview__field">Order number</span>
-      <span class="as-block-preview__btn">Open my warranties</span>
+      <span class="as-block-preview__btn" style="background:{{ accent }};">Open my warranties</span>
       <a class="as-block-preview__link" href="{{ embed_src }}" target="_blank" rel="noopener">Open live preview ↗</a>
     </div>
   {% endif %}
@@ -21,7 +30,7 @@
     class="as-embed-block__frame{% if request.design_mode %} as-embed-block__frame--editor{% endif %}"
     title="{{ block.settings.title | default: 'Warranty portal' }}"
     src="{{ embed_src }}"
-    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;"
+    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:{{ radius }}px;background:{{ surface }};"
     loading="lazy"
     allow="clipboard-write"
     referrerpolicy="no-referrer-when-downgrade"
@@ -36,7 +45,7 @@
   "settings": [
     {
       "type": "paragraph",
-      "content": "Shows the customer warranty portal. In the theme editor, use “Open live preview”. On the live storefront the form is fully interactive."
+      "content": "Fills the full width of the parent section. Design colors below apply only to this theme block — hosted AfterSale pages keep their own brand kit."
     },
     {
       "type": "text",
@@ -49,9 +58,31 @@
       "id": "min_height",
       "label": "Minimum height (px)",
       "min": 400,
-      "max": 1200,
+      "max": 1400,
       "step": 40,
       "default": 720
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accent color",
+      "default": "#0F172A"
+    },
+    {
+      "type": "color",
+      "id": "surface_color",
+      "label": "Surface / background",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "range",
+      "id": "corner_radius",
+      "label": "Corner radius",
+      "min": 0,
+      "max": 28,
+      "step": 2,
+      "unit": "px",
+      "default": 0
     }
   ]
 }

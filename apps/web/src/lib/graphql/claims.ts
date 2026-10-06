@@ -72,6 +72,8 @@ export const claimsTypeDefs = /* GraphQL */ `
     attachments: [ClaimAttachment!]!
     notes: [ClaimNote!]!
     trackingUrl: String!
+    aiAssist: ClaimAiAssist
+    aiAssistAt: String
   }
 
   type ClaimConnection {
@@ -230,6 +232,22 @@ export async function mapClaim(claimId: string, shopId: string, shopDomain: stri
       createdAt: n.createdAt.toISOString(),
     })),
     trackingUrl: `https://${shopDomain}/apps/aftersale/claim/${c.publicToken}`,
+    aiAssist: c.aiAssistJson
+      ? (c.aiAssistJson as {
+          summary: string;
+          suggestedCategory: string;
+          categoryConfidence: number;
+          missingInfo: string[];
+          suggestedReply: string;
+          nextSteps: string[];
+          provider: string;
+          model: string | null;
+          creditsUsed: number;
+          creditsRemaining: number;
+          creditsLimit: number;
+        })
+      : null,
+    aiAssistAt: c.aiAssistAt?.toISOString() ?? null,
   };
 }
 

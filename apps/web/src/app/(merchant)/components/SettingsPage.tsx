@@ -19,6 +19,13 @@ import { TourTrigger, useOptionalTour } from "./ProductTour";
 type ShopSettings = {
   brandingLogoUrl: string | null;
   brandingAccentColor: string | null;
+  brandingBgColor: string | null;
+  brandingSurfaceColor: string | null;
+  brandingTextColor: string | null;
+  brandingFont: string | null;
+  brandingRadius: number | null;
+  brandingButtonStyle: string | null;
+  brandingHeroStyle: string | null;
   voidWarrantyOnRefund: boolean;
   timezone: string;
   shopDomain: string;
@@ -31,6 +38,13 @@ const QUERY = `#graphql
       shop {
         brandingLogoUrl
         brandingAccentColor
+        brandingBgColor
+        brandingSurfaceColor
+        brandingTextColor
+        brandingFont
+        brandingRadius
+        brandingButtonStyle
+        brandingHeroStyle
         voidWarrantyOnRefund
         timezone
         shopDomain
@@ -57,6 +71,13 @@ export function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [logoUrl, setLogoUrl] = useState("");
   const [accent, setAccent] = useState("#3B82F6");
+  const [bgColor, setBgColor] = useState("#F4F6FB");
+  const [surfaceColor, setSurfaceColor] = useState("#FFFFFF");
+  const [textColor, setTextColor] = useState("#0F172A");
+  const [font, setFont] = useState("sans");
+  const [radius, setRadius] = useState("22");
+  const [buttonStyle, setButtonStyle] = useState("solid");
+  const [heroStyle, setHeroStyle] = useState("bold");
   const [timezone, setTimezone] = useState("UTC");
   const [voidOnRefund, setVoidOnRefund] = useState(true);
   const [shopDomain, setShopDomain] = useState("");
@@ -117,6 +138,13 @@ export function SettingsPage() {
       .then((d) => {
         setLogoUrl(d.home.shop.brandingLogoUrl ?? "");
         setAccent(d.home.shop.brandingAccentColor ?? "#3B82F6");
+        setBgColor(d.home.shop.brandingBgColor ?? "#F4F6FB");
+        setSurfaceColor(d.home.shop.brandingSurfaceColor ?? "#FFFFFF");
+        setTextColor(d.home.shop.brandingTextColor ?? "#0F172A");
+        setFont(d.home.shop.brandingFont ?? "sans");
+        setRadius(String(d.home.shop.brandingRadius ?? 22));
+        setButtonStyle(d.home.shop.brandingButtonStyle ?? "solid");
+        setHeroStyle(d.home.shop.brandingHeroStyle ?? "bold");
         setTimezone(d.home.shop.timezone ?? "UTC");
         setVoidOnRefund(d.home.shop.voidWarrantyOnRefund);
         setShopDomain(d.home.shop.shopDomain);
@@ -166,12 +194,26 @@ export function SettingsPage() {
         mutation SaveSettings(
           $logo: String
           $accent: String
+          $bg: String
+          $surface: String
+          $text: String
+          $font: String
+          $radius: Int
+          $buttonStyle: String
+          $heroStyle: String
           $timezone: String
           $voidWarrantyOnRefund: Boolean
         ) {
           updateShopSettings(
             brandingLogoUrl: $logo
             brandingAccentColor: $accent
+            brandingBgColor: $bg
+            brandingSurfaceColor: $surface
+            brandingTextColor: $text
+            brandingFont: $font
+            brandingRadius: $radius
+            brandingButtonStyle: $buttonStyle
+            brandingHeroStyle: $heroStyle
             timezone: $timezone
             voidWarrantyOnRefund: $voidWarrantyOnRefund
           ) {
@@ -183,6 +225,13 @@ export function SettingsPage() {
         {
           logo: logoUrl || null,
           accent: accent || null,
+          bg: bgColor || null,
+          surface: surfaceColor || null,
+          text: textColor || null,
+          font: font || null,
+          radius: Number(radius) || 22,
+          buttonStyle: buttonStyle || null,
+          heroStyle: heroStyle || null,
           timezone,
           voidWarrantyOnRefund: voidOnRefund,
         },
@@ -524,6 +573,70 @@ export function SettingsPage() {
                     </label>
                   </div>
                   <div className="as-m-color-swatch" style={{ background: accent || "#3B82F6" }} />
+
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">
+                    Hosted page design
+                  </Text>
+                  <Text as="p" tone="subdued">
+                    These controls apply to self-hosted AfterSale pages (portal, register, claim,
+                    certificates). Theme Liquid blocks keep their own colors in the theme editor.
+                  </Text>
+                  <div className="as-m-color-row">
+                    <div style={{ flex: 1 }}>
+                      <TextField label="Background" value={bgColor} onChange={setBgColor} autoComplete="off" />
+                    </div>
+                    <label className="as-m-color-input">
+                      <input type="color" value={/^#[0-9A-Fa-f]{6}$/.test(bgColor) ? bgColor : "#F4F6FB"} onChange={(e) => setBgColor(e.target.value.toUpperCase())} />
+                    </label>
+                  </div>
+                  <div className="as-m-color-row">
+                    <div style={{ flex: 1 }}>
+                      <TextField label="Surface / cards" value={surfaceColor} onChange={setSurfaceColor} autoComplete="off" />
+                    </div>
+                    <label className="as-m-color-input">
+                      <input type="color" value={/^#[0-9A-Fa-f]{6}$/.test(surfaceColor) ? surfaceColor : "#FFFFFF"} onChange={(e) => setSurfaceColor(e.target.value.toUpperCase())} />
+                    </label>
+                  </div>
+                  <div className="as-m-color-row">
+                    <div style={{ flex: 1 }}>
+                      <TextField label="Text color" value={textColor} onChange={setTextColor} autoComplete="off" />
+                    </div>
+                    <label className="as-m-color-input">
+                      <input type="color" value={/^#[0-9A-Fa-f]{6}$/.test(textColor) ? textColor : "#0F172A"} onChange={(e) => setTextColor(e.target.value.toUpperCase())} />
+                    </label>
+                  </div>
+                  <label className="as-label" style={{ display: "block", marginBottom: 6 }}>
+                    Font style
+                  </label>
+                  <select className="as-m-select" value={font} onChange={(e) => setFont(e.target.value)}>
+                    <option value="sans">Clean sans</option>
+                    <option value="serif">Editorial serif</option>
+                    <option value="display">Display + sans</option>
+                  </select>
+                  <label className="as-label" style={{ display: "block", margin: "12px 0 6px" }}>
+                    Button style
+                  </label>
+                  <select className="as-m-select" value={buttonStyle} onChange={(e) => setButtonStyle(e.target.value)}>
+                    <option value="solid">Solid</option>
+                    <option value="soft">Soft tint</option>
+                    <option value="outline">Outline</option>
+                  </select>
+                  <label className="as-label" style={{ display: "block", margin: "12px 0 6px" }}>
+                    Hero style
+                  </label>
+                  <select className="as-m-select" value={heroStyle} onChange={(e) => setHeroStyle(e.target.value)}>
+                    <option value="bold">Bold</option>
+                    <option value="calm">Calm</option>
+                    <option value="minimal">Minimal</option>
+                  </select>
+                  <TextField
+                    label="Corner radius (px)"
+                    type="number"
+                    value={radius}
+                    onChange={setRadius}
+                    autoComplete="off"
+                  />
+
                   <TextField label="Timezone" value={timezone} onChange={setTimezone} autoComplete="off" />
                   <label className="as-m-toggle">
                     <input
@@ -618,6 +731,36 @@ export function SettingsPage() {
               </button>{" "}
               tab or the Setup wizard.
             </p>
+          </div>
+
+          <div className="as-m-panel" style={{ marginTop: 14, background: "#f8fafc" }}>
+            <div className="as-m-panel-title">
+              <h3>Online Store menu links</h3>
+            </div>
+            <Text as="p" tone="subdued">
+              Shopify does not let apps auto-inject links into your Navigation menus. Copy any URL
+              below, then in Admin → Online Store → Navigation → edit a menu → Add menu item → paste
+              the link. Keep them handy whenever you edit menus.
+            </Text>
+            <div className="as-m-link-grid" style={{ marginTop: 10 }}>
+              {(
+                [
+                  ["Warranty portal", "portal"],
+                  ["Register product", "register"],
+                  ["File a claim", "claim"],
+                ] as const
+              ).map(([label, key]) => (
+                <div key={`menu-${key}`} className="as-m-link-card">
+                  <strong>{label}</strong>
+                  <div className="as-m-link-row">
+                    <code>{storefront[key]}</code>
+                    <Button size="slim" onClick={() => copyText(`menu-${key}`, storefront[key])}>
+                      {copied === `menu-${key}` ? "Copied" : "Copy for menu"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="as-m-link-grid">

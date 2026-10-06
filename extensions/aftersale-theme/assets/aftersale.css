@@ -33,18 +33,22 @@
   font-weight: 600;
 }
 
-/* Form embeds — live iframe; editor shows a simple preview card (not Mac chrome) */
+/* Form embeds — fill parent section width; theme-local design only */
 .as-embed-block {
-  margin: 1rem 0;
+  margin: 0;
   width: 100%;
+  max-width: 100%;
+  display: block;
+  box-sizing: border-box;
 }
 
 .as-embed-block__frame {
   display: block;
-  width: 100%;
+  width: 100% !important;
+  max-width: 100%;
   border: 0;
-  border-radius: 8px;
-  background: transparent;
+  border-radius: var(--as-embed-radius, 0);
+  background: var(--as-embed-surface, transparent);
 }
 
 .as-embed-block__frame--editor {
@@ -126,16 +130,28 @@
   font-weight: 600;
 }
 
-/* —— Warranty opt-in (checkbox near ATC / cart) —— */
+/* —— Warranty opt-in (premium checkbox near ATC / cart) —— */
 .as-optin {
   --as-optin-accent: #111111;
-  --as-optin-surface: transparent;
-  --as-optin-radius: 8px;
-  margin: 0.75rem 0 1rem;
+  --as-optin-surface: #ffffff;
+  --as-optin-ink: #0f172a;
+  --as-optin-muted: #64748b;
+  --as-optin-border: rgba(15, 23, 42, 0.12);
+  --as-optin-radius: 14px;
+  margin: 0.85rem 0 1.1rem;
+  width: 100%;
   max-width: 100%;
+  box-sizing: border-box;
   font: inherit;
   position: relative;
   z-index: 2;
+  color: var(--as-optin-ink);
+}
+
+.as-optin *,
+.as-optin *::before,
+.as-optin *::after {
+  box-sizing: border-box;
 }
 
 .as-optin--embed {
@@ -144,86 +160,125 @@
 
 .as-optin__card {
   display: flex;
-  gap: 10px;
+  gap: 14px;
   align-items: flex-start;
-  padding: 10px 0;
+  width: 100%;
+  padding: 14px 16px;
   border-radius: var(--as-optin-radius);
-  border: 0;
-  background: transparent;
+  border: 1px solid var(--as-optin-border);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--as-optin-surface) 92%, #fff), var(--as-optin-surface));
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 10px 28px rgba(15, 23, 42, 0.04);
   cursor: pointer;
   user-select: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.as-optin__card:hover {
+  border-color: color-mix(in srgb, var(--as-optin-accent) 35%, var(--as-optin-border));
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), 0 14px 32px rgba(15, 23, 42, 0.07);
+}
+
+.as-optin.is-checked .as-optin__card {
+  border-color: color-mix(in srgb, var(--as-optin-accent) 55%, var(--as-optin-border));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--as-optin-accent) 14%, transparent),
+    0 12px 30px rgba(15, 23, 42, 0.06);
 }
 
 .as-optin__checkwrap {
   position: relative;
-  flex: 0 0 22px;
-  width: 22px;
-  height: 22px;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
   margin-top: 1px;
 }
 
-/* Full-size hit target — was 1px + pointer-events:none (felt disabled) */
 .as-optin__checkbox {
   position: absolute;
   inset: 0;
   z-index: 2;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   margin: 0;
   opacity: 0;
   cursor: pointer;
 }
 
 .as-optin__box {
-  display: block;
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  border: 1.5px solid #9ca3af;
-  background: var(--as-optin-surface, #fff);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  border: 1.5px solid color-mix(in srgb, var(--as-optin-ink) 22%, transparent);
+  background: #fff;
   box-sizing: border-box;
   pointer-events: none;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.as-optin__box::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  opacity: 0;
+  transform: scale(0.6);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.2 8.3 L6.4 11.5 L12.8 4.2' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  transition: opacity 0.14s ease, transform 0.14s ease;
 }
 
 .as-optin__checkbox:checked + .as-optin__box,
 .as-optin.is-checked .as-optin__box {
   background: var(--as-optin-accent);
   border-color: var(--as-optin-accent);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.2 L6.2 11.5 L13 4' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 12px 12px;
+  transform: scale(1.04);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--as-optin-accent) 35%, transparent);
+}
+
+.as-optin__checkbox:checked + .as-optin__box::after,
+.as-optin.is-checked .as-optin__box::after {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .as-optin__checkbox:focus-visible + .as-optin__box {
   outline: 2px solid var(--as-optin-accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 .as-optin__copy {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
+  flex: 1;
+  padding-top: 1px;
 }
 
 .as-optin__title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: inherit;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--as-optin-ink);
   line-height: 1.35;
+  letter-spacing: -0.01em;
 }
 
 .as-optin__sub {
-  font-size: 0.85rem;
-  line-height: 1.4;
-  opacity: 0.75;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--as-optin-muted);
 }
 
 .as-optin__panel {
-  margin-top: 8px;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: calc(var(--as-optin-radius) - 2px);
+  border: 1px solid color-mix(in srgb, var(--as-optin-accent) 18%, var(--as-optin-border));
+  background: color-mix(in srgb, var(--as-optin-accent) 6%, #fff);
 }
 
 .as-optin__panel[hidden] {
@@ -231,27 +286,31 @@
 }
 
 .as-optin__hint {
-  margin: 0 0 8px;
-  font-size: 0.85rem;
-  line-height: 1.4;
-  opacity: 0.8;
+  margin: 0 0 10px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--as-optin-muted);
 }
 
 .as-optin__cta {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.55rem 0.9rem;
-  border-radius: var(--as-optin-radius);
+  gap: 6px;
+  padding: 0.65rem 1rem;
+  border-radius: calc(var(--as-optin-radius) - 4px);
   background: var(--as-optin-accent);
   color: #fff !important;
   text-decoration: none;
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--as-optin-accent) 28%, transparent);
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
 .as-optin__cta:hover {
-  opacity: 0.92;
+  opacity: 0.94;
+  transform: translateY(-1px);
 }
 
 .as-optin__cta--inline {
@@ -264,20 +323,20 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px 14px;
-  padding: 10px 0;
+  gap: 12px 16px;
+  width: 100%;
+  padding: 14px 16px;
   border-radius: var(--as-optin-radius);
-  background: transparent;
-  border: 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--as-optin-surface);
+  border: 1px solid var(--as-optin-border);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
 }
 
 .as-optin__banner-copy {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
-  flex: 1 1 160px;
+  flex: 1 1 180px;
 }
 
 .as-optin__btn {
@@ -286,22 +345,23 @@
   justify-content: center;
   width: auto;
   max-width: 100%;
-  padding: 0.7rem 1.1rem;
+  padding: 0.8rem 1.2rem;
   border-radius: var(--as-optin-radius);
   background: var(--as-optin-accent);
   color: #fff !important;
   text-decoration: none;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--as-optin-accent) 28%, transparent);
 }
 
 .as-optin__btn:hover {
-  opacity: 0.92;
+  opacity: 0.94;
 }
 
 .as-optin__btn-sub {
-  margin: 6px 0 0;
-  font-size: 0.8rem;
+  margin: 8px 0 0;
+  font-size: 0.82rem;
   line-height: 1.4;
-  opacity: 0.75;
+  color: var(--as-optin-muted);
 }

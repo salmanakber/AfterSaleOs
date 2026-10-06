@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, Suspense, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { customerPageUrl, publicApiUrl } from "@/lib/public-api";
 import { BrandLoader } from "../../../components/BrandLoader";
 import { CustomerShell } from "../../../components/CustomerShell";
+import { OrderPicker } from "../../../components/OrderPicker";
 
 function RegisterInner() {
   const params = useSearchParams();
@@ -14,6 +15,8 @@ function RegisterInner() {
   const variantId = params.get("variant_id") ?? "";
   const qr = params.get("qr") ?? "";
   const embed = params.get("embed") === "1";
+  const themeLocal = params.get("theme") === "local" || embed;
+  const accentOverride = params.get("accent");
   const auto = params.get("auto") === "1";
   const prefillEmail = params.get("email") ?? "";
   const prefillOrder = params.get("order") ?? "";
@@ -27,9 +30,43 @@ function RegisterInner() {
   const [cert, setCert] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   const query = useMemo(() => params.toString(), [params]);
   const done = Boolean(cert || message);
+  const loggedInEmail = Boolean(prefillEmail);
+
+  useEffect(() => {
+    if (prefillEmail) setEmail(prefillEmail);
+    if (prefillOrder) setOrderNumber(prefillOrder);
+  }, [prefillEmail, prefillOrder]);
+
+  async function requestVerify(e: FormEvent) {
+    e.preventDefault();
+    setVerifying(true);
+    setVerifyMsg(null);
+    setError(null);
+    try {
+      if (!shop) throw new Error("Missing shop.");
+      const res = await fetch(publicApiUrl(`/api/public/guest-link?shop=${encodeURIComponent(shop)}`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, orderNumber, shop }),
+      });
+      const json = await res.json();
+      if (json.portal?.orders?.[0]) {
+        setOrderNumber(json.portal.orders[0].orderNumber);
+        setVerifyMsg(json.emailHint ?? "Verified — pick your order or continue.");
+      } else {
+        setVerifyMsg(json.message ?? "If we find a matching order, you will receive an email shortly.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      setVerifying(false);
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -72,6 +109,8 @@ function RegisterInner() {
         lede="Registration received. Your certificate is ready when coverage activates."
         shopDomain={shop}
         embed={embed}
+        themeLocal={themeLocal}
+        accentOverride={accentOverride}
         steps={["Details", "Submit", "Certificate"]}
         activeStep={2}
         footer={
@@ -103,10 +142,12 @@ function RegisterInner() {
       lede={
         productTitle
           ? `Activate coverage for ${productTitle}.`
-          : "Enter your order details to activate coverage."
+          : "Choose your order and activate coverage."
       }
       shopDomain={shop}
       embed={embed}
+      themeLocal={themeLocal}
+      accentOverride={accentOverride}
       steps={["Details", "Submit", "Certificate"]}
       activeStep={0}
       footer={
@@ -120,22 +161,71 @@ function RegisterInner() {
           This registration page needs a shop link. Open it from your store, QR code, or theme embed.
         </div>
       ) : null}
-      {auto ? (
+      {auto || loggedInEmail ? (
         <div className="as-alert as-alert-ok">
-          Registering from your order — no extra email verification needed for this purchase.
+          {loggedInEmail
+            ? "Signed in — pick the order that matches this product."
+            : "Registering from your order — no extra email verification needed for this purchase."}
         </div>
       ) : null}
 
+      {loggedInEmail && shop ? (
+        <div style={{ marginBottom: 16 }}>
+          <OrderPicker
+            shop={shop}
+            email={email}
+            selectedOrderNumber={orderNumber}
+            mode="order"
+            onSelect={(o) => setOrderNumber(o.orderNumber)}
+          />
+        </div>
+      ) : null}
+
+      {!loggedInEmail ? (
+        <form onSubmit={requestVerify} style={{ marginBottom: 18 }}>
+          <p className="as-muted" style={{ marginTop: 0 }}>
+            Not signed in? Verify with the email and order number from your purchase — we’ll open
+            coverage when they match, and email a secure link when mail is configured.
+          </p>
+          <label className="as-label">Email</label>
+          <input
+            className="as-input"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+          />
+          <label className="as-label">Order number</label>
+          <input
+            className="as-input"
+            required
+            value={orderNumber}
+            onChange={(e) => setOrderNumber(e.target.value)}
+            placeholder="#1001"
+          />
+          {verifyMsg ? <div className="as-alert as-alert-ok">{verifyMsg}</div> : null}
+          <button className="as-btn as-btn-secondary" type="submit" disabled={verifying || !shop}>
+            {verifying ? "Checking…" : "Verify my order"}
+          </button>
+        </form>
+      ) : null}
+
       <form onSubmit={onSubmit}>
-        <label className="as-label">Email</label>
-        <input
-          className="as-input"
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-        />
+        {loggedInEmail ? (
+          <>
+            <label className="as-label">Email</label>
+            <input className="as-input" type="email" required value={email} readOnly />
+            <label className="as-label">Order number</label>
+            <input
+              className="as-input"
+              required
+              value={orderNumber}
+              onChange={(e) => setOrderNumber(e.target.value)}
+              placeholder="Select an order above or type #"
+            />
+          </>
+        ) : null}
 
         <div className="as-field-grid">
           <div>
@@ -148,15 +238,6 @@ function RegisterInner() {
           </div>
         </div>
 
-        <label className="as-label">Order number</label>
-        <input
-          className="as-input"
-          value={orderNumber}
-          onChange={(e) => setOrderNumber(e.target.value)}
-          placeholder="#1001"
-          required
-        />
-
         <label className="as-label">Serial number</label>
         <input
           className="as-input"
@@ -167,7 +248,7 @@ function RegisterInner() {
 
         {error ? <div className="as-alert as-alert-error">{error}</div> : null}
 
-        <button className="as-btn" type="submit" disabled={loading || !shop}>
+        <button className="as-btn" type="submit" disabled={loading || !shop || !orderNumber}>
           {loading ? "Submitting…" : "Register product"}
         </button>
       </form>

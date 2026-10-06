@@ -42,6 +42,20 @@ type ClaimDetail = {
   assignee: { id: string; name: string | null; email: string } | null;
   notes: { id: string; body: string; isInternal: boolean; authorType: string; createdAt: string }[];
   attachments: { id: string; fileName: string; downloadUrl: string | null; scanStatus: string }[];
+  aiAssistAt: string | null;
+  aiAssist: {
+    summary: string;
+    suggestedCategory: string;
+    categoryConfidence: number;
+    missingInfo: string[];
+    suggestedReply: string;
+    nextSteps: string[];
+    provider: string;
+    model: string | null;
+    creditsUsed: number;
+    creditsRemaining: number;
+    creditsLimit: number;
+  } | null;
 };
 
 type WorkflowStatus = { key: string; label: string };
@@ -52,7 +66,11 @@ const DETAIL = `#graphql
     claim(id: $id) {
       id claimNumber status workflowStatusKey customerEmail customerName productTitle orderNumber serialNumber
       issueCategory issueSummary issueDetails eligibilityLabel eligibilityReasons eligibilityOverride
-      trackingUrl slaDueAt
+      trackingUrl slaDueAt aiAssistAt
+      aiAssist {
+        summary suggestedCategory categoryConfidence missingInfo suggestedReply nextSteps
+        provider model creditsUsed creditsRemaining creditsLimit
+      }
       assignee { id name email }
       notes { id body isInternal authorType createdAt }
       attachments { id fileName downloadUrl scanStatus }
@@ -121,6 +139,9 @@ export function ClaimDetailPage() {
         setWorkflowStatuses(d.claimWorkflow.statuses);
         setSuppliers(d.suppliers);
         setAiCredits(d.aiCreditBalance);
+        if (d.claim.aiAssist) {
+          setAiAssist(d.claim.aiAssist);
+        }
         if (!supplierId && d.suppliers[0]) setSupplierId(d.suppliers[0].id);
       })
       .catch((e) => setError(friendlyError(e)));
@@ -148,6 +169,7 @@ export function ClaimDetailPage() {
         limit: d.runClaimAiAssist.creditsLimit,
         remaining: d.runClaimAiAssist.creditsRemaining,
       });
+      load();
     } catch (e) {
       setError(friendlyError(e, "AI assist failed"));
     } finally {
@@ -603,13 +625,16 @@ export function ClaimDetailPage() {
                     </Text>
                     <Text as="p" tone="subdued">
                       Suggest-only triage — never approves or rejects for you.
-                      {aiCredits
+                      {aiAssist
+                        ? ` · Saved on this claim${claim.aiAssistAt ? ` · ${new Date(claim.aiAssistAt).toLocaleString()}` : ""} — re-run only if you need a fresh analysis (uses 1 credit).`
+                        : null}
+                      {!aiAssist && aiCredits
                         ? ` · ${aiCredits.remaining}/${aiCredits.limit} credits left`
                         : null}
                     </Text>
                   </BlockStack>
                   <Button variant="primary" loading={aiBusy} onClick={() => void runAiAssist()}>
-                    {aiAssist ? "Run again" : "Analyze claim"}
+                    {aiAssist ? "Run again (1 credit)" : "Analyze claim"}
                   </Button>
                 </InlineStack>
 

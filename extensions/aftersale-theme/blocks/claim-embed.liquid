@@ -1,23 +1,35 @@
-{% comment %} Claim form embed {% endcomment %}
+{% comment %} Claim form embed — full parent width; theme-local design {% endcomment %}
 
 {% assign as_app_url = 'https://aftersale.tidyflowapp.com' %}
+{% assign accent = block.settings.accent_color | default: '#0f172a' %}
+{% assign surface = block.settings.surface_color | default: 'transparent' %}
+{% assign radius = block.settings.corner_radius | default: 0 %}
 {% assign product_q = '' %}
 {% if product %}
   {% assign product_q = product.title | url_encode %}
 {% endif %}
-{% assign embed_src = as_app_url | append: '/apps/aftersale/claim?shop=' | append: shop.permanent_domain | append: '&embed=1' %}
+{% assign embed_src = as_app_url | append: '/apps/aftersale/claim?shop=' | append: shop.permanent_domain | append: '&embed=1&theme=local' %}
+{% assign embed_src = embed_src | append: '&accent=' | append: accent | url_encode %}
 {% if product %}
   {% assign embed_src = embed_src | append: '&product=' | append: product_q | append: '&product_id=' | append: product.id %}
 {% endif %}
+{% if customer and customer.email != blank %}
+  {% assign embed_src = embed_src | append: '&email=' | append: customer.email %}
+{% endif %}
 
-<div class="as-embed-block" {{ block.shopify_attributes }} data-as-embed>
+<div
+  class="as-embed-block"
+  {{ block.shopify_attributes }}
+  data-as-embed
+  style="--as-embed-radius: {{ radius }}px; --as-embed-surface: {{ surface }}; width:100%;"
+>
   {% if request.design_mode %}
-    <div class="as-block-preview">
+    <div class="as-block-preview" style="border-radius: {{ radius }}px;">
       <strong>File a warranty claim</strong>
-      <p>Customers describe the issue and track status after submit.</p>
+      <p>Customers describe the issue and track status after submit. Theme-local colors only.</p>
       <span class="as-block-preview__field">Email</span>
       <span class="as-block-preview__field">Issue summary</span>
-      <span class="as-block-preview__btn">Submit claim</span>
+      <span class="as-block-preview__btn" style="background:{{ accent }};">Submit claim</span>
       <a class="as-block-preview__link" href="{{ embed_src }}" target="_blank" rel="noopener">Open live preview ↗</a>
     </div>
   {% endif %}
@@ -25,7 +37,7 @@
     class="as-embed-block__frame{% if request.design_mode %} as-embed-block__frame--editor{% endif %}"
     title="{{ block.settings.title | default: 'File a claim' }}"
     src="{{ embed_src }}"
-    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;"
+    style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:{{ radius }}px;background:{{ surface }};"
     loading="lazy"
     allow="clipboard-write"
     referrerpolicy="no-referrer-when-downgrade"
@@ -40,7 +52,7 @@
   "settings": [
     {
       "type": "paragraph",
-      "content": "Embedded claim form. Use “Open live preview” in the theme editor to test clicks."
+      "content": "Fills the parent section width. Colors below style this embed only."
     },
     {
       "type": "text",
@@ -53,9 +65,31 @@
       "id": "min_height",
       "label": "Minimum height (px)",
       "min": 400,
-      "max": 1200,
+      "max": 1400,
       "step": 40,
       "default": 720
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accent color",
+      "default": "#0F172A"
+    },
+    {
+      "type": "color",
+      "id": "surface_color",
+      "label": "Surface / background",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "range",
+      "id": "corner_radius",
+      "label": "Corner radius",
+      "min": 0,
+      "max": 28,
+      "step": 2,
+      "unit": "px",
+      "default": 0
     }
   ]
 }

@@ -58,6 +58,13 @@ const typeDefs = /* GraphQL */ `
     timezone: String!
     brandingLogoUrl: String
     brandingAccentColor: String
+    brandingBgColor: String
+    brandingSurfaceColor: String
+    brandingTextColor: String
+    brandingFont: String
+    brandingRadius: Int
+    brandingButtonStyle: String
+    brandingHeroStyle: String
     plan: Plan
     usage: [UsageMeter!]!
   }
@@ -230,6 +237,13 @@ const typeDefs = /* GraphQL */ `
       timezone: String
       brandingLogoUrl: String
       brandingAccentColor: String
+      brandingBgColor: String
+      brandingSurfaceColor: String
+      brandingTextColor: String
+      brandingFont: String
+      brandingRadius: Int
+      brandingButtonStyle: String
+      brandingHeroStyle: String
     ): ShopSummary!
     approveRegistration(id: ID!): Registration!
     rejectRegistration(id: ID!, note: String): Registration!
@@ -264,6 +278,13 @@ async function shopSummary(shopId: string) {
     timezone: shop.timezone,
     brandingLogoUrl: shop.brandingLogoUrl,
     brandingAccentColor: shop.brandingAccentColor,
+    brandingBgColor: shop.brandingBgColor,
+    brandingSurfaceColor: shop.brandingSurfaceColor,
+    brandingTextColor: shop.brandingTextColor,
+    brandingFont: shop.brandingFont,
+    brandingRadius: shop.brandingRadius,
+    brandingButtonStyle: shop.brandingButtonStyle,
+    brandingHeroStyle: shop.brandingHeroStyle,
     plan: plan
       ? {
           id: plan.id,
@@ -828,6 +849,13 @@ const yoga = createYoga({
             timezone?: string;
             brandingLogoUrl?: string | null;
             brandingAccentColor?: string | null;
+            brandingBgColor?: string | null;
+            brandingSurfaceColor?: string | null;
+            brandingTextColor?: string | null;
+            brandingFont?: string | null;
+            brandingRadius?: number | null;
+            brandingButtonStyle?: string | null;
+            brandingHeroStyle?: string | null;
           },
           ctx: { request: Request },
         ) => {
@@ -840,9 +868,25 @@ const yoga = createYoga({
               brandingLogoUrl: args.brandingLogoUrl === undefined ? undefined : args.brandingLogoUrl,
               brandingAccentColor:
                 args.brandingAccentColor === undefined ? undefined : args.brandingAccentColor,
+              brandingBgColor: args.brandingBgColor === undefined ? undefined : args.brandingBgColor,
+              brandingSurfaceColor:
+                args.brandingSurfaceColor === undefined ? undefined : args.brandingSurfaceColor,
+              brandingTextColor:
+                args.brandingTextColor === undefined ? undefined : args.brandingTextColor,
+              brandingFont: args.brandingFont === undefined ? undefined : args.brandingFont,
+              brandingRadius: args.brandingRadius === undefined ? undefined : args.brandingRadius,
+              brandingButtonStyle:
+                args.brandingButtonStyle === undefined ? undefined : args.brandingButtonStyle,
+              brandingHeroStyle:
+                args.brandingHeroStyle === undefined ? undefined : args.brandingHeroStyle,
             },
           });
-          if (args.brandingLogoUrl !== undefined || args.brandingAccentColor !== undefined) {
+          if (
+            args.brandingLogoUrl !== undefined ||
+            args.brandingAccentColor !== undefined ||
+            args.brandingBgColor !== undefined ||
+            args.brandingFont !== undefined
+          ) {
             await prisma.shop.update({
               where: { id: merchant.shopId },
               data: { onboardingCompleted: true },

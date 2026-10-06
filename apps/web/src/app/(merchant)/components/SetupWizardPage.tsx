@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Banner,
   BlockStack,
@@ -17,7 +17,7 @@ import {
 import { gqlRequest } from "@/lib/graphql";
 import { friendlyError } from "@/lib/merchant-errors";
 import { appHref } from "@/lib/shop-context";
-import { clearSessionTokenCache } from "@/lib/session-token";
+import { clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
 
 type HomeShop = {
   shopName: string | null;
@@ -87,6 +87,8 @@ export function SetupWizardPage() {
   const [logoUrl, setLogoUrl] = useState("");
   const [ruleName, setRuleName] = useState("Store warranty");
   const [duration, setDuration] = useState("12");
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
     gqlRequest<{
@@ -107,6 +109,25 @@ export function SetupWizardPage() {
   }, [load]);
 
   const progress = useMemo(() => ((step + 1) / STEPS.length) * 100, [step]);
+
+  async function uploadLogo(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      clearSessionTokenCache();
+      const headers = await merchantAuthHeaders();
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/merchant/branding/upload", { method: "POST", headers, body: fd });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Upload failed");
+      setLogoUrl(json.url);
+    } catch (e) {
+      setError(friendlyError(e, "Logo upload failed"));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function saveBrand() {
     setBusy(true);
@@ -255,12 +276,53 @@ export function SetupWizardPage() {
                     Your brand on customer pages
                   </Text>
                   <Text as="p" tone="subdued">
-                    Logo and accent color appear on registration, claims, portal, embeds, and PDF
-                    certificates.
+                    Logo and accent color appear on hosted registration, claims, portal, and PDF
+                    certificates. Theme Liquid blocks use their own colors in the theme editor.
                   </Text>
                   <FormLayout>
-                    <TextField label="Logo URL" value={logoUrl} onChange={setLogoUrl} autoComplete="off" helpText="Upload a logo anytime under Customer pages → Branding." />
-                    <TextField label="Accent color" value={accent} onChange={setAccent} autoComplete="off" />
+                    <div className="as-m-logo-picker">
+                      <div className="as-m-logo-preview">
+                        {logoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={logoUrl} alt="Logo preview" />
+                        ) : (
+                          <span>No logo</span>
+                        )}
+                      </div>
+                      <div className="as-m-logo-actions">
+                        <input
+                          ref={fileRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                          hidden
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) void uploadLogo(f);
+                            e.target.value = "";
+                          }}
+                        />
+                        <Button loading={uploading} onClick={() => fileRef.current?.click()}>
+                          {logoUrl ? "Replace logo" : "Upload logo"}
+                        </Button>
+                        {logoUrl ? (
+                          <Button tone="critical" variant="plain" onClick={() => setLogoUrl("")}>
+                            Remove
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="as-m-color-row">
+                      <div style={{ flex: 1 }}>
+                        <TextField label="Accent color" value={accent} onChange={setAccent} autoComplete="off" />
+                      </div>
+                      <label className="as-m-color-input" title="Pick color">
+                        <input
+                          type="color"
+                          value={/^#[0-9A-Fa-f]{6}$/.test(accent) ? accent : "#3B82F6"}
+                          onChange={(e) => setAccent(e.target.value.toUpperCase())}
+                        />
+                      </label>
+                    </div>
                   </FormLayout>
                   <div
                     className="as-m-preview"

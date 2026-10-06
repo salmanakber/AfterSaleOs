@@ -1291,6 +1291,17 @@ body {
   align-items: flex-start;
 }
 
+.as-m-select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--as-m-line, #e2e8f0);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  background: #fff;
+  color: var(--as-m-ink, #0f172a);
+}
+
 .as-m-color-row {
   display: flex;
   gap: 10px;

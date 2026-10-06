@@ -3,9 +3,9 @@
   Auto-places near Add to cart on product pages and near checkout on cart.
 {% endcomment %}
 
-{% assign accent = block.settings.accent_color | default: '#111111' %}
-{% assign surface = block.settings.surface_color | default: 'transparent' %}
-{% assign radius = block.settings.corner_radius | default: 8 %}
+{% assign accent = block.settings.accent_color | default: '#0f172a' %}
+{% assign surface = block.settings.surface_color | default: '#ffffff' %}
+{% assign radius = block.settings.corner_radius | default: 14 %}
 {% assign style = block.settings.display_style | default: 'checkbox_card' %}
 {% assign as_app_url = 'https://aftersale.tidyflowapp.com' %}
 {% assign register_url = as_app_url | append: '/apps/aftersale/register?shop=' | append: shop.permanent_domain %}
@@ -142,7 +142,7 @@
       "type": "color",
       "id": "accent_color",
       "label": "Accent / button color",
-      "default": "#111111"
+      "default": "#0F172A"
     },
     {
       "type": "color",
@@ -155,10 +155,10 @@
       "id": "corner_radius",
       "label": "Corner radius",
       "min": 0,
-      "max": 24,
+      "max": 28,
       "step": 2,
       "unit": "px",
-      "default": 8
+      "default": 14
     }
   ]
 }

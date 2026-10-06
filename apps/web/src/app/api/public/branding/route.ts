@@ -19,5 +19,12 @@ export async function GET(request: NextRequest) {
     shopDomain: shop.shopDomain,
     logoUrl: shop.brandingLogoUrl,
     accentColor: shop.brandingAccentColor ?? "#F59E0B",
+    bgColor: shop.brandingBgColor ?? null,
+    surfaceColor: shop.brandingSurfaceColor ?? null,
+    textColor: shop.brandingTextColor ?? null,
+    font: shop.brandingFont ?? "sans",
+    radius: shop.brandingRadius ?? 22,
+    buttonStyle: shop.brandingButtonStyle ?? "solid",
+    heroStyle: shop.brandingHeroStyle ?? "bold",
   });
 }

@@ -40,6 +40,8 @@ function PortalInner() {
   const shop = params.get("shop") ?? "";
   const token = params.get("token");
   const embed = params.get("embed") === "1";
+  const themeLocal = params.get("theme") === "local" || embed;
+  const accentOverride = params.get("accent");
   const prefillEmail = params.get("email") ?? "";
 
   const [email, setEmail] = useState(prefillEmail);
@@ -187,6 +189,8 @@ function PortalInner() {
       lede="Find coverage, register products from your orders, or start a claim."
       shopDomain={shop}
       embed={embed}
+      themeLocal={themeLocal}
+      accentOverride={accentOverride}
       steps={open ? ["Verify", "Your orders", "Manage"] : ["Verify", "Open portal", "Manage"]}
       activeStep={open ? 1 : 0}
       footer={

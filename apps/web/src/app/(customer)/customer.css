@@ -1034,18 +1034,64 @@
 }
 
 .as-shell-embed {
-  width: min(100% - 16px, 680px);
-  padding-top: 12px;
-  padding-bottom: 20px;
+  width: 100%;
+  max-width: 100%;
+  padding: 8px 0 16px;
+  box-sizing: border-box;
+}
+
+.as-shell-theme-local .as-hero {
+  box-shadow: none;
+  border-color: color-mix(in srgb, var(--as-primary) 12%, var(--as-border));
 }
 
 .as-shell-embed .as-hero {
-  padding-top: 8px;
+  padding: 14px 16px 12px;
   margin-bottom: 12px;
 }
 
 .as-shell-embed .as-panel {
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  box-shadow: none;
+  border-radius: var(--as-radius);
+}
+
+.as-font-serif {
+  --as-font-sans: var(--as-font-display), Fraunces, Georgia, serif;
+}
+
+.as-font-display-mode .as-brand,
+.as-font-display-mode .as-hero-title {
+  font-family: var(--as-font-display), Fraunces, Georgia, serif;
+}
+
+.as-hero-calm {
+  background: color-mix(in srgb, var(--as-surface) 96%, transparent);
+  box-shadow: none;
+}
+
+.as-hero-minimal {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.as-btn-style-soft .as-btn {
+  background: var(--as-primary-tint);
+  color: var(--as-primary);
+  box-shadow: none;
+}
+
+.as-btn-style-outline .as-btn {
+  background: transparent;
+  color: var(--as-primary);
+  box-shadow: none;
+  border: 1.5px solid color-mix(in srgb, var(--as-primary) 45%, var(--as-border));
+}
+
+.as-order-picker .as-card {
+  margin: 0;
 }
 
 
