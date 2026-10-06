@@ -182,7 +182,7 @@ export function SettingsPage() {
     };
   }, [hosted, embedHeight]);
 
-  async function onSave(e?: FormEvent) {
+  async function onSavePreferences(e?: FormEvent) {
     e?.preventDefault();
     setBusy(true);
     setSaved(false);
@@ -190,7 +190,31 @@ export function SettingsPage() {
     try {
       await gqlRequest(
         `#graphql
-        mutation SaveSettings(
+        mutation SavePrefs($timezone: String, $voidWarrantyOnRefund: Boolean) {
+          updateShopSettings(timezone: $timezone, voidWarrantyOnRefund: $voidWarrantyOnRefund) {
+            id
+            timezone
+            voidWarrantyOnRefund
+          }
+        }`,
+        { timezone, voidWarrantyOnRefund: voidOnRefund },
+      );
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onSaveBranding() {
+    setBusy(true);
+    setSaved(false);
+    setError(null);
+    try {
+      await gqlRequest(
+        `#graphql
+        mutation SaveBranding(
           $logo: String
           $accent: String
           $bg: String
@@ -200,8 +224,6 @@ export function SettingsPage() {
           $radius: Int
           $buttonStyle: String
           $heroStyle: String
-          $timezone: String
-          $voidWarrantyOnRefund: Boolean
         ) {
           updateShopSettings(
             brandingLogoUrl: $logo
@@ -213,8 +235,6 @@ export function SettingsPage() {
             brandingRadius: $radius
             brandingButtonStyle: $buttonStyle
             brandingHeroStyle: $heroStyle
-            timezone: $timezone
-            voidWarrantyOnRefund: $voidWarrantyOnRefund
           ) {
             id
             onboardingCompleted
@@ -231,8 +251,6 @@ export function SettingsPage() {
           radius: Number(radius) || 22,
           buttonStyle: buttonStyle || null,
           heroStyle: heroStyle || null,
-          timezone,
-          voidWarrantyOnRefund: voidOnRefund,
         },
       );
       setSaved(true);
@@ -560,7 +578,7 @@ export function SettingsPage() {
             </div>
             <form
               onSubmit={(e) => {
-                void onSave(e);
+                void onSavePreferences(e);
               }}
             >
               <FormLayout>
@@ -613,7 +631,7 @@ export function SettingsPage() {
             }}
             onClose={() => setActiveTab("guide")}
             onSave={async () => {
-              await onSave();
+              await onSaveBranding();
             }}
             onUploadLogo={uploadLogo}
             busy={busy}

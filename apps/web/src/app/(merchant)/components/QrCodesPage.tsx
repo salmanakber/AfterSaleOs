@@ -19,6 +19,7 @@ import {
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 import { TourTrigger } from "./ProductTour";
+import { FeatureLock, useFeatureAccess } from "./FeatureLock";
 
 type QrLink = {
   id: string;
@@ -55,6 +56,7 @@ const SET_ACTIVE = `#graphql
 `;
 
 export function QrCodesPage() {
+  const { allowed } = useFeatureAccess("qrCodes");
   const [links, setLinks] = useState<QrLink[]>([]);
   const [products, setProducts] = useState<{ id: string; title: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -65,19 +67,21 @@ export function QrCodesPage() {
   const [productId, setProductId] = useState("");
 
   const load = useCallback(() => {
+    if (!allowed) return;
     gqlRequest<{ qrLinks: QrLink[]; products: { id: string; title: string }[] }>(QUERY)
       .then((d) => {
         setLinks(d.qrLinks);
         setProducts(d.products);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
-  }, []);
+  }, [allowed]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   async function create() {
+    if (!allowed) return;
     setBusy(true);
     setError(null);
     try {
@@ -128,6 +132,7 @@ export function QrCodesPage() {
   ]);
 
   return (
+    <FeatureLock feature="qrCodes" mode="replace">
     <Page
       title="QR codes"
       subtitle="Short links for product registration — encode the URL in any QR generator"
@@ -214,5 +219,6 @@ export function QrCodesPage() {
         </Modal.Section>
       </Modal>
     </Page>
+    </FeatureLock>
   );
 }

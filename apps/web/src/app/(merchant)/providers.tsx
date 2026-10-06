@@ -16,11 +16,32 @@ import { AppProvider, Banner, Frame } from "@shopify/polaris";
 import enTranslations from "@shopify/polaris/locales/en.json";
 import { getSessionToken, clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
 import { rememberShopParams, getRememberedShop, getRememberedHost, appHref } from "@/lib/shop-context";
+import {
+  featuresFromPlan,
+  type PlanEntitlements,
+  type PlanFeatureKey,
+} from "@/lib/plan-features";
 import { AppNav } from "./components/AppNav";
 import { BrandLoader } from "./components/BrandLoader";
 import { TourProvider } from "./components/ProductTour";
 
 const SHOPIFY_API_KEY = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY ?? "";
+
+function mapBillingPlan(raw: Record<string, unknown> | null | undefined): PlanEntitlements | null {
+  if (!raw || typeof raw.id !== "string") return null;
+  return {
+    id: raw.id,
+    name: String(raw.name ?? "Plan"),
+    slug: String(raw.slug ?? ""),
+    priceMonthlyCents: Number(raw.priceMonthlyCents ?? 0),
+    warrantiesPerMonth: Number(raw.warrantiesPerMonth ?? 0),
+    claimsPerMonth: Number(raw.claimsPerMonth ?? 0),
+    aiCreditsPerMonth: Number(raw.aiCreditsPerMonth ?? 0),
+    staffSeats: Number(raw.staffSeats ?? 1),
+    warrantyRulesLimit: Number(raw.warrantyRulesLimit ?? 3),
+    features: featuresFromPlan(raw as Partial<Record<PlanFeatureKey, boolean>>),
+  };
+}
 
 /** If we landed on standalone APP_URL (outside Admin iframe), bounce into embed. */
 function redirectStandaloneIntoAdmin(shop: string | null, host: string | null): boolean {
@@ -84,6 +105,8 @@ type MerchantAuth = {
   isNavigating: boolean;
   /** True until the shop picks a plan (or billing is bypassed). */
   needsPlanSelection: boolean;
+  /** Active plan entitlements (limits + feature flags). */
+  plan: PlanEntitlements | null;
   refreshBillingGate: () => Promise<void>;
 };
 
@@ -95,6 +118,7 @@ const MerchantAuthContext = createContext<MerchantAuth>({
   navigate: () => undefined,
   isNavigating: false,
   needsPlanSelection: false,
+  plan: null,
   refreshBillingGate: async () => undefined,
 });
 
@@ -136,6 +160,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [shop, setShop] = useState<string | null>(null);
   const [needsPlanSelection, setNeedsPlanSelection] = useState(false);
+  const [plan, setPlan] = useState<PlanEntitlements | null>(null);
   const [isNavigating, startTransition] = useTransition();
   const bootstrapped = useRef(false);
 
@@ -154,8 +179,12 @@ export function AppProviders({ children }: { children: ReactNode }) {
       const headers = await merchantAuthHeaders();
       const billingRes = await fetch("/api/billing", { headers });
       if (!billingRes.ok) return;
-      const billing = (await billingRes.json()) as { needsPlanSelection?: boolean };
+      const billing = (await billingRes.json()) as {
+        needsPlanSelection?: boolean;
+        current?: Record<string, unknown> | null;
+      };
       setNeedsPlanSelection(Boolean(billing.needsPlanSelection));
+      setPlan(mapBillingPlan(billing.current));
     } catch {
       /* ignore */
     }
@@ -203,15 +232,17 @@ export function AppProviders({ children }: { children: ReactNode }) {
           const billing = (await billingRes.json()) as {
             needsPlanSelection?: boolean;
             billingStatus?: string;
-            current?: { slug?: string } | null;
+            current?: Record<string, unknown> | null;
           };
           const needsPlan = Boolean(billing.needsPlanSelection);
           setNeedsPlanSelection(needsPlan);
+          setPlan(mapBillingPlan(billing.current));
           const onPlans = window.location.pathname.startsWith("/plans");
 
           if (billingReturn) {
             if (billing.current?.slug || billing.billingStatus === "ACTIVE") {
               setNeedsPlanSelection(false);
+              setPlan(mapBillingPlan(billing.current));
               router.replace(appHref("/"));
               setReady(true);
               return;
@@ -286,9 +317,10 @@ export function AppProviders({ children }: { children: ReactNode }) {
       navigate,
       isNavigating,
       needsPlanSelection,
+      plan,
       refreshBillingGate,
     }),
-    [shop, navigate, isNavigating, needsPlanSelection, refreshBillingGate],
+    [shop, navigate, isNavigating, needsPlanSelection, plan, refreshBillingGate],
   );
 
   if (!ready) {

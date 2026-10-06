@@ -2,6 +2,9 @@
 
 import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
+import { appHref } from "@/lib/shop-context";
+import { useFeatureAccess } from "./FeatureLock";
 
 export type BrandingDraft = {
   logoUrl: string;
@@ -287,6 +290,7 @@ export function BrandingStudio({
   const [device, setDevice] = useState<Device>("desktop");
   const [page, setPage] = useState<PreviewPage>("portal");
   const [section, setSection] = useState<"identity" | "colors" | "type" | "style">("identity");
+  const { allowed: canBrand, plan, meta } = useFeatureAccess("customBranding");
 
   useEffect(() => setMounted(true), []);
 
@@ -351,13 +355,38 @@ export function BrandingStudio({
           <button type="button" className="br-btn br-btn-ghost" onClick={onClose}>
             Close
           </button>
-          <button type="button" className="br-btn br-btn-primary" disabled={busy} onClick={() => void onSave()}>
-            {busy ? "Saving…" : "Save branding"}
-          </button>
+          {canBrand ? (
+            <button type="button" className="br-btn br-btn-primary" disabled={busy} onClick={() => void onSave()}>
+              {busy ? "Saving…" : "Save branding"}
+            </button>
+          ) : (
+            <Link className="br-btn br-btn-primary" href={appHref("/plans")} style={{ textDecoration: "none" }}>
+              Upgrade to edit
+            </Link>
+          )}
         </div>
       </header>
 
       <div className="br-studio-body">
+        {!canBrand ? (
+          <aside className="br-studio-rail br-studio-rail--locked">
+            <div className="br-lock-panel">
+              <span className="br-lock-badge">Not on {plan?.name ?? "Free"}</span>
+              <h2>{meta.label}</h2>
+              <p>{meta.blurb}</p>
+              <p className="br-rail-lede">
+                Preview stays visible so you can see the default look. Upgrade to upload a logo and
+                customize colors, type, and style.
+              </p>
+              <Link className="br-btn br-btn-primary" href={appHref("/plans")} style={{ textDecoration: "none", textAlign: "center" }}>
+                Compare plans
+              </Link>
+              <button type="button" className="br-btn br-btn-ghost" onClick={onClose}>
+                Back to Customer pages
+              </button>
+            </div>
+          </aside>
+        ) : (
         <aside className="br-studio-rail">
           <nav className="br-rail-nav">
             {(
@@ -518,6 +547,7 @@ export function BrandingStudio({
             ) : null}
           </form>
         </aside>
+        )}
 
         <main className="br-studio-canvas">
           <div className="br-canvas-toolbar">
@@ -539,7 +569,9 @@ export function BrandingStudio({
                 </button>
               ))}
             </div>
-            <span className="br-canvas-hint">Changes preview live — save when you’re happy</span>
+            <span className="br-canvas-hint">
+              {canBrand ? "Changes preview live — save when you’re happy" : "Read-only preview on your current plan"}
+            </span>
           </div>
 
           <div className="br-canvas-stage">

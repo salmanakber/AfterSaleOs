@@ -17,6 +17,7 @@ import { useParams } from "next/navigation";
 import { appHref } from "@/lib/shop-context";
 import { PageEmpty, PageLoading } from "./PageLoading";
 import { BrandLoader } from "./BrandLoader";
+import { FeatureLock } from "./FeatureLock";
 
 type Repair = {
   id: string;
@@ -98,6 +99,7 @@ export function RepairsListPage() {
   }));
 
   return (
+    <FeatureLock feature="repairsEnabled" mode="replace">
     <Page title="Repairs" subtitle={hasLoaded ? `${rows.length} on the board` : "Loading…"}>
       <div className="as-m-ops-surface">
         {error ? (
@@ -165,6 +167,7 @@ export function RepairsListPage() {
         )}
       </div>
     </Page>
+    </FeatureLock>
   );
 }
 
@@ -257,6 +260,7 @@ export function RepairDetailPage() {
   }
 
   return (
+    <FeatureLock feature="repairsEnabled" mode="replace">
     <Page
       title={repair.repairNumber}
       backAction={{ url: appHref("/repairs") }}
@@ -309,5 +313,6 @@ export function RepairDetailPage() {
         </div>
       </div>
     </Page>
+    </FeatureLock>
   );
 }

@@ -5,21 +5,23 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { NavMenu } from "@shopify/app-bridge-react";
 import { appHref } from "@/lib/shop-context";
+import type { PlanFeatureKey } from "@/lib/plan-features";
+import { useMerchantAuth } from "../providers";
 
-type NavItem = { href: string; label: string; group?: string };
+type NavItem = { href: string; label: string; group?: string; feature?: PlanFeatureKey };
 
 const NAV: NavItem[] = [
   { href: "/", label: "Home", group: "Overview" },
   { href: "/setup", label: "Setup wizard", group: "Overview" },
   { href: "/claims", label: "Claims", group: "Operations" },
-  { href: "/repairs", label: "Repairs", group: "Operations" },
+  { href: "/repairs", label: "Repairs", group: "Operations", feature: "repairsEnabled" },
   { href: "/resolutions", label: "Resolutions", group: "Operations" },
-  { href: "/suppliers", label: "Suppliers", group: "Operations" },
+  { href: "/suppliers", label: "Suppliers", group: "Operations", feature: "supplierPortal" },
   { href: "/warranties", label: "Warranties", group: "Coverage" },
   { href: "/registrations", label: "Registrations", group: "Coverage" },
   { href: "/products-rules", label: "Products & Rules", group: "Coverage" },
   { href: "/automations", label: "Automations", group: "Setup" },
-  { href: "/qr-codes", label: "QR codes", group: "Setup" },
+  { href: "/qr-codes", label: "QR codes", group: "Setup", feature: "qrCodes" },
   { href: "/team", label: "Team", group: "Setup" },
   { href: "/settings", label: "Customer pages", group: "Setup" },
   { href: "/plans", label: "Plans & Usage", group: "Setup" },
@@ -34,9 +36,15 @@ function pathActive(pathname: string | null, href: string) {
 /** Shopify admin NavMenu + in-app sidebar (client navigation keeps shell mounted). */
 export function AppNav() {
   const pathname = usePathname();
+  const { plan } = useMerchantAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const groups = ["Overview", "Operations", "Coverage", "Setup"] as const;
+
+  function isLocked(item: NavItem) {
+    if (!item.feature || !plan) return false;
+    return !plan.features[item.feature];
+  }
 
   return (
     <div className="as-m-nav-column">
@@ -99,20 +107,29 @@ export function AppNav() {
             return (
               <div key={group} className="as-m-sidebar-group">
                 {!collapsed ? <div className="as-m-sidebar-label">{group}</div> : null}
-                {items.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={appHref(item.href)}
-                    className="as-m-sidebar-link"
-                    data-active={pathActive(pathname, item.href)}
-                    title={item.label}
-                    prefetch
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    <span className="as-m-sidebar-dot" aria-hidden />
-                    {!collapsed ? <span>{item.label}</span> : null}
-                  </Link>
-                ))}
+                {items.map((item) => {
+                  const locked = isLocked(item);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={appHref(item.href)}
+                      className="as-m-sidebar-link"
+                      data-active={pathActive(pathname, item.href)}
+                      data-locked={locked || undefined}
+                      title={locked ? `${item.label} · upgrade to unlock` : item.label}
+                      prefetch
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <span className="as-m-sidebar-dot" aria-hidden />
+                      {!collapsed ? (
+                        <span className="as-m-sidebar-link-label">
+                          {item.label}
+                          {locked ? <em className="as-m-sidebar-lock">Pro</em> : null}
+                        </span>
+                      ) : null}
+                    </Link>
+                  );
+                })}
               </div>
             );
           })}

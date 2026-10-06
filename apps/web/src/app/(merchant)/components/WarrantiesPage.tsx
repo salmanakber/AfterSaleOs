@@ -20,6 +20,9 @@ import { theme } from "@aftersale/shared";
 import { gqlRequest } from "@/lib/graphql";
 import { friendlyError } from "@/lib/merchant-errors";
 import { BrandLoader } from "./BrandLoader";
+import { useFeatureAccess } from "./FeatureLock";
+import { appHref } from "@/lib/shop-context";
+import Link from "next/link";
 
 type Warranty = {
   id: string;
@@ -171,6 +174,7 @@ function formatBackfillSummary(job: Job): string {
 }
 
 export function WarrantiesPage() {
+  const { allowed: deepBackfill } = useFeatureAccess("backfillBeyond12Months");
   const [nodes, setNodes] = useState<Warranty[]>([]);
   const [total, setTotal] = useState(0);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -495,14 +499,29 @@ export function WarrantiesPage() {
             </Text>
             <Select
               label="Lookback"
-              options={[
-                { label: "Last 12 months", value: "12" },
-                { label: "Last 24 months (paid plans)", value: "24" },
-                { label: "All available history (paid plans)", value: "0" },
-              ]}
+              options={
+                deepBackfill
+                  ? [
+                      { label: "Last 12 months", value: "12" },
+                      { label: "Last 24 months", value: "24" },
+                      { label: "All available history", value: "0" },
+                    ]
+                  : [{ label: "Last 12 months", value: "12" }]
+              }
               value={lookback}
               onChange={setLookback}
+              helpText={
+                deepBackfill
+                  ? undefined
+                  : "Longer lookbacks unlock on paid plans."
+              }
             />
+            {!deepBackfill ? (
+              <Text as="p" tone="subdued">
+                Need 24 months or full history?{" "}
+                <Link href={appHref("/plans")}>Compare plans</Link>
+              </Text>
+            ) : null}
           </BlockStack>
         </Modal.Section>
       </Modal>

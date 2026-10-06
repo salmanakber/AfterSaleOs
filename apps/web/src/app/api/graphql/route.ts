@@ -42,6 +42,25 @@ const typeDefs = /* GraphQL */ `
     warrantiesPerMonth: Int!
     claimsPerMonth: Int!
     aiCreditsPerMonth: Int!
+    staffSeats: Int!
+    warrantyRulesLimit: Int!
+    customBranding: Boolean!
+    pdfCertificate: Boolean!
+    qrCodes: Boolean!
+    csvExport: Boolean!
+    backfillBeyond12Months: Boolean!
+    repairsEnabled: Boolean!
+    customWorkflows: Boolean!
+    advancedAnalytics: Boolean!
+    flowEnabled: Boolean!
+    expiryCampaigns: Boolean!
+    bulkOperations: Boolean!
+    supplierPortal: Boolean!
+    technicianPortal: Boolean!
+    partsInventory: Boolean!
+    multiLocation: Boolean!
+    erpConnectors: Boolean!
+    publicApiEnabled: Boolean!
   }
 
   type UsageMeter {
@@ -297,6 +316,25 @@ async function shopSummary(shopId: string) {
           warrantiesPerMonth: plan.warrantiesPerMonth,
           claimsPerMonth: plan.claimsPerMonth,
           aiCreditsPerMonth: plan.aiCreditsPerMonth,
+          staffSeats: plan.staffSeats,
+          warrantyRulesLimit: plan.warrantyRulesLimit,
+          customBranding: plan.customBranding,
+          pdfCertificate: plan.pdfCertificate,
+          qrCodes: plan.qrCodes,
+          csvExport: plan.csvExport,
+          backfillBeyond12Months: plan.backfillBeyond12Months,
+          repairsEnabled: plan.repairsEnabled,
+          customWorkflows: plan.customWorkflows,
+          advancedAnalytics: plan.advancedAnalytics,
+          flowEnabled: plan.flowEnabled,
+          expiryCampaigns: plan.expiryCampaigns,
+          bulkOperations: plan.bulkOperations,
+          supplierPortal: plan.supplierPortal,
+          technicianPortal: plan.technicianPortal,
+          partsInventory: plan.partsInventory,
+          multiLocation: plan.multiLocation,
+          erpConnectors: plan.erpConnectors,
+          publicApiEnabled: plan.publicApiEnabled,
         }
       : null,
     usage: [

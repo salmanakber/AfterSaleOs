@@ -17,6 +17,7 @@ import {
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 import { PageEmpty, PageLoading } from "./PageLoading";
+import { FeatureLock } from "./FeatureLock";
 
 type Supplier = {
   id: string;
@@ -173,6 +174,7 @@ export function SuppliersPage() {
     .reduce((s, c) => s + (c.amountCents ?? 0), 0);
 
   return (
+    <FeatureLock feature="supplierPortal" mode="replace">
     <Page
       title="Suppliers"
       subtitle={hasLoaded ? `${suppliers.length} suppliers` : "Loading…"}
@@ -352,5 +354,6 @@ export function SuppliersPage() {
         )}
       </div>
     </Page>
+    </FeatureLock>
   );
 }
