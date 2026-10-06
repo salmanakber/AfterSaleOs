@@ -6,6 +6,7 @@ import {
   type StartDateRuleKind,
 } from "@aftersale/shared";
 import { usageRepository } from "../repositories";
+import { assertMonthlyQuota } from "../plan-limits";
 
 export type SerialValidationResult =
   | { ok: true; mode: string; needsReview?: boolean }
@@ -346,6 +347,8 @@ export async function approveRegistration(params: {
   registrationId: string;
   actorId?: string;
 }) {
+  await assertMonthlyQuota(params.shopId, "warranties_created");
+
   const reg = await prisma.registration.findFirst({
     where: { id: params.registrationId, shopId: params.shopId },
   });

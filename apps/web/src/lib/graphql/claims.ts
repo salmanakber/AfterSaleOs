@@ -445,6 +445,7 @@ export const claimsResolvers = {
         issueCategory: args.input.issueCategory,
         issueSummary: args.input.issueSummary,
         issueDetails: args.input.issueDetails,
+        enforcePlanQuota: true,
       });
       const appBase = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://aftersale.tidyflowapp.com").replace(
         /\/$/,

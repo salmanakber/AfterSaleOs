@@ -1,5 +1,6 @@
 import { prisma } from "../client";
 import type { StartDateRule, SerialMode } from "@prisma/client";
+import { assertWarrantyRulesQuota } from "../plan-limits";
 
 export type RuleVersionInput = {
   warrantyType: string;
@@ -24,6 +25,8 @@ export async function createWarrantyRule(params: {
   version: RuleVersionInput;
   assignments: AssignmentInput[];
 }) {
+  await assertWarrantyRulesQuota(params.shopId);
+
   const rule = await prisma.warrantyRule.create({
     data: {
       shopId: params.shopId,

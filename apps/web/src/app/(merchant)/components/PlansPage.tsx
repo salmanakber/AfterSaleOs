@@ -6,6 +6,7 @@ import { Badge, Banner, Button, Layout, Page, Text } from "@shopify/polaris";
 import { clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
 import { appHref } from "@/lib/shop-context";
 import { gqlRequest } from "@/lib/graphql";
+import { useMerchantAuth } from "../providers";
 
 type Plan = {
   id: string;
@@ -49,6 +50,7 @@ async function billingFetch(init?: RequestInit & { sync?: boolean }): Promise<Re
 export function PlansPage() {
   const router = useRouter();
   const search = useSearchParams();
+  const { refreshBillingGate } = useMerchantAuth();
   const welcome = search.get("welcome") === "1";
   const billingReturn = search.get("billing") === "return";
 
@@ -132,9 +134,8 @@ export function PlansPage() {
         return;
       }
       await load();
-      if (welcome) {
-        router.replace(appHref("/"));
-      }
+      await refreshBillingGate();
+      router.replace(appHref("/"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Billing error");
     } finally {

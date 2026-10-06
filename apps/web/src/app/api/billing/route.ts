@@ -3,6 +3,7 @@ import { prisma, isShopifyBillingTestMode } from "@aftersale/db";
 import { getOfflineSession, shopify } from "@/lib/shopify/client";
 import { resolveMerchantContext } from "@/lib/auth/merchant";
 import { syncShopifySubscriptionStatus } from "@/lib/billing-sync";
+import { embeddedAdminAppUrl } from "@/lib/shopify/embedded-url";
 
 /**
  * Billing: create a Shopify app subscription for a paid plan.
@@ -91,7 +92,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Reconnect required" }, { status: 401 });
     }
 
-    const returnUrl = `${process.env.APP_URL}/plans?shop=${merchant.shopDomain}&billing=return&welcome=1`;
+    // Return into Shopify Admin embed (not standalone APP_URL) so pricing stays in-dashboard.
+    const returnUrl = embeddedAdminAppUrl({
+      path: "/plans?billing=return&welcome=1",
+      shop: merchant.shopDomain,
+      apiKey: process.env.SHOPIFY_API_KEY,
+    });
     const test = await isShopifyBillingTestMode();
     const client = new shopify.clients.Graphql({ session });
 

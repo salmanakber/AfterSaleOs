@@ -13,6 +13,8 @@ import {
   upsertNotificationTemplate,
   upsertStaffMember,
   updateWorkflowStatusLabel,
+  assertShopHasPlan,
+  assertPlanFeature,
 } from "@aftersale/db";
 import { resolveMerchantContext } from "@/lib/auth/merchant";
 
@@ -82,7 +84,9 @@ export const merchantOpsTypeDefs = /* GraphQL */ `
 `;
 
 async function merchant(ctx: { request: Request }) {
-  return resolveMerchantContext(ctx.request);
+  const m = await resolveMerchantContext(ctx.request);
+  await assertShopHasPlan(m.shopId);
+  return m;
 }
 
 export const merchantOpsResolvers = {
@@ -133,10 +137,7 @@ export const merchantOpsResolvers = {
       ctx: { request: Request },
     ) => {
       const m = await merchant(ctx);
-      const plan = await shopPlanFeatures(m.shopId);
-      if (plan && !plan.qrCodes) {
-        throw new Error("QR codes are not included on your current plan. Upgrade to enable.");
-      }
+      await assertPlanFeature(m.shopId, "qrCodes", "QR codes");
       const link = await createQrLink({
         shopId: m.shopId,
         targetType: args.targetType,

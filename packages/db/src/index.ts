@@ -14,6 +14,18 @@ export {
   isShopifyBillingTestMode,
   PLATFORM_KEYS,
 } from "./platform";
+export {
+  PlanLimitError,
+  assertShopHasPlan,
+  assertPlanFeature,
+  assertMonthlyQuota,
+  assertWarrantyRulesQuota,
+  assertBackfillLookback,
+  remainingMonthlyQuota,
+  getShopWithPlan,
+  type MonthlyMetric,
+  type PlanFeatureFlag,
+} from "./plan-limits";
 export * from "./warranty";
 export * from "./claims";
 export * from "./resolutions";

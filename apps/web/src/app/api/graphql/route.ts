@@ -9,6 +9,9 @@ import {
   getWarrantyRule,
   createManualWarranty,
   approveRegistration,
+  assertBackfillLookback,
+  assertMonthlyQuota,
+  assertPlanFeature,
 } from "@aftersale/db";
 import {
   resolveMerchantContext,
@@ -819,9 +822,8 @@ const yoga = createYoga({
         ) => {
           const merchant = await resolveMerchantContext(ctx.request);
           const months = args.lookbackMonths;
-          if (![12, 24, 0].includes(months) && months < 0) {
-            throw new Error("lookbackMonths must be 12, 24, or 0 (all available)");
-          }
+          await assertBackfillLookback(merchant.shopId, months);
+          await assertMonthlyQuota(merchant.shopId, "warranties_created");
           const job = await prisma.job.create({
             data: {
               shopId: merchant.shopId,
@@ -860,6 +862,19 @@ const yoga = createYoga({
           ctx: { request: Request },
         ) => {
           const merchant = await resolveMerchantContext(ctx.request);
+          const brandingTouched =
+            args.brandingLogoUrl !== undefined ||
+            args.brandingAccentColor !== undefined ||
+            args.brandingBgColor !== undefined ||
+            args.brandingSurfaceColor !== undefined ||
+            args.brandingTextColor !== undefined ||
+            args.brandingFont !== undefined ||
+            args.brandingRadius !== undefined ||
+            args.brandingButtonStyle !== undefined ||
+            args.brandingHeroStyle !== undefined;
+          if (brandingTouched) {
+            await assertPlanFeature(merchant.shopId, "customBranding", "Custom branding");
+          }
           await prisma.shop.update({
             where: { id: merchant.shopId },
             data: {

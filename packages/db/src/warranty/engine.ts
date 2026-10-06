@@ -8,6 +8,7 @@ import {
   type StartDateRuleKind,
 } from "@aftersale/shared";
 import { usageRepository } from "../repositories";
+import { assertMonthlyQuota } from "../plan-limits";
 
 export async function loadMatchableRules(shopId: string): Promise<MatchableRule[]> {
   const rules = await prisma.warrantyRule.findMany({
@@ -336,6 +337,8 @@ export async function createManualWarranty(params: {
   reason: string;
   actorId?: string;
 }) {
+  await assertMonthlyQuota(params.shopId, "warranties_created");
+
   const shop = await prisma.shop.findUniqueOrThrow({ where: { id: params.shopId } });
   const rule = await prisma.warrantyRule.findFirst({
     where: { id: params.ruleId, shopId: params.shopId },

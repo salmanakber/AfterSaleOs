@@ -12,7 +12,12 @@ export function friendlyError(err: unknown, fallback = "Something went wrong. Tr
   if (lower.includes("staff seat") || lower.includes("seat limit")) {
     return msg; // already merchant-friendly from the API
   }
-  if (lower.includes("not included on your current plan") || lower.includes("upgrade")) {
+  if (
+    lower.includes("not included on your current plan") ||
+    lower.includes("upgrade") ||
+    lower.includes("limit reached") ||
+    lower.includes("choose a plan")
+  ) {
     return msg;
   }
   if (lower.includes("not found")) {

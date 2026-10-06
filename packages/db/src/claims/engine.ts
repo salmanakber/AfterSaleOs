@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { prisma } from "../client";
 import { evaluateEligibility, type EligibilityOutcome } from "@aftersale/shared";
 import { usageRepository } from "../repositories";
+import { assertMonthlyQuota } from "../plan-limits";
 import type { ClaimStatus, ClaimSystemState } from "@prisma/client";
 
 const STATUS_TO_SYSTEM: Record<ClaimStatus, ClaimSystemState> = {
@@ -114,7 +115,13 @@ export async function createClaim(params: {
   issueSummary: string;
   issueDetails?: string;
   attachmentIds?: string[];
+  /** Merchant desk / admin — enforce plan claims quota. Customer portal never sets this. */
+  enforcePlanQuota?: boolean;
 }) {
+  if (params.enforcePlanQuota) {
+    await assertMonthlyQuota(params.shopId, "claims_created");
+  }
+
   const email = params.email.trim().toLowerCase();
 
   let warrantyId = params.warrantyId;

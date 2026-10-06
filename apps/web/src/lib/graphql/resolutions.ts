@@ -10,6 +10,7 @@ import {
   upsertSupplierClaim,
   ensureDefaultWorkflow,
   applyWorkflowStatus,
+  assertPlanFeature,
 } from "@aftersale/db";
 import type { RepairStatus, ReplacementWarrantyMode, SupplierClaimStatus } from "@prisma/client";
 import { resolveMerchantContext } from "@/lib/auth/merchant";
@@ -485,6 +486,7 @@ export const resolutionsResolvers = {
       ctx: { request: Request },
     ) => {
       const merchant = await resolveMerchantContext(ctx.request);
+      await assertPlanFeature(merchant.shopId, "repairsEnabled", "Repairs");
       const repair = await createRepair({
         shopId: merchant.shopId,
         claimId: args.input.claimId,

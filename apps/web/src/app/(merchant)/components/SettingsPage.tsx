@@ -1,9 +1,8 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Banner,
-  BlockStack,
   Button,
   FormLayout,
   InlineStack,
@@ -15,6 +14,7 @@ import { gqlRequest } from "@/lib/graphql";
 import { appHref } from "@/lib/shop-context";
 import { clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
 import { TourTrigger, useOptionalTour } from "./ProductTour";
+import { BrandingStudio } from "./BrandingStudio";
 
 type ShopSettings = {
   brandingLogoUrl: string | null;
@@ -68,7 +68,6 @@ function openOutsideAdmin(url: string) {
 type PreviewKind = "portal" | "register" | "claim";
 
 export function SettingsPage() {
-  const fileRef = useRef<HTMLInputElement>(null);
   const [logoUrl, setLogoUrl] = useState("");
   const [accent, setAccent] = useState("#3B82F6");
   const [bgColor, setBgColor] = useState("#F4F6FB");
@@ -183,8 +182,8 @@ export function SettingsPage() {
     };
   }, [hosted, embedHeight]);
 
-  async function onSave(e: FormEvent) {
-    e.preventDefault();
+  async function onSave(e?: FormEvent) {
+    e?.preventDefault();
     setBusy(true);
     setSaved(false);
     setError(null);
@@ -307,6 +306,9 @@ export function SettingsPage() {
           cart, or after checkout.
         </p>
         <div className="as-m-hero-actions">
+          <button type="button" className="as-m-chip as-m-chip-accent" onClick={() => setActiveTab("brand")}>
+            Branding studio
+          </button>
           <button type="button" className="as-m-chip as-m-chip-accent" onClick={() => setActiveTab("placement")}>
             Product · cart · checkout
           </button>
@@ -507,187 +509,118 @@ export function SettingsPage() {
       ) : null}
 
       {activeTab === "brand" ? (
-        <div className="as-m-settings-grid" style={{ marginTop: 14 }} data-tour="cx-brand">
-          <div className="as-m-panel">
-            <div className="as-m-panel-title">
-              <h3>Brand kit</h3>
+        <div style={{ marginTop: 14 }} data-tour="cx-brand">
+          <div className="br-brand-card">
+            <h3>Customer page branding</h3>
+            <p>
+              Design logo, colors, type, and button style on a full-screen canvas with a live
+              preview of portal, register, and claim pages.
+            </p>
+            <div className="br-brand-card-actions">
+              <Button variant="primary" onClick={() => setActiveTab("brand")}>
+                Open branding studio
+              </Button>
+              <Button onClick={() => setActiveTab("preview")}>Live hosted preview</Button>
             </div>
-            <form onSubmit={onSave}>
-              <BlockStack gap="400">
-                <div>
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">
-                    Logo
-                  </Text>
-                  <Text as="p" tone="subdued">
-                    PNG, JPG, WEBP, GIF, or SVG · max 5MB. Shown on customer pages and certificates.
-                  </Text>
-                  <div className="as-m-logo-picker">
-                    <div className="as-m-logo-preview">
-                      {logoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={logoUrl} alt="Logo preview" />
-                      ) : (
-                        <span>No logo</span>
-                      )}
-                    </div>
-                    <div className="as-m-logo-actions">
-                      <input
-                        ref={fileRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                        hidden
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) void uploadLogo(f);
-                          e.target.value = "";
-                        }}
-                      />
-                      <Button loading={uploading} onClick={() => fileRef.current?.click()}>
-                        {logoUrl ? "Replace logo" : "Upload logo"}
-                      </Button>
-                      {logoUrl ? (
-                        <Button tone="critical" variant="plain" onClick={() => setLogoUrl("")}>
-                          Remove
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <FormLayout>
-                  <div className="as-m-color-row">
-                    <div style={{ flex: 1 }}>
-                      <TextField
-                        label="Accent color"
-                        value={accent}
-                        onChange={setAccent}
-                        autoComplete="off"
-                      />
-                    </div>
-                    <label className="as-m-color-input" title="Pick color">
-                      <input
-                        type="color"
-                        value={/^#[0-9A-Fa-f]{6}$/.test(accent) ? accent : "#3B82F6"}
-                        onChange={(e) => setAccent(e.target.value.toUpperCase())}
-                      />
-                    </label>
-                  </div>
-                  <div className="as-m-color-swatch" style={{ background: accent || "#3B82F6" }} />
-
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">
-                    Hosted page design
-                  </Text>
-                  <Text as="p" tone="subdued">
-                    These controls apply to self-hosted AfterSale pages (portal, register, claim,
-                    certificates). Theme Liquid blocks keep their own colors in the theme editor.
-                  </Text>
-                  <div className="as-m-color-row">
-                    <div style={{ flex: 1 }}>
-                      <TextField label="Background" value={bgColor} onChange={setBgColor} autoComplete="off" />
-                    </div>
-                    <label className="as-m-color-input">
-                      <input type="color" value={/^#[0-9A-Fa-f]{6}$/.test(bgColor) ? bgColor : "#F4F6FB"} onChange={(e) => setBgColor(e.target.value.toUpperCase())} />
-                    </label>
-                  </div>
-                  <div className="as-m-color-row">
-                    <div style={{ flex: 1 }}>
-                      <TextField label="Surface / cards" value={surfaceColor} onChange={setSurfaceColor} autoComplete="off" />
-                    </div>
-                    <label className="as-m-color-input">
-                      <input type="color" value={/^#[0-9A-Fa-f]{6}$/.test(surfaceColor) ? surfaceColor : "#FFFFFF"} onChange={(e) => setSurfaceColor(e.target.value.toUpperCase())} />
-                    </label>
-                  </div>
-                  <div className="as-m-color-row">
-                    <div style={{ flex: 1 }}>
-                      <TextField label="Text color" value={textColor} onChange={setTextColor} autoComplete="off" />
-                    </div>
-                    <label className="as-m-color-input">
-                      <input type="color" value={/^#[0-9A-Fa-f]{6}$/.test(textColor) ? textColor : "#0F172A"} onChange={(e) => setTextColor(e.target.value.toUpperCase())} />
-                    </label>
-                  </div>
-                  <label className="as-label" style={{ display: "block", marginBottom: 6 }}>
-                    Font style
-                  </label>
-                  <select className="as-m-select" value={font} onChange={(e) => setFont(e.target.value)}>
-                    <option value="sans">Clean sans</option>
-                    <option value="serif">Editorial serif</option>
-                    <option value="display">Display + sans</option>
-                  </select>
-                  <label className="as-label" style={{ display: "block", margin: "12px 0 6px" }}>
-                    Button style
-                  </label>
-                  <select className="as-m-select" value={buttonStyle} onChange={(e) => setButtonStyle(e.target.value)}>
-                    <option value="solid">Solid</option>
-                    <option value="soft">Soft tint</option>
-                    <option value="outline">Outline</option>
-                  </select>
-                  <label className="as-label" style={{ display: "block", margin: "12px 0 6px" }}>
-                    Hero style
-                  </label>
-                  <select className="as-m-select" value={heroStyle} onChange={(e) => setHeroStyle(e.target.value)}>
-                    <option value="bold">Bold</option>
-                    <option value="calm">Calm</option>
-                    <option value="minimal">Minimal</option>
-                  </select>
-                  <TextField
-                    label="Corner radius (px)"
-                    type="number"
-                    value={radius}
-                    onChange={setRadius}
-                    autoComplete="off"
-                  />
-
-                  <TextField label="Timezone" value={timezone} onChange={setTimezone} autoComplete="off" />
-                  <label className="as-m-toggle">
-                    <input
-                      type="checkbox"
-                      checked={voidOnRefund}
-                      onChange={(e) => setVoidOnRefund(e.target.checked)}
-                    />
-                    <span>
-                      <strong style={{ display: "block", fontSize: 13 }}>Void warranty on refund</strong>
-                      <span style={{ fontSize: 12, color: "#6b7280" }}>
-                        Keep coverage aligned with refunded orders
-                      </span>
-                    </span>
-                  </label>
-                  <Button submit variant="primary" loading={busy}>
-                    Save branding
-                  </Button>
-                </FormLayout>
-              </BlockStack>
-            </form>
-          </div>
-
-          <div>
             <div
               className="as-m-preview"
-              style={{ ["--as-preview-accent" as string]: accent || "#3B82F6" }}
+              style={{
+                marginTop: 8,
+                ["--as-preview-accent" as string]: accent || "#3B82F6",
+              }}
             >
               <div className="as-m-preview-bar">
                 <i />
                 <i />
                 <i />
               </div>
-              <div className="as-m-preview-body">
+              <div className="as-m-preview-body" style={{ background: bgColor || "#F4F6FB" }}>
                 {logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={logoUrl}
                     alt=""
                     style={{ height: 36, marginBottom: 12, objectFit: "contain", maxWidth: "70%" }}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
                   />
                 ) : null}
-                <h4>{shopName || "Your store"} warranty portal</h4>
-                <p>Look up coverage, register a product, or start a claim.</p>
-                <span className="as-m-preview-cta">Open my warranties</span>
+                <h4 style={{ color: textColor || "#0F172A" }}>
+                  {shopName || "Your store"} warranty portal
+                </h4>
+                <p>Open the studio to edit with live canvas preview.</p>
+                <span className="as-m-preview-cta" style={{ background: accent || "#3B82F6" }}>
+                  Open branding studio
+                </span>
               </div>
             </div>
-            <p className="as-m-hint">Instant brand preview. Use Live preview for the real pages.</p>
           </div>
+
+          <div className="as-m-panel" style={{ marginTop: 14 }}>
+            <div className="as-m-panel-title">
+              <h3>Store preferences</h3>
+            </div>
+            <form
+              onSubmit={(e) => {
+                void onSave(e);
+              }}
+            >
+              <FormLayout>
+                <TextField label="Timezone" value={timezone} onChange={setTimezone} autoComplete="off" />
+                <label className="as-m-toggle">
+                  <input
+                    type="checkbox"
+                    checked={voidOnRefund}
+                    onChange={(e) => setVoidOnRefund(e.target.checked)}
+                  />
+                  <span>
+                    <strong style={{ display: "block", fontSize: 13 }}>Void warranty on refund</strong>
+                    <span style={{ fontSize: 12, color: "#6b7280" }}>
+                      Keep coverage aligned with refunded orders
+                    </span>
+                  </span>
+                </label>
+                <Button submit variant="primary" loading={busy}>
+                  Save preferences
+                </Button>
+              </FormLayout>
+            </form>
+          </div>
+
+          <BrandingStudio
+            open
+            draft={{
+              logoUrl,
+              accent,
+              bgColor,
+              surfaceColor,
+              textColor,
+              font,
+              radius,
+              buttonStyle,
+              heroStyle,
+              shopName,
+            }}
+            onChange={(patch) => {
+              if (patch.logoUrl !== undefined) setLogoUrl(patch.logoUrl);
+              if (patch.accent !== undefined) setAccent(patch.accent);
+              if (patch.bgColor !== undefined) setBgColor(patch.bgColor);
+              if (patch.surfaceColor !== undefined) setSurfaceColor(patch.surfaceColor);
+              if (patch.textColor !== undefined) setTextColor(patch.textColor);
+              if (patch.font !== undefined) setFont(patch.font);
+              if (patch.radius !== undefined) setRadius(patch.radius);
+              if (patch.buttonStyle !== undefined) setButtonStyle(patch.buttonStyle);
+              if (patch.heroStyle !== undefined) setHeroStyle(patch.heroStyle);
+              if (patch.shopName !== undefined) setShopName(patch.shopName);
+            }}
+            onClose={() => setActiveTab("guide")}
+            onSave={async () => {
+              await onSave();
+            }}
+            onUploadLogo={uploadLogo}
+            busy={busy}
+            uploading={uploading}
+            error={error}
+            saved={saved}
+          />
         </div>
       ) : null}
 

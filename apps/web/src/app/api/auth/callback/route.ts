@@ -3,6 +3,7 @@ import { Session } from "@shopify/shopify-api";
 import { shopify, sessionStorage } from "@/lib/shopify/client";
 import { shopRepository, prisma } from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
+import { embeddedAdminAppUrl } from "@/lib/shopify/embedded-url";
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
@@ -85,17 +86,22 @@ export async function GET(request: NextRequest) {
   }
 
   const fresh = await prisma.shop.findUniqueOrThrow({ where: { id: shopRow.id } });
-  const host = url.searchParams.get("host");
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const host =
+    url.searchParams.get("host") ?? request.cookies.get("shopify_oauth_host")?.value ?? null;
   const needsPlan = !fresh.planId && !fresh.billingBypass;
-  const path = needsPlan ? "/plans" : "/";
-  const qs = new URLSearchParams({ shop: shopDomain });
-  if (host) qs.set("host", host);
-  if (needsPlan) qs.set("welcome", "1");
-  const redirectTo = `${appUrl}${path}?${qs.toString()}`;
+  // Embedded apps must return into Shopify Admin — not standalone APP_URL —
+  // or the merchant lands outside the embed and App Bridge / idToken never boot.
+  const path = needsPlan ? "/plans?welcome=1" : "/";
+  const redirectTo = embeddedAdminAppUrl({
+    path,
+    shop: shopDomain,
+    host,
+    apiKey,
+  });
 
   const response = NextResponse.redirect(redirectTo);
   response.cookies.delete("shopify_oauth_state");
   response.cookies.delete("shopify_oauth_shop");
+  response.cookies.delete("shopify_oauth_host");
   return response;
 }

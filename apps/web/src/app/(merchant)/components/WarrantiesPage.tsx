@@ -102,6 +102,74 @@ function statusTone(status: string): "success" | "attention" | "info" | "critica
   }
 }
 
+function parseBackfillResult(raw: string | null): {
+  processedOrders?: number;
+  warrantiesCreated?: number;
+  lookbackMonths?: number | null;
+} {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      processedOrders: typeof parsed.processedOrders === "number" ? parsed.processedOrders : undefined,
+      warrantiesCreated:
+        typeof parsed.warrantiesCreated === "number" ? parsed.warrantiesCreated : undefined,
+      lookbackMonths:
+        parsed.lookbackMonths === null
+          ? null
+          : typeof parsed.lookbackMonths === "number"
+            ? parsed.lookbackMonths
+            : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function backfillBannerTitle(job: Job): string {
+  if (job.status === "FAILED") return "Backfill failed";
+  if (job.status === "COMPLETED") return "Backfill finished";
+  if (job.status === "RUNNING" || job.status === "PENDING") return "Backfill in progress";
+  return `Backfill ${job.status.toLowerCase()}`;
+}
+
+function formatBackfillSummary(job: Job): string {
+  if (job.errorSummary) return job.errorSummary;
+
+  const result = parseBackfillResult(job.result);
+  const lookback =
+    result.lookbackMonths === 0 || result.lookbackMonths === null
+      ? "all available history"
+      : result.lookbackMonths
+        ? `the last ${result.lookbackMonths} months`
+        : null;
+
+  if (job.status === "COMPLETED") {
+    const orders = result.processedOrders ?? 0;
+    const created = result.warrantiesCreated ?? 0;
+    if (orders === 0 && created === 0) {
+      return lookback
+        ? `No matching orders were found in ${lookback}. Try a longer lookback or confirm order webhooks / Protected Customer Data access.`
+        : "No matching orders were found. Try a longer lookback or confirm order access.";
+    }
+    const parts = [
+      `Checked ${orders.toLocaleString()} order${orders === 1 ? "" : "s"}`,
+      `created ${created.toLocaleString()} warrant${created === 1 ? "y" : "ies"}`,
+    ];
+    if (lookback) parts.push(`from ${lookback}`);
+    return `${parts.join(", ")}.`;
+  }
+
+  if (job.status === "RUNNING" || job.status === "PENDING") {
+    if (job.progress > 0) {
+      return `Working through historical orders… ${job.progress.toLocaleString()} processed so far.`;
+    }
+    return "Queued — scanning Shopify orders for warranty coverage.";
+  }
+
+  return job.result ? String(job.result) : "Backfill status updated.";
+}
+
 export function WarrantiesPage() {
   const [nodes, setNodes] = useState<Warranty[]>([]);
   const [total, setTotal] = useState(0);
@@ -152,6 +220,14 @@ export function WarrantiesPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Poll while a backfill job is still running.
+  useEffect(() => {
+    const active = jobs.some((j) => j.status === "PENDING" || j.status === "RUNNING");
+    if (!active) return;
+    const id = window.setInterval(() => load(), 3000);
+    return () => window.clearInterval(id);
+  }, [jobs, load]);
 
   async function runBackfill() {
     setBusy(true);
@@ -312,13 +388,9 @@ export function WarrantiesPage() {
                     ? "success"
                     : "info"
               }
-              title={`Backfill ${latestJob.status.toLowerCase()}`}
+              title={backfillBannerTitle(latestJob)}
             >
-              <p>
-                Progress: {latestJob.progress}
-                {latestJob.result ? ` · ${latestJob.result}` : ""}
-                {latestJob.errorSummary ? ` · ${latestJob.errorSummary}` : ""}
-              </p>
+              <p>{formatBackfillSummary(latestJob)}</p>
             </Banner>
           </Layout.Section>
         ) : null}
@@ -424,9 +496,9 @@ export function WarrantiesPage() {
             <Select
               label="Lookback"
               options={[
-                { label: "12 months", value: "12" },
-                { label: "24 months", value: "24" },
-                { label: "All available", value: "0" },
+                { label: "Last 12 months", value: "12" },
+                { label: "Last 24 months (paid plans)", value: "24" },
+                { label: "All available history (paid plans)", value: "0" },
               ]}
               value={lookback}
               onChange={setLookback}
