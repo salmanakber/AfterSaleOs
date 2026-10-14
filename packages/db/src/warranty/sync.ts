@@ -1,4 +1,5 @@
 import { prisma } from "../client";
+import { canConsumeMonthlyQuota } from "../plan-limits";
 import { createWarrantiesForOrderLine, refreshWarrantiesForOrder, voidWarrantiesOnCancel } from "./engine";
 
 type ShopifyOrderPayload = {
@@ -31,31 +32,57 @@ type ShopifyOrderPayload = {
     sku?: string | null;
     quantity: number;
     price?: string;
+    properties?: Array<{ name?: string; value?: string }>;
   }>;
   fulfillments?: Array<{ created_at?: string; status?: string }>;
 };
 
+function attrYes(
+  notes: Array<{ name?: string; value?: string }> | undefined,
+  name: string,
+): boolean {
+  return (notes ?? []).some(
+    (n) => n?.name === name && String(n.value ?? "").toLowerCase() === "yes",
+  );
+}
+
 function orderWantsWarrantyRegistration(order: ShopifyOrderPayload): boolean {
-  const notes = order.note_attributes ?? [];
-  for (const n of notes) {
-    if (
-      n?.name === "aftersale_register_intent" &&
-      String(n.value ?? "").toLowerCase() === "yes"
-    ) {
-      return true;
-    }
-  }
+  if (attrYes(order.note_attributes, "aftersale_register_intent")) return true;
   if (order.attributes && !Array.isArray(order.attributes)) {
     return String(order.attributes.aftersale_register_intent ?? "").toLowerCase() === "yes";
   }
   if (Array.isArray(order.attributes)) {
-    return order.attributes.some(
-      (a) =>
-        a?.name === "aftersale_register_intent" &&
-        String(a.value ?? "").toLowerCase() === "yes",
-    );
+    return attrYes(order.attributes, "aftersale_register_intent");
+  }
+  // Line-item property set from PDP opt-in (product-scoped).
+  for (const item of order.line_items ?? []) {
+    if (attrYes(item.properties, "_aftersale_register") || attrYes(item.properties, "aftersale_register")) {
+      return true;
+    }
   }
   return false;
+}
+
+function orderHasWarrantyFeeLine(order: ShopifyOrderPayload, feeVariantId: string | null | undefined): boolean {
+  if (!feeVariantId) return false;
+  const want = feeVariantId.replace(/\D/g, "");
+  for (const item of order.line_items ?? []) {
+    const vid = String(item.variant_id ?? "").replace(/\D/g, "");
+    if (vid && vid === want) return true;
+    if (attrYes(item.properties, "_aftersale_warranty_fee")) return true;
+  }
+  return false;
+}
+
+function isFeeLineItem(
+  item: NonNullable<ShopifyOrderPayload["line_items"]>[number],
+  feeVariantId: string | null | undefined,
+): boolean {
+  if (attrYes(item.properties, "_aftersale_warranty_fee")) return true;
+  if (!feeVariantId) return false;
+  const want = feeVariantId.replace(/\D/g, "");
+  const vid = String(item.variant_id ?? "").replace(/\D/g, "");
+  return Boolean(want && vid && want === vid);
 }
 
 function gidNum(id: number | string | null | undefined): string | null {
@@ -105,6 +132,10 @@ export async function syncOrderFromWebhook(shopId: string, payload: unknown) {
       : null;
 
   const orderNumber = String(order.name ?? order.order_number ?? shopifyOrderId);
+  const optedIn = orderWantsWarrantyRegistration(order);
+  const paidFee = orderHasWarrantyFeeLine(order, shop.warrantyFeeVariantId);
+  const shouldCreateWarranties =
+    !shop.warrantyOptInRequired || optedIn || paidFee;
 
   const dbOrder = await prisma.order.upsert({
     where: { shopId_shopifyOrderId: { shopId, shopifyOrderId } },
@@ -131,6 +162,9 @@ export async function syncOrderFromWebhook(shopId: string, payload: unknown) {
       cancelledAt: order.cancelled_at ? new Date(order.cancelled_at) : undefined,
     },
   });
+
+  let warrantiesCreated = 0;
+  let skippedQuota = false;
 
   for (const item of order.line_items ?? []) {
     const shopifyLineItemId = String(item.id);
@@ -176,7 +210,22 @@ export async function syncOrderFromWebhook(shopId: string, payload: unknown) {
       },
     });
 
-    await createWarrantiesForOrderLine({
+    // Never create coverage on the warranty-fee product itself.
+    if (isFeeLineItem(item, shop.warrantyFeeVariantId)) continue;
+
+    if (!shouldCreateWarranties) continue;
+
+    const quota = await canConsumeMonthlyQuota(
+      shopId,
+      "warranties_created",
+      Math.max(1, item.quantity || 1),
+    );
+    if (!quota.ok) {
+      skippedQuota = true;
+      continue;
+    }
+
+    const { warranties } = await createWarrantiesForOrderLine({
       shopId,
       orderId: dbOrder.id,
       orderLineItemId: line.id,
@@ -191,11 +240,10 @@ export async function syncOrderFromWebhook(shopId: string, payload: unknown) {
       timeZone: shop.timezone,
       source: "ORDER",
     });
+    warrantiesCreated += warranties.length;
   }
 
-  // Product-page / cart checkbox → cart attribute aftersale_register_intent=yes
-  // Warranties are already created from rules above (no email confirmation).
-  if (orderWantsWarrantyRegistration(order)) {
+  if (optedIn || paidFee) {
     await prisma.activityLog.create({
       data: {
         shopId,
@@ -206,8 +254,38 @@ export async function syncOrderFromWebhook(shopId: string, payload: unknown) {
         meta: {
           orderNumber: dbOrder.orderNumber,
           email: dbOrder.email,
-          source: "aftersale_register_intent",
+          source: paidFee ? "warranty_fee" : "aftersale_register_intent",
+          warrantiesCreated,
+          skippedQuota,
+          optInRequired: shop.warrantyOptInRequired,
         },
+      },
+    });
+  } else if (shop.warrantyOptInRequired) {
+    await prisma.activityLog.create({
+      data: {
+        shopId,
+        actorType: "system",
+        action: "warranty.opt_in_skipped",
+        entityType: "order",
+        entityId: dbOrder.id,
+        meta: {
+          orderNumber: dbOrder.orderNumber,
+          reason: "no_checkout_opt_in",
+        },
+      },
+    });
+  }
+
+  if (skippedQuota) {
+    await prisma.activityLog.create({
+      data: {
+        shopId,
+        actorType: "system",
+        action: "warranty.quota_skipped",
+        entityType: "order",
+        entityId: dbOrder.id,
+        meta: { orderNumber: dbOrder.orderNumber, warrantiesCreated },
       },
     });
   }

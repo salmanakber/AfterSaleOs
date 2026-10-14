@@ -99,6 +99,14 @@ export async function remainingMonthlyQuota(shopId: string, metric: MonthlyMetri
   return { used, limit, remaining: Math.max(0, limit - used) };
 }
 
+/** Soft check for automated paths (webhooks). Returns false when over limit — does not throw. */
+export async function canConsumeMonthlyQuota(shopId: string, metric: MonthlyMetric, need = 1) {
+  const bal = await remainingMonthlyQuota(shopId, metric);
+  if (bal.limit <= 0) return { ok: false as const, ...bal };
+  if (bal.remaining < need) return { ok: false as const, ...bal };
+  return { ok: true as const, ...bal };
+}
+
 export async function assertWarrantyRulesQuota(shopId: string) {
   const plan = await assertShopHasPlan(shopId);
   if (!plan) return;

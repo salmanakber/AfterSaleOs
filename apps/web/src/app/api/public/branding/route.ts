@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { shopRepository } from "@aftersale/db";
+import { prisma, shopRepository } from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
 
 export const runtime = "nodejs";
@@ -14,6 +14,17 @@ export async function GET(request: NextRequest) {
   if (!shop || shop.status === "UNINSTALLED") {
     return NextResponse.json({ error: "Shop not found" }, { status: 404 });
   }
+
+  let warrantyFeeCents: number | null = null;
+  const feeVariantId = shop.warrantyFeeVariantId?.replace(/\D/g, "") || null;
+  if (shop.warrantyFeeEnabled && feeVariantId) {
+    const variant = await prisma.productVariant.findFirst({
+      where: { shopId: shop.id, shopifyVariantId: feeVariantId },
+      select: { priceCents: true },
+    });
+    warrantyFeeCents = variant?.priceCents ?? null;
+  }
+
   return NextResponse.json({
     shopName: shop.shopName ?? shop.shopDomain,
     shopDomain: shop.shopDomain,
@@ -26,5 +37,11 @@ export async function GET(request: NextRequest) {
     radius: shop.brandingRadius ?? 22,
     buttonStyle: shop.brandingButtonStyle ?? "solid",
     heroStyle: shop.brandingHeroStyle ?? "bold",
+    warrantyOptInRequired: shop.warrantyOptInRequired !== false,
+    warrantyFeeEnabled: Boolean(shop.warrantyFeeEnabled),
+    warrantyFeeVariantId: feeVariantId,
+    warrantyFeeLabel: shop.warrantyFeeLabel ?? "Product warranty registration",
+    warrantyFeeCents,
+    currency: shop.currency ?? "USD",
   });
 }

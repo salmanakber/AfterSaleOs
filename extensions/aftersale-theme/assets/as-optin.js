@@ -1,36 +1,199 @@
 (function () {
+  var ATTR_KEY = "aftersale_register_intent";
+
+  function moneyLabel(cents, currency) {
+    if (cents == null || !Number.isFinite(Number(cents))) return "";
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency: currency || "USD",
+      }).format(Number(cents) / 100);
+    } catch (e) {
+      return "$" + (Number(cents) / 100).toFixed(2);
+    }
+  }
+
   function syncPanel(root) {
     var check = root.querySelector("[data-as-optin-check]");
     var panel = root.querySelector("[data-as-optin-panel]");
+    var status = root.querySelector("[data-as-optin-status]");
     if (!check) return;
     if (panel) panel.hidden = !check.checked;
     root.classList.toggle("is-checked", check.checked);
+    root.classList.toggle("is-saving", false);
+    root.classList.toggle("is-saved", false);
+    if (status) {
+      status.textContent = check.checked
+        ? root.getAttribute("data-checked-status") ||
+          "Warranty will be registered when you complete checkout."
+        : "";
+      status.hidden = !check.checked;
+    }
     try {
       if (check.checked) {
-        sessionStorage.setItem("aftersale_register_intent", "1");
-        var url = root.getAttribute("data-register-url");
-        if (url) sessionStorage.setItem("aftersale_register_url", url);
+        sessionStorage.setItem(ATTR_KEY, "1");
       } else {
-        sessionStorage.removeItem("aftersale_register_intent");
+        sessionStorage.removeItem(ATTR_KEY);
         sessionStorage.removeItem("aftersale_register_url");
       }
     } catch (e) {
       /* ignore */
     }
-    setCartAttribute("aftersale_register_intent", check.checked ? "yes" : "");
+    injectFormAttributes(check.checked);
+    setCartAttribute(ATTR_KEY, check.checked ? "yes" : "").then(function () {
+      root.classList.toggle("is-saved", check.checked);
+      if (status && check.checked) {
+        status.textContent =
+          root.getAttribute("data-checked-status") ||
+          "Warranty will be registered when you complete checkout.";
+      }
+    });
+    syncWarrantyFee(root, check.checked);
   }
 
   function setCartAttribute(key, value) {
-    if (!window.fetch) return;
+    if (!window.fetch) return Promise.resolve();
     var attrs = {};
     attrs[key] = value || null;
-    fetch("/cart/update.js", {
+    return fetch("/cart/update.js", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ attributes: attrs }),
+      credentials: "same-origin",
     }).catch(function () {
       /* cart API optional */
     });
+  }
+
+  function injectFormAttributes(checked) {
+    var forms = document.querySelectorAll(
+      "form[action*='/cart'], form[action='/cart'], form[action$='/cart'], form[action*='/cart/add']",
+    );
+    forms.forEach(function (form) {
+      var existing = form.querySelector('input[name="attributes[' + ATTR_KEY + ']"]');
+      if (!checked) {
+        if (existing) existing.remove();
+        return;
+      }
+      if (!existing) {
+        existing = document.createElement("input");
+        existing.type = "hidden";
+        existing.name = "attributes[" + ATTR_KEY + "]";
+        form.appendChild(existing);
+      }
+      existing.value = "yes";
+    });
+  }
+
+  function getFeeVariantId(root) {
+    return (root.getAttribute("data-fee-variant-id") || "").replace(/\D/g, "");
+  }
+
+  function syncWarrantyFee(root, enabled) {
+    var variantId = getFeeVariantId(root);
+    if (!variantId || !window.fetch) return;
+    if (!enabled) {
+      removeFeeLines(variantId);
+      return;
+    }
+    fetch("/cart.js", { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (cart) {
+        var items = (cart && cart.items) || [];
+        var already = items.some(function (it) {
+          return (
+            String(it.variant_id) === variantId ||
+            (it.properties && it.properties._aftersale_warranty_fee === "1")
+          );
+        });
+        if (already) return;
+        return fetch("/cart/add.js", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            items: [
+              {
+                id: Number(variantId),
+                quantity: 1,
+                properties: { _aftersale_warranty_fee: "1" },
+              },
+            ],
+          }),
+        });
+      })
+      .catch(function () {
+        /* fee add optional */
+      });
+  }
+
+  function removeFeeLines(variantId) {
+    fetch("/cart.js", { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (cart) {
+        var updates = {};
+        var changed = false;
+        ((cart && cart.items) || []).forEach(function (it) {
+          var isFee =
+            String(it.variant_id) === variantId ||
+            (it.properties && it.properties._aftersale_warranty_fee === "1");
+          if (isFee) {
+            updates[it.key] = 0;
+            changed = true;
+          }
+        });
+        if (!changed) return;
+        return fetch("/cart/update.js", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ updates: updates }),
+        });
+      })
+      .catch(function () {
+        /* ignore */
+      });
+  }
+
+  function applyFeeConfig(root, cfg) {
+    if (!cfg || !cfg.warrantyFeeEnabled || !cfg.warrantyFeeVariantId) {
+      root.removeAttribute("data-fee-variant-id");
+      var feeNote = root.querySelector("[data-as-fee-note]");
+      if (feeNote) feeNote.hidden = true;
+      return;
+    }
+    root.setAttribute("data-fee-variant-id", String(cfg.warrantyFeeVariantId));
+    var note = root.querySelector("[data-as-fee-note]");
+    if (note) {
+      var label = cfg.warrantyFeeLabel || "Warranty registration";
+      var price = moneyLabel(cfg.warrantyFeeCents, cfg.currency);
+      note.textContent = price
+        ? label + " · " + price + " added at checkout when checked"
+        : label + " fee applies when checked";
+      note.hidden = false;
+    }
+  }
+
+  function loadFeeConfig(root) {
+    var shop = root.getAttribute("data-shop") || "";
+    var api = root.getAttribute("data-fee-api") || "";
+    if (!shop || !api || !window.fetch) return;
+    fetch(api + (api.indexOf("?") >= 0 ? "&" : "?") + "shop=" + encodeURIComponent(shop), {
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (json) {
+        if (json) applyFeeConfig(root, json);
+      })
+      .catch(function () {
+        /* ignore */
+      });
   }
 
   function bind(root) {
@@ -38,26 +201,34 @@
     root.dataset.asBound = "1";
     var check = root.querySelector("[data-as-optin-check]");
     var btn = root.querySelector("[data-as-optin-btn]");
+    loadFeeConfig(root);
     if (btn) {
+      // Portal link styles only — never used as the checkbox control.
       btn.addEventListener("click", function () {
         try {
-          sessionStorage.setItem("aftersale_register_intent", "1");
-          var url = root.getAttribute("data-register-url");
-          if (url) sessionStorage.setItem("aftersale_register_url", url);
+          sessionStorage.setItem(ATTR_KEY, "1");
         } catch (e) {
           /* ignore */
         }
-        setCartAttribute("aftersale_register_intent", "yes");
+        setCartAttribute(ATTR_KEY, "yes");
       });
     }
     if (!check) return;
-    // Ensure clicks on the custom box toggle the input
     check.addEventListener("change", function () {
       syncPanel(root);
     });
     check.addEventListener("click", function (e) {
       e.stopPropagation();
     });
+    var card = root.querySelector("[data-as-optin-card]");
+    if (card) {
+      card.addEventListener("click", function (e) {
+        if (e.target === check || (e.target && e.target.closest && e.target.closest("a,label"))) return;
+        e.preventDefault();
+        check.checked = !check.checked;
+        syncPanel(root);
+      });
+    }
     syncPanel(root);
   }
 
@@ -141,9 +312,28 @@
     bind(embed);
   }
 
+  function reassertIntentBeforeCheckout(e) {
+    var target = e.target;
+    if (!target || !target.closest) return;
+    var checkout =
+      target.closest("[name='checkout']") ||
+      target.closest("button[name='checkout']") ||
+      target.closest(".cart__checkout-button") ||
+      target.closest("[data-cart-checkout]");
+    if (!checkout) return;
+    var checked = document.querySelector("[data-as-optin-check]:checked");
+    if (!checked) return;
+    injectFormAttributes(true);
+    setCartAttribute(ATTR_KEY, "yes");
+  }
+
   function init() {
     document.querySelectorAll("[data-as-optin]").forEach(bind);
     mountEmbed();
+    if (!document.documentElement.dataset.asOptinCheckoutGuard) {
+      document.documentElement.dataset.asOptinCheckoutGuard = "1";
+      document.addEventListener("click", reassertIntentBeforeCheckout, true);
+    }
   }
 
   if (document.readyState === "loading") {

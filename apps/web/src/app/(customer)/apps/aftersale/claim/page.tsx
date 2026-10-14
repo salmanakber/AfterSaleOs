@@ -3,6 +3,11 @@
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { publicApiUrl } from "@/lib/public-api";
+import {
+  loadCustomerOrderSession,
+  saveCustomerOrderSession,
+  type CachedOrder,
+} from "@/lib/customer-order-session";
 import { BrandLoader } from "../../../components/BrandLoader";
 import { CustomerShell } from "../../../components/CustomerShell";
 import { OrderPicker } from "../../../components/OrderPicker";
@@ -10,17 +15,23 @@ import { OrderPicker } from "../../../components/OrderPicker";
 function ClaimFormInner() {
   const params = useSearchParams();
   const shop = params.get("shop") ?? "";
-  const certificateToken = params.get("certificate") ?? "";
+  const certificateFromUrl = params.get("certificate") ?? "";
   const embed = params.get("embed") === "1";
   const themeLocal = params.get("theme") === "local" || embed;
   const accentOverride = params.get("accent");
   const prefillEmail = params.get("email") ?? "";
+  const prefillOrder = params.get("order") ?? "";
   const query = useMemo(() => params.toString(), [params]);
 
   const [email, setEmail] = useState(prefillEmail);
   const [name, setName] = useState("");
-  const [orderNumber, setOrderNumber] = useState("");
+  const [orderNumber, setOrderNumber] = useState(prefillOrder);
   const [serial, setSerial] = useState("");
+  const [certificateToken, setCertificateToken] = useState(certificateFromUrl);
+  const [selectedLineId, setSelectedLineId] = useState("");
+  const [productTitle, setProductTitle] = useState("");
+  const [seedOrders, setSeedOrders] = useState<CachedOrder[]>([]);
+  const [sessionReady, setSessionReady] = useState(Boolean(prefillEmail));
   const [category, setCategory] = useState("defect");
   const [summary, setSummary] = useState("");
   const [details, setDetails] = useState("");
@@ -29,6 +40,7 @@ function ClaimFormInner() {
   const [error, setError] = useState<string | null>(null);
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const [result, setResult] = useState<{
     claimNumber: string;
     trackingUrl: string;
@@ -36,11 +48,32 @@ function ClaimFormInner() {
     eligibility: string;
   } | null>(null);
 
-  const loggedInEmail = Boolean(prefillEmail);
+  const showPicker = sessionReady && Boolean(email && shop);
 
   useEffect(() => {
-    if (prefillEmail) setEmail(prefillEmail);
-  }, [prefillEmail]);
+    if (prefillEmail) {
+      setEmail(prefillEmail);
+      setSessionReady(true);
+    }
+    if (prefillOrder) setOrderNumber(prefillOrder);
+    if (certificateFromUrl) setCertificateToken(certificateFromUrl);
+  }, [prefillEmail, prefillOrder, certificateFromUrl]);
+
+  useEffect(() => {
+    if (!shop) return;
+    const cached = loadCustomerOrderSession(shop);
+    if (!cached) {
+      setHydrated(true);
+      return;
+    }
+    if (!prefillEmail) setEmail(cached.email);
+    setSeedOrders(cached.orders);
+    setSessionReady(true);
+    if (!prefillOrder && cached.orders[0]) {
+      setOrderNumber(cached.orders[0].orderNumber);
+    }
+    setHydrated(true);
+  }, [shop, prefillEmail, prefillOrder]);
 
   async function requestVerify(e: FormEvent) {
     e.preventDefault();
@@ -55,9 +88,20 @@ function ClaimFormInner() {
         body: JSON.stringify({ email, orderNumber, shop }),
       });
       const json = await res.json();
-      if (json.portal?.orders?.[0]) {
-        setOrderNumber(json.portal.orders[0].orderNumber);
-        setVerifyMsg(json.emailHint ?? "Verified — you can continue your claim.");
+      if (json.portal?.orders?.length) {
+        const orders = json.portal.orders as CachedOrder[];
+        setSeedOrders(orders);
+        setSessionReady(true);
+        setOrderNumber(orders[0]?.orderNumber ?? orderNumber);
+        saveCustomerOrderSession({
+          shop,
+          email: json.portal.email ?? email,
+          orders,
+          warranties: json.portal.warranties ?? [],
+          source: "guest_verify",
+        });
+        if (json.portal.email) setEmail(json.portal.email);
+        setVerifyMsg(json.emailHint ?? "Verified — pick the product to claim.");
       } else {
         setVerifyMsg(json.message ?? "If we find a matching order, you will receive an email shortly.");
       }
@@ -65,6 +109,23 @@ function ClaimFormInner() {
       setError(err instanceof Error ? err.message : "Verification failed");
     } finally {
       setVerifying(false);
+    }
+  }
+
+  function onPickOrder(o: CachedOrder, lineItemId?: string) {
+    setOrderNumber(o.orderNumber);
+    const line = lineItemId
+      ? o.lineItems.find((li) => li.id === lineItemId)
+      : undefined;
+    if (line) {
+      setSelectedLineId(line.id);
+      setProductTitle(line.title);
+      if (line.certificateToken && !certificateFromUrl) {
+        setCertificateToken(line.certificateToken);
+      }
+    } else {
+      setSelectedLineId("");
+      setProductTitle("");
     }
   }
 
@@ -158,7 +219,7 @@ function ClaimFormInner() {
   return (
     <CustomerShell
       title="Submit a claim"
-      lede="Tell us what happened. Photos help us resolve faster."
+      lede="Pick your order and product, then tell us what happened."
       shopDomain={shop}
       embed={embed}
       themeLocal={themeLocal}
@@ -166,20 +227,26 @@ function ClaimFormInner() {
       steps={["Describe", "Evidence", "Submitted"]}
       activeStep={summary.trim() ? 1 : 0}
     >
-      {loggedInEmail && shop ? (
+      {showPicker && hydrated ? (
         <div style={{ marginBottom: 16 }}>
           <OrderPicker
             shop={shop}
             email={email}
             selectedOrderNumber={orderNumber}
-            mode="order"
-            onSelect={(o) => setOrderNumber(o.orderNumber)}
+            selectedLineId={selectedLineId}
+            mode="line"
+            seedOrders={seedOrders}
+            purpose="claim"
+            onSelect={onPickOrder}
           />
         </div>
-      ) : (
+      ) : null}
+
+      {!sessionReady ? (
         <form onSubmit={requestVerify} style={{ marginBottom: 18 }}>
           <p className="as-muted" style={{ marginTop: 0 }}>
-            Verify with the email and order from your purchase first — then finish the claim details.
+            Verify once with the email and order from your purchase. We’ll save your orders in this
+            browser so claim and register stay easy.
           </p>
           <label className="as-label">Email</label>
           <input
@@ -200,9 +267,13 @@ function ClaimFormInner() {
           />
           {verifyMsg ? <div className="as-alert as-alert-ok">{verifyMsg}</div> : null}
           <button className="as-btn as-btn-secondary" type="submit" disabled={verifying || !shop}>
-            {verifying ? "Checking…" : "Verify my order"}
+            {verifying ? "Checking…" : "Find my orders"}
           </button>
         </form>
+      ) : (
+        <div className="as-alert as-alert-ok" style={{ marginBottom: 16 }}>
+          Orders loaded for {email}. Select a product above, then finish the claim details.
+        </div>
       )}
 
       <form onSubmit={onSubmit}>
@@ -217,7 +288,7 @@ function ClaimFormInner() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
-              readOnly={loggedInEmail}
+              readOnly={sessionReady}
             />
           </div>
           <div>
@@ -241,6 +312,13 @@ function ClaimFormInner() {
             <input className="as-input" value={serial} onChange={(e) => setSerial(e.target.value)} />
           </div>
         </div>
+
+        {productTitle ? (
+          <>
+            <label className="as-label">Product</label>
+            <input className="as-input" value={productTitle} readOnly />
+          </>
+        ) : null}
 
         <hr className="as-divider" />
         <p className="as-section-title">What happened</p>
@@ -282,7 +360,9 @@ function ClaimFormInner() {
           onChange={(e) => setFiles(e.target.files)}
         />
 
-        {certificateToken ? <p className="as-muted">Linked to your warranty certificate.</p> : null}
+        {certificateToken ? (
+          <p className="as-muted">Linked to warranty certificate for this product.</p>
+        ) : null}
         {error ? <div className="as-alert as-alert-error">{error}</div> : null}
 
         <button className="as-btn" type="submit" disabled={loading || !shop}>

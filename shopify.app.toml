@@ -40,16 +40,17 @@ api_version = "2025-01"
   ]
   uri = "/api/webhooks/shopify"
 
-  # Re-enable AFTER Partners → App → API access → Protected customer data is approved:
-  # [[webhooks.subscriptions]]
-  # topics = [
-  #   "orders/create",
-  #   "orders/updated",
-  #   "orders/cancelled",
-  #   "refunds/create",
-  #   "customers/update"
-  # ]
-  # uri = "/api/webhooks/shopify"
+  # Order / customer topics — require Protected Customer Data approval in Partners.
+  # Without these, live checkout→warranty will not run (backfill still works).
+  [[webhooks.subscriptions]]
+  topics = [
+    "orders/create",
+    "orders/updated",
+    "orders/cancelled",
+    "refunds/create",
+    "customers/update"
+  ]
+  uri = "/api/webhooks/shopify"
 
 [pos]
 embedded = false

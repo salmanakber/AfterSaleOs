@@ -27,6 +27,10 @@ type ShopSettings = {
   brandingButtonStyle: string | null;
   brandingHeroStyle: string | null;
   voidWarrantyOnRefund: boolean;
+  warrantyOptInRequired: boolean;
+  warrantyFeeEnabled: boolean;
+  warrantyFeeVariantId: string | null;
+  warrantyFeeLabel: string | null;
   timezone: string;
   shopDomain: string;
   shopName: string | null;
@@ -46,6 +50,10 @@ const QUERY = `#graphql
         brandingButtonStyle
         brandingHeroStyle
         voidWarrantyOnRefund
+        warrantyOptInRequired
+        warrantyFeeEnabled
+        warrantyFeeVariantId
+        warrantyFeeLabel
         timezone
         shopDomain
         shopName
@@ -79,6 +87,10 @@ export function SettingsPage() {
   const [heroStyle, setHeroStyle] = useState("bold");
   const [timezone, setTimezone] = useState("UTC");
   const [voidOnRefund, setVoidOnRefund] = useState(true);
+  const [optInRequired, setOptInRequired] = useState(true);
+  const [feeEnabled, setFeeEnabled] = useState(false);
+  const [feeVariantId, setFeeVariantId] = useState("");
+  const [feeLabel, setFeeLabel] = useState("Product warranty registration");
   const [shopDomain, setShopDomain] = useState("");
   const [shopName, setShopName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +100,7 @@ export function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "brand" | "share" | "embed" | "preview" | "guide" | "placement"
+    "brand" | "share" | "embed" | "preview" | "guide" | "placement" | "warranty"
   >("guide");
   const [previewKind, setPreviewKind] = useState<PreviewKind>("portal");
   const [embedHeight, setEmbedHeight] = useState(720);
@@ -103,7 +115,8 @@ export function SettingsPage() {
         tab === "embed" ||
         tab === "preview" ||
         tab === "guide" ||
-        tab === "placement"
+        tab === "placement" ||
+        tab === "warranty"
       ) {
         setActiveTab(tab);
       }
@@ -146,6 +159,10 @@ export function SettingsPage() {
         setHeroStyle(d.home.shop.brandingHeroStyle ?? "bold");
         setTimezone(d.home.shop.timezone ?? "UTC");
         setVoidOnRefund(d.home.shop.voidWarrantyOnRefund);
+        setOptInRequired(d.home.shop.warrantyOptInRequired !== false);
+        setFeeEnabled(Boolean(d.home.shop.warrantyFeeEnabled));
+        setFeeVariantId(d.home.shop.warrantyFeeVariantId ?? "");
+        setFeeLabel(d.home.shop.warrantyFeeLabel ?? "Product warranty registration");
         setShopDomain(d.home.shop.shopDomain);
         setShopName(d.home.shop.shopName ?? d.home.shop.shopDomain);
       })
@@ -190,14 +207,39 @@ export function SettingsPage() {
     try {
       await gqlRequest(
         `#graphql
-        mutation SavePrefs($timezone: String, $voidWarrantyOnRefund: Boolean) {
-          updateShopSettings(timezone: $timezone, voidWarrantyOnRefund: $voidWarrantyOnRefund) {
+        mutation SavePrefs(
+          $timezone: String
+          $voidWarrantyOnRefund: Boolean
+          $warrantyOptInRequired: Boolean
+          $warrantyFeeEnabled: Boolean
+          $warrantyFeeVariantId: String
+          $warrantyFeeLabel: String
+        ) {
+          updateShopSettings(
+            timezone: $timezone
+            voidWarrantyOnRefund: $voidWarrantyOnRefund
+            warrantyOptInRequired: $warrantyOptInRequired
+            warrantyFeeEnabled: $warrantyFeeEnabled
+            warrantyFeeVariantId: $warrantyFeeVariantId
+            warrantyFeeLabel: $warrantyFeeLabel
+          ) {
             id
             timezone
             voidWarrantyOnRefund
+            warrantyOptInRequired
+            warrantyFeeEnabled
+            warrantyFeeVariantId
+            warrantyFeeLabel
           }
         }`,
-        { timezone, voidWarrantyOnRefund: voidOnRefund },
+        {
+          timezone,
+          voidWarrantyOnRefund: voidOnRefund,
+          warrantyOptInRequired: optInRequired,
+          warrantyFeeEnabled: feeEnabled,
+          warrantyFeeVariantId: feeVariantId.trim() || null,
+          warrantyFeeLabel: feeLabel.trim() || "Product warranty registration",
+        },
       );
       setSaved(true);
     } catch (err) {
@@ -330,6 +372,9 @@ export function SettingsPage() {
           <button type="button" className="as-m-chip as-m-chip-accent" onClick={() => setActiveTab("placement")}>
             Product · cart · checkout
           </button>
+          <button type="button" className="as-m-chip as-m-chip-accent" onClick={() => setActiveTab("warranty")}>
+            Warranty fee
+          </button>
           <button type="button" className="as-m-chip" onClick={() => openOutsideAdmin(hosted.portal)}>
             Open portal
           </button>
@@ -360,6 +405,7 @@ export function SettingsPage() {
           [
             ["guide", "How it works"],
             ["placement", "Product · cart · checkout"],
+            ["warranty", "Warranty checkout"],
             ["brand", "Branding"],
             ["share", "Share & theme"],
             ["embed", "Embed code"],
@@ -459,6 +505,113 @@ export function SettingsPage() {
         </div>
       ) : null}
 
+      {activeTab === "warranty" ? (
+        <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-warranty">
+          <div className="as-m-panel-title">
+            <h3>Checkout warranty registration</h3>
+          </div>
+          <p className="as-m-guide-lead">
+            When the storefront checkbox is checked, the order is marked for warranty registration.
+            Coverage is created after checkout (requires a matching warranty rule and the{" "}
+            <code>orders/create</code> webhook). Optionally charge a fee by adding a Shopify product
+            variant to the cart when the box is checked.
+          </p>
+          <form
+            onSubmit={(e) => {
+              void onSavePreferences(e);
+            }}
+          >
+            <FormLayout>
+              <label className="as-m-toggle">
+                <input
+                  type="checkbox"
+                  checked={optInRequired}
+                  onChange={(e) => setOptInRequired(e.target.checked)}
+                />
+                <span>
+                  <strong style={{ display: "block", fontSize: 13 }}>
+                    Only register when checkbox is checked
+                  </strong>
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>
+                    Off = create warranties for every matching order automatically (no opt-in needed)
+                  </span>
+                </span>
+              </label>
+              <label className="as-m-toggle">
+                <input
+                  type="checkbox"
+                  checked={feeEnabled}
+                  onChange={(e) => setFeeEnabled(e.target.checked)}
+                />
+                <span>
+                  <strong style={{ display: "block", fontSize: 13 }}>
+                    Charge a warranty registration fee
+                  </strong>
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>
+                    Leave off for free registration. When on, checking the box adds your fee product
+                    to the cart.
+                  </span>
+                </span>
+              </label>
+              {feeEnabled ? (
+                <>
+                  <TextField
+                    label="Fee product variant ID"
+                    helpText="Shopify Admin → Products → your fee product → variant. Use the numeric variant ID (or paste the GID)."
+                    value={feeVariantId}
+                    onChange={setFeeVariantId}
+                    autoComplete="off"
+                    placeholder="e.g. 40123456789012"
+                  />
+                  <TextField
+                    label="Fee label on storefront"
+                    value={feeLabel}
+                    onChange={setFeeLabel}
+                    autoComplete="off"
+                  />
+                </>
+              ) : null}
+              <TextField label="Timezone" value={timezone} onChange={setTimezone} autoComplete="off" />
+              <label className="as-m-toggle">
+                <input
+                  type="checkbox"
+                  checked={voidOnRefund}
+                  onChange={(e) => setVoidOnRefund(e.target.checked)}
+                />
+                <span>
+                  <strong style={{ display: "block", fontSize: 13 }}>Void warranty on refund</strong>
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>
+                    Keep coverage aligned with refunded orders
+                  </span>
+                </span>
+              </label>
+              <Button submit variant="primary" loading={busy}>
+                Save warranty settings
+              </Button>
+            </FormLayout>
+          </form>
+          <div className="as-m-liquid-guide" style={{ marginTop: 16 }}>
+            <strong>Setup checklist</strong>
+            <ol>
+              <li>
+                Create a warranty rule that matches the products you sell (Products &amp; rules).
+              </li>
+              <li>
+                Enable <strong>Warranty opt-in (auto)</strong> in theme App embeds — style must be{" "}
+                <em>Checkbox</em> (not portal button).
+              </li>
+              <li>
+                For a paid fee: create a simple Shopify product (e.g. “Warranty registration”), set
+                the price, then paste its variant ID above.
+              </li>
+              <li>
+                Usage meters on Plans count each warranty created against Free / paid plan limits.
+              </li>
+            </ol>
+          </div>
+        </div>
+      ) : null}
+
       {activeTab === "placement" ? (
         <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-placement">
           <div className="as-m-panel-title">
@@ -467,7 +620,8 @@ export function SettingsPage() {
           <p className="as-m-guide-lead">
             Enable <strong>one App embed</strong> — no need to add a block on every product template.
             The checkbox appears next to <strong>Add to cart</strong> and again near checkout on the
-            cart. Checkout itself cannot host Liquid; use the thank-you block after payment.
+            cart. Checking it registers warranty on the order — it does not open the registration
+            portal. Checkout itself cannot host Liquid; use the thank-you block after payment.
           </p>
 
           <div className="as-m-liquid-guide" style={{ marginBottom: 14 }}>

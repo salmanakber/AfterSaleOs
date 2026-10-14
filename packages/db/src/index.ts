@@ -22,6 +22,7 @@ export {
   assertWarrantyRulesQuota,
   assertBackfillLookback,
   remainingMonthlyQuota,
+  canConsumeMonthlyQuota,
   getShopWithPlan,
   type MonthlyMetric,
   type PlanFeatureFlag,

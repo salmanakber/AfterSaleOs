@@ -3,37 +3,17 @@
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { customerPageUrl, publicApiUrl } from "@/lib/public-api";
+import {
+  loadCustomerOrderSession,
+  saveCustomerOrderSession,
+  type CachedOrder,
+  type CachedWarranty,
+} from "@/lib/customer-order-session";
 import { BrandLoader } from "../../../components/BrandLoader";
 import { CustomerShell } from "../../../components/CustomerShell";
 
-type WarrantyRow = {
-  id: string;
-  status: string;
-  productTitle: string;
-  orderNumber: string;
-  serialNumber: string | null;
-  certificateToken: string;
-  startAt: string | null;
-  endAt: string | null;
-  ruleName?: string;
-};
-
-type OrderRow = {
-  id: string;
-  orderNumber: string;
-  processedAt: string;
-  lineItems: Array<{
-    id: string;
-    title: string;
-    quantity: number;
-    shopifyProductId: string | null;
-    shopifyVariantId: string | null;
-    hasWarranty: boolean;
-    certificateToken: string | null;
-  }>;
-};
-
-const CACHE_KEY = "aftersale.portal.v1";
+type WarrantyRow = CachedWarranty;
+type OrderRow = CachedOrder;
 
 function PortalInner() {
   const params = useSearchParams();
@@ -56,27 +36,14 @@ function PortalInner() {
     if (prefillEmail) setEmail(prefillEmail);
   }, [prefillEmail]);
 
-  // Restore cached session for this shop
+  // Restore cached session for this shop (shared with register / claim)
   useEffect(() => {
     if (!shop || token) return;
-    try {
-      const raw = localStorage.getItem(CACHE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as {
-        shop?: string;
-        email?: string;
-        warranties?: WarrantyRow[];
-        orders?: OrderRow[];
-        at?: number;
-      };
-      if (parsed.shop !== shop) return;
-      if (!parsed.at || Date.now() - parsed.at > 1000 * 60 * 60 * 12) return;
-      setSessionEmail(parsed.email ?? null);
-      setWarranties(parsed.warranties ?? []);
-      setOrders(parsed.orders ?? []);
-    } catch {
-      /* ignore */
-    }
+    const cached = loadCustomerOrderSession(shop);
+    if (!cached) return;
+    setSessionEmail(cached.email);
+    setWarranties(cached.warranties);
+    setOrders(cached.orders);
   }, [shop, token]);
 
   useEffect(() => {
@@ -96,7 +63,15 @@ function PortalInner() {
         setSessionEmail(json.email ?? null);
         setWarranties(json.warranties ?? []);
         setOrders(json.orders ?? null);
-        cachePortal(shop, json.email, json.warranties ?? [], json.orders ?? []);
+        if (json.email) {
+          saveCustomerOrderSession({
+            shop,
+            email: json.email,
+            orders: json.orders ?? [],
+            warranties: json.warranties ?? [],
+            source: "portal_token",
+          });
+        }
       } catch (err) {
         if (!cancelled) setMessage(err instanceof Error ? err.message : "Could not open portal");
       } finally {
@@ -107,22 +82,6 @@ function PortalInner() {
       cancelled = true;
     };
   }, [token, shop]);
-
-  function cachePortal(
-    shopDomain: string,
-    em: string | null | undefined,
-    w: WarrantyRow[],
-    o: OrderRow[],
-  ) {
-    try {
-      localStorage.setItem(
-        CACHE_KEY,
-        JSON.stringify({ shop: shopDomain, email: em, warranties: w, orders: o, at: Date.now() }),
-      );
-    } catch {
-      /* ignore */
-    }
-  }
 
   async function requestLink(e: FormEvent) {
     e.preventDefault();
@@ -144,7 +103,15 @@ function PortalInner() {
         setSessionEmail(json.portal.email);
         setWarranties(json.portal.warranties);
         setOrders(json.portal.orders ?? []);
-        cachePortal(shop, json.portal.email, json.portal.warranties, json.portal.orders ?? []);
+        if (json.portal.email) {
+          saveCustomerOrderSession({
+            shop,
+            email: json.portal.email,
+            orders: json.portal.orders ?? [],
+            warranties: json.portal.warranties ?? [],
+            source: "guest_verify",
+          });
+        }
         setMessage(json.emailHint ?? "Portal opened.");
       } else {
         setMessage(json.message ?? "If we find a matching order, you will receive an email shortly.");

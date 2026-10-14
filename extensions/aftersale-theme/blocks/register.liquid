@@ -12,7 +12,7 @@
 <div class="as-register-block" style="--as-btn-accent: {{ accent }};" {{ block.shopify_attributes }}>
   <a
     class="as-register-block__btn"
-    href="{{ as_app_url }}/apps/aftersale/register?shop={{ shop.permanent_domain }}{% if product %}&product={{ product_q }}&product_id={{ product.id }}{% if product.selected_or_first_available_variant %}&variant_id={{ product.selected_or_first_available_variant.id }}{% endif %}{% endif %}"
+    href="{{ as_app_url }}/apps/aftersale/register?shop={{ shop.permanent_domain }}{% if product %}&product={{ product_q }}&product_id={{ product.id }}{% if product.selected_or_first_available_variant %}&variant_id={{ product.selected_or_first_available_variant.id }}{% endif %}{% endif %}{% if customer and customer.email != blank %}&email={{ customer.email | url_encode }}{% endif %}"
   >
     {{ block.settings.button_label | default: "Register for warranty" }}
   </a>

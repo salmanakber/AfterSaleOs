@@ -1,6 +1,7 @@
 {% comment %}
   App embed — enable once: Theme settings → App embeds → Warranty opt-in
   Auto-places near Add to cart on product pages and near checkout on cart.
+  Checkbox = register intent at checkout (does NOT navigate to the portal).
 {% endcomment %}
 
 {% assign accent = block.settings.accent_color | default: '#0f172a' %}
@@ -9,6 +10,7 @@
 {% assign style = block.settings.display_style | default: 'checkbox_card' %}
 {% assign as_app_url = 'https://aftersale.tidyflowapp.com' %}
 {% assign register_url = as_app_url | append: '/apps/aftersale/register?shop=' | append: shop.permanent_domain %}
+{% assign fee_api = as_app_url | append: '/api/public/branding' %}
 {% assign mount_on = '' %}
 
 {% if template.name == 'product' and product %}
@@ -33,7 +35,10 @@
     data-as-embed-mount
     data-as-mount="{{ mount_on }}"
     data-as-style="{{ style }}"
+    data-shop="{{ shop.permanent_domain }}"
+    data-fee-api="{{ fee_api }}"
     data-register-url="{{ register_url }}"
+    data-checked-status="{{ block.settings.checked_hint | default: 'Warranty will be registered when you complete checkout.' | escape }}"
   >
     {% if style == 'button' %}
       <a class="as-optin__btn" href="{{ register_url }}" data-as-optin-btn>
@@ -50,12 +55,12 @@
             <span class="as-optin__sub">{{ block.settings.subtitle }}</span>
           {% endif %}
         </div>
-        <a class="as-optin__cta as-optin__cta--inline" href="{{ register_url }}">
+        <a class="as-optin__cta as-optin__cta--inline" href="{{ register_url }}" data-as-optin-btn>
           {{ block.settings.cta_label }}
         </a>
       </div>
     {% else %}
-      <label class="as-optin__card" for="as-optin-check-{{ block.id }}">
+      <div class="as-optin__card" data-as-optin-card>
         <span class="as-optin__checkwrap">
           <input
             id="as-optin-check-{{ block.id }}"
@@ -69,17 +74,15 @@
           <span class="as-optin__box" aria-hidden="true"></span>
         </span>
         <span class="as-optin__copy">
-          <span class="as-optin__title">{{ block.settings.title }}</span>
+          <label class="as-optin__title" for="as-optin-check-{{ block.id }}">{{ block.settings.title }}</label>
           {% if block.settings.subtitle != blank %}
             <span class="as-optin__sub">{{ block.settings.subtitle }}</span>
           {% endif %}
+          <span class="as-optin__fee" data-as-fee-note hidden></span>
         </span>
-      </label>
-      <div class="as-optin__panel" data-as-optin-panel hidden>
-        {% if block.settings.checked_hint != blank %}
-          <p class="as-optin__hint">{{ block.settings.checked_hint }}</p>
-        {% endif %}
-        <a class="as-optin__cta" href="{{ register_url }}">{{ block.settings.cta_label }}</a>
+      </div>
+      <div class="as-optin__panel as-optin__panel--confirm" data-as-optin-panel hidden>
+        <p class="as-optin__status" data-as-optin-status role="status"></p>
       </div>
     {% endif %}
   </div>
@@ -95,16 +98,16 @@
   "settings": [
     {
       "type": "paragraph",
-      "content": "When enabled, shows next to Add to cart on product pages and near checkout on the cart. Customize copy and colors below — no block to add on each template."
+      "content": "Shows next to Add to cart / checkout. Checking the box registers warranty after purchase — it does not open another page."
     },
     {
       "type": "select",
       "id": "display_style",
       "label": "Style",
       "options": [
-        { "value": "checkbox_card", "label": "Checkbox" },
-        { "value": "soft_banner", "label": "Text + button" },
-        { "value": "button", "label": "Button only" }
+        { "value": "checkbox_card", "label": "Checkbox (recommended)" },
+        { "value": "soft_banner", "label": "Text + portal button" },
+        { "value": "button", "label": "Portal button only" }
       ],
       "default": "checkbox_card"
     },
@@ -112,24 +115,24 @@
       "type": "text",
       "id": "title",
       "label": "Title",
-      "default": "Register this product for warranty"
+      "default": "Include free warranty registration"
     },
     {
       "type": "textarea",
       "id": "subtitle",
       "label": "Supporting text",
-      "default": "Optional — keep coverage after you buy."
+      "default": "Check this box to register coverage automatically after you buy."
     },
     {
       "type": "text",
       "id": "checked_hint",
-      "label": "Text when checked",
-      "default": "You can register now or after checkout."
+      "label": "Confirmation when checked",
+      "default": "Warranty will be registered when you complete checkout."
     },
     {
       "type": "text",
       "id": "cta_label",
-      "label": "Button label",
+      "label": "Portal button label (button styles only)",
       "default": "Register for warranty"
     },
     {

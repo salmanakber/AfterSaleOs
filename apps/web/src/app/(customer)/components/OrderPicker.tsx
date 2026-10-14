@@ -2,21 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { publicApiUrl } from "@/lib/public-api";
+import {
+  saveCustomerOrderSession,
+  type CachedOrder,
+} from "@/lib/customer-order-session";
 
-export type OrderOption = {
-  id: string;
-  orderNumber: string;
-  processedAt: string;
-  lineItems: Array<{
-    id: string;
-    title: string;
-    quantity: number;
-    shopifyProductId: string | null;
-    shopifyVariantId: string | null;
-    hasWarranty: boolean;
-    certificateToken: string | null;
-  }>;
-};
+export type OrderOption = CachedOrder;
 
 /** Pick an order (and optionally a line item) when the customer email is known. */
 export function OrderPicker({
@@ -26,6 +17,8 @@ export function OrderPicker({
   selectedLineId,
   onSelect,
   mode = "order",
+  seedOrders,
+  purpose = "register",
 }: {
   shop: string;
   email: string;
@@ -33,16 +26,26 @@ export function OrderPicker({
   selectedLineId?: string;
   onSelect: (order: OrderOption, lineItemId?: string) => void;
   mode?: "order" | "line";
+  /** Instant list from guest verify / local session before network refresh */
+  seedOrders?: OrderOption[];
+  purpose?: "register" | "claim";
 }) {
-  const [orders, setOrders] = useState<OrderOption[]>([]);
+  const [orders, setOrders] = useState<OrderOption[]>(seedOrders ?? []);
   const [filter, setFilter] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!(seedOrders && seedOrders.length > 0));
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (seedOrders && seedOrders.length > 0) {
+      setOrders(seedOrders);
+      setLoading(false);
+    }
+  }, [seedOrders]);
 
   useEffect(() => {
     if (!shop || !email) return;
     let cancelled = false;
-    setLoading(true);
+    setLoading(!(seedOrders && seedOrders.length > 0));
     setError(null);
     fetch(publicApiUrl("/api/public/orders-lookup"), {
       method: "POST",
@@ -52,10 +55,23 @@ export function OrderPicker({
       .then(async (r) => {
         const json = await r.json();
         if (!r.ok) throw new Error(json.error ?? "Could not load orders");
-        if (!cancelled) setOrders(json.orders ?? []);
+        const next = (json.orders ?? []) as OrderOption[];
+        if (cancelled) return;
+        setOrders(next);
+        saveCustomerOrderSession({
+          shop,
+          email,
+          orders: next,
+          source: "lookup",
+        });
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed");
+        if (!cancelled) {
+          // Keep seed orders if refresh fails
+          if (!(seedOrders && seedOrders.length > 0)) {
+            setError(e instanceof Error ? e.message : "Failed");
+          }
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -63,6 +79,7 @@ export function OrderPicker({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed used as initial only
   }, [shop, email]);
 
   const filtered = useMemo(() => {
@@ -75,10 +92,10 @@ export function OrderPicker({
     );
   }, [orders, filter]);
 
-  if (loading) {
+  if (loading && orders.length === 0) {
     return <p className="as-muted">Loading your orders…</p>;
   }
-  if (error) {
+  if (error && orders.length === 0) {
     return <div className="as-alert as-alert-error">{error}</div>;
   }
   if (orders.length === 0) {
@@ -93,9 +110,14 @@ export function OrderPicker({
   return (
     <div className="as-stack as-order-picker">
       <div className="as-section-head">
-        <h2>Your orders</h2>
-        <span className="as-chip">{orders.length} found</span>
+        <h2>{purpose === "claim" ? "Pick order & product to claim" : "Pick order & product"}</h2>
+        <span className="as-chip">{orders.length} order{orders.length === 1 ? "" : "s"}</span>
       </div>
+      <p className="as-muted" style={{ margin: 0, fontSize: 13 }}>
+        {purpose === "claim"
+          ? "Select the order, then the product you want to claim."
+          : "Select the order, then the product to register for warranty."}
+      </p>
       <label className="as-label">Filter orders</label>
       <input
         className="as-input"
@@ -118,7 +140,7 @@ export function OrderPicker({
               <button
                 type="button"
                 className="as-order-pick-head"
-                onClick={() => onSelect(o, o.lineItems[0]?.id)}
+                onClick={() => onSelect(o, mode === "line" ? undefined : o.lineItems[0]?.id)}
                 style={{
                   all: "unset",
                   cursor: "pointer",
@@ -160,7 +182,7 @@ export function OrderPicker({
                         <strong>{li.title}</strong>
                         <div className="as-muted" style={{ fontSize: 12 }}>
                           Qty {li.quantity}
-                          {li.hasWarranty ? " · Covered" : ""}
+                          {li.hasWarranty ? " · Covered" : " · Not registered yet"}
                         </div>
                       </div>
                       {selectedLineId === li.id ? (
@@ -171,6 +193,13 @@ export function OrderPicker({
                     </button>
                   ))}
                 </div>
+              ) : mode === "line" && !active ? (
+                <ul className="as-muted" style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 12 }}>
+                  {o.lineItems.slice(0, 3).map((li) => (
+                    <li key={li.id}>{li.title}</li>
+                  ))}
+                  {o.lineItems.length > 3 ? <li>+{o.lineItems.length - 3} more</li> : null}
+                </ul>
               ) : null}
             </article>
           );

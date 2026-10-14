@@ -77,6 +77,10 @@ const typeDefs = /* GraphQL */ `
     onboardingCompleted: Boolean!
     needsPlanSelection: Boolean!
     voidWarrantyOnRefund: Boolean!
+    warrantyOptInRequired: Boolean!
+    warrantyFeeEnabled: Boolean!
+    warrantyFeeVariantId: String
+    warrantyFeeLabel: String
     timezone: String!
     brandingLogoUrl: String
     brandingAccentColor: String
@@ -256,6 +260,10 @@ const typeDefs = /* GraphQL */ `
     startBackfill(lookbackMonths: Int!): JobStatus!
     updateShopSettings(
       voidWarrantyOnRefund: Boolean
+      warrantyOptInRequired: Boolean
+      warrantyFeeEnabled: Boolean
+      warrantyFeeVariantId: String
+      warrantyFeeLabel: String
       timezone: String
       brandingLogoUrl: String
       brandingAccentColor: String
@@ -297,6 +305,10 @@ async function shopSummary(shopId: string) {
     onboardingCompleted: shop.onboardingCompleted,
     needsPlanSelection: !shop.planId && !shop.billingBypass,
     voidWarrantyOnRefund: shop.voidWarrantyOnRefund,
+    warrantyOptInRequired: shop.warrantyOptInRequired,
+    warrantyFeeEnabled: shop.warrantyFeeEnabled,
+    warrantyFeeVariantId: shop.warrantyFeeVariantId,
+    warrantyFeeLabel: shop.warrantyFeeLabel,
     timezone: shop.timezone,
     brandingLogoUrl: shop.brandingLogoUrl,
     brandingAccentColor: shop.brandingAccentColor,
@@ -341,17 +353,17 @@ async function shopSummary(shopId: string) {
       {
         metric: "warranties_created",
         used: await usageRepository.getCount(shop.id, "warranties_created"),
-        limit: plan?.warrantiesPerMonth ?? 50,
+        limit: plan?.warrantiesPerMonth ?? 0,
       },
       {
         metric: "claims_created",
         used: await usageRepository.getCount(shop.id, "claims_created"),
-        limit: plan?.claimsPerMonth ?? 10,
+        limit: plan?.claimsPerMonth ?? 0,
       },
       {
         metric: "ai_credits",
         used: await usageRepository.getCount(shop.id, "ai_credits"),
-        limit: plan?.aiCreditsPerMonth ?? 10,
+        limit: plan?.aiCreditsPerMonth ?? 0,
       },
     ],
   };
@@ -886,6 +898,10 @@ const yoga = createYoga({
           _: unknown,
           args: {
             voidWarrantyOnRefund?: boolean;
+            warrantyOptInRequired?: boolean;
+            warrantyFeeEnabled?: boolean;
+            warrantyFeeVariantId?: string | null;
+            warrantyFeeLabel?: string | null;
             timezone?: string;
             brandingLogoUrl?: string | null;
             brandingAccentColor?: string | null;
@@ -917,6 +933,16 @@ const yoga = createYoga({
             where: { id: merchant.shopId },
             data: {
               voidWarrantyOnRefund: args.voidWarrantyOnRefund,
+              warrantyOptInRequired: args.warrantyOptInRequired,
+              warrantyFeeEnabled: args.warrantyFeeEnabled,
+              warrantyFeeVariantId:
+                args.warrantyFeeVariantId === undefined
+                  ? undefined
+                  : args.warrantyFeeVariantId
+                    ? String(args.warrantyFeeVariantId).replace(/\D/g, "") || null
+                    : null,
+              warrantyFeeLabel:
+                args.warrantyFeeLabel === undefined ? undefined : args.warrantyFeeLabel,
               timezone: args.timezone,
               brandingLogoUrl: args.brandingLogoUrl === undefined ? undefined : args.brandingLogoUrl,
               brandingAccentColor:

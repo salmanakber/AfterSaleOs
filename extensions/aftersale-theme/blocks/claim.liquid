@@ -9,7 +9,7 @@
 <div class="as-claim-block" style="--as-btn-accent: {{ accent }};" {{ block.shopify_attributes }}>
   <a
     class="as-register-block__btn"
-    href="{{ as_app_url }}/apps/aftersale/claim?shop={{ shop.permanent_domain }}{% if product %}&product={{ product_q }}&product_id={{ product.id }}{% endif %}"
+    href="{{ as_app_url }}/apps/aftersale/claim?shop={{ shop.permanent_domain }}{% if product %}&product={{ product_q }}&product_id={{ product.id }}{% endif %}{% if customer and customer.email != blank %}&email={{ customer.email | url_encode }}{% endif %}"
   >
     {{ block.settings.button_label | default: "File a warranty claim" }}
   </a>
