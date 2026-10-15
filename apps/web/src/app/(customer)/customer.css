@@ -1103,10 +1103,24 @@
 .as-shell-embed {
   width: 100%;
   max-width: 100%;
-  margin: 0;
+  margin: 0 auto;
   padding: 0;
   box-sizing: border-box;
   animation: none;
+}
+
+/* Theme customizer: Form width */
+.as-shell-embed--full {
+  max-width: 100%;
+}
+.as-shell-embed--wide {
+  max-width: 960px;
+}
+.as-shell-embed--medium {
+  max-width: 720px;
+}
+.as-shell-embed--compact {
+  max-width: 520px;
 }
 
 .as-embed-main {
@@ -1118,10 +1132,32 @@
   box-shadow: none;
 }
 
+/* Default + customizer: two columns */
 .as-shell-embed .as-field-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px 14px;
+}
+
+/* Theme customizer: Form fields = one column */
+.as-shell-embed[data-cols="1"] .as-field-grid {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+/* Theme customizer: Form style = flat */
+.as-shell-embed--flat .as-form-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.as-shell-embed--flat .as-section-title {
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--as-border) 70%, transparent);
 }
 
 .as-shell-embed .as-field-grid > div {
@@ -1250,7 +1286,9 @@
 }
 
 @media (max-width: 560px) {
-  .as-shell-embed .as-field-grid {
+  /* Narrow viewports always stack, even when merchant chose 2 columns */
+  .as-shell-embed .as-field-grid,
+  .as-shell-embed[data-cols="2"] .as-field-grid {
     grid-template-columns: 1fr;
     gap: 10px;
   }

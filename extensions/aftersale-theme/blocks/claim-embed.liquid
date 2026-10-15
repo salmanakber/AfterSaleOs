@@ -1,15 +1,16 @@
-{% comment %} Claim form embed — full parent width; theme-local design {% endcomment %}
+{% comment %} Claim form embed — merchant controls columns + width in customizer {% endcomment %}
 
 {% assign as_app_url = 'https://aftersale.tidyflowapp.com' %}
 {% assign accent = block.settings.accent_color | default: '#0f172a' %}
 {% assign surface = block.settings.surface_color | default: 'transparent' %}
-{% assign radius = block.settings.corner_radius | default: 0 %}
+{% assign radius = block.settings.corner_radius | default: 12 %}
 {% assign accent_q = accent | url_encode %}
+{% render 'as-embed-layout' %}
 {% assign product_q = '' %}
 {% if product %}
   {% assign product_q = product.title | url_encode %}
 {% endif %}
-{% assign embed_src = as_app_url | append: '/apps/aftersale/claim?shop=' | append: shop.permanent_domain | append: '&embed=1&theme=local&accent=' | append: accent_q %}
+{% assign embed_src = as_app_url | append: '/apps/aftersale/claim?shop=' | append: shop.permanent_domain | append: '&embed=1&theme=local&accent=' | append: accent_q | append: as_layout_qs %}
 {% if product %}
   {% assign embed_src = embed_src | append: '&product=' | append: product_q | append: '&product_id=' | append: product.id %}
 {% endif %}
@@ -22,23 +23,22 @@
 {% endif %}
 
 <div
-  class="as-embed-block"
+  class="as-embed-block as-embed-block--{{ as_cwidth }} as-embed-block--cols-{{ as_cols }}"
   {{ block.shopify_attributes }}
   data-as-embed
-  style="--as-embed-radius: {{ radius }}px; --as-embed-surface: {{ surface }}; width:100%; max-width:100%;"
+  style="--as-embed-radius: {{ radius }}px; --as-embed-surface: {{ surface }}; --as-embed-max: {{ as_max_w }};"
 >
   {% if request.design_mode %}
-    <div class="as-block-preview as-block-preview--slim" style="border-radius: {{ radius }}px;">
-      <div class="as-block-preview__col">
-        <span class="as-block-preview__kicker">Warranty</span>
-        <strong>File a claim</strong>
-        <p>Describe the issue and track status after submit.</p>
-      </div>
-      <div class="as-block-preview__col as-block-preview__col--form">
+    <div class="as-block-preview as-block-preview--form as-block-preview--cols-{{ as_cols }}" style="border-radius: {{ radius }}px; max-width: {{ as_max_w }};">
+      <strong>Claim form · {% if as_cols == '1' %}1 column{% else %}2 columns{% endif %} · {{ as_cwidth }}</strong>
+      <p>Adjust Form fields, Form width, and Form style in the block settings.</p>
+      <div class="as-block-preview__grid as-block-preview__grid--{{ as_cols }}">
         <span class="as-block-preview__field">Email</span>
-        <span class="as-block-preview__field">Issue summary</span>
-        <span class="as-block-preview__btn" style="background:{{ accent }};">Submit claim</span>
+        <span class="as-block-preview__field">Name</span>
+        <span class="as-block-preview__field">Order</span>
+        <span class="as-block-preview__field">Serial</span>
       </div>
+      <span class="as-block-preview__btn" style="background:{{ accent }};">Submit claim</span>
       <a class="as-block-preview__link" href="{{ embed_src }}" target="_blank" rel="noopener">Open live preview ↗</a>
     </div>
   {% else %}
@@ -46,7 +46,7 @@
       class="as-embed-block__frame"
       title="{{ block.settings.title | default: 'File a claim' }}"
       src="{{ embed_src }}"
-      style="width:100%;min-height:{{ block.settings.min_height }}px;border:0;border-radius:{{ radius }}px;background:{{ surface }};"
+      style="width:100%;max-width:{{ as_max_w }};min-height:{{ block.settings.min_height }}px;border:0;border-radius:{{ radius }}px;background:{{ surface }};margin-inline:auto;display:block;"
       loading="lazy"
       allow="clipboard-write"
       referrerpolicy="no-referrer-when-downgrade"
@@ -62,13 +62,43 @@
   "settings": [
     {
       "type": "paragraph",
-      "content": "Full-width claim form for this section. Colors below style this block on your storefront."
+      "content": "Customize how the claim form looks inside this section."
     },
     {
-      "type": "text",
-      "id": "title",
-      "label": "Accessible name",
-      "default": "File a warranty claim"
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "select",
+      "id": "form_columns",
+      "label": "Form fields",
+      "options": [
+        { "value": "2", "label": "Two columns" },
+        { "value": "1", "label": "One column" }
+      ],
+      "default": "2"
+    },
+    {
+      "type": "select",
+      "id": "content_width",
+      "label": "Form width",
+      "options": [
+        { "value": "full", "label": "Full section width" },
+        { "value": "wide", "label": "Wide (960px)" },
+        { "value": "medium", "label": "Medium (720px)" },
+        { "value": "compact", "label": "Compact (520px)" }
+      ],
+      "default": "wide"
+    },
+    {
+      "type": "select",
+      "id": "form_style",
+      "label": "Form style",
+      "options": [
+        { "value": "cards", "label": "Section cards" },
+        { "value": "flat", "label": "Flat (minimal)" }
+      ],
+      "default": "cards"
     },
     {
       "type": "range",
@@ -77,7 +107,17 @@
       "min": 280,
       "max": 1200,
       "step": 20,
-      "default": 420
+      "default": 480
+    },
+    {
+      "type": "header",
+      "content": "Appearance"
+    },
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Accessible name",
+      "default": "File a warranty claim"
     },
     {
       "type": "color",
@@ -99,7 +139,7 @@
       "max": 28,
       "step": 2,
       "unit": "px",
-      "default": 0
+      "default": 12
     }
   ]
 }

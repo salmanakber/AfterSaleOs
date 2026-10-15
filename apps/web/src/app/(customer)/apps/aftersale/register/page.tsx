@@ -8,6 +8,7 @@ import {
   type CachedOrder,
 } from "@/lib/customer-order-session";
 import { useCustomerOrderSession } from "@/lib/use-customer-order-session";
+import { parseEmbedLayout } from "@/lib/embed-layout";
 import { BrandLoader } from "../../../components/BrandLoader";
 import { CustomerShell } from "../../../components/CustomerShell";
 import { OrderPicker } from "../../../components/OrderPicker";
@@ -22,6 +23,7 @@ function RegisterInner() {
   const embed = params.get("embed") === "1";
   const themeLocal = params.get("theme") === "local" || embed;
   const accentOverride = params.get("accent");
+  const embedLayout = parseEmbedLayout(params);
   const auto = params.get("auto") === "1";
   const prefillEmail = params.get("email") ?? "";
   const prefillOrder = params.get("order") ?? "";
@@ -156,6 +158,9 @@ function RegisterInner() {
         embed={embed}
         themeLocal={themeLocal}
         accentOverride={accentOverride}
+        embedCols={embedLayout.cols}
+        embedWidth={embedLayout.width}
+        embedStyle={embedLayout.style}
         steps={["Details", "Submit", "Certificate"]}
         activeStep={2}
         footer={
@@ -193,6 +198,9 @@ function RegisterInner() {
       embed={embed}
       themeLocal={themeLocal}
       accentOverride={accentOverride}
+      embedCols={embedLayout.cols}
+      embedWidth={embedLayout.width}
+      embedStyle={embedLayout.style}
       steps={["Details", "Submit", "Certificate"]}
       activeStep={0}
       footer={

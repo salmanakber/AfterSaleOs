@@ -8,6 +8,7 @@ import {
   type CachedOrder,
 } from "@/lib/customer-order-session";
 import { useCustomerOrderSession } from "@/lib/use-customer-order-session";
+import { parseEmbedLayout } from "@/lib/embed-layout";
 import { BrandLoader } from "../../../components/BrandLoader";
 import { CustomerShell } from "../../../components/CustomerShell";
 import { OrderPicker } from "../../../components/OrderPicker";
@@ -19,6 +20,7 @@ function ClaimFormInner() {
   const embed = params.get("embed") === "1";
   const themeLocal = params.get("theme") === "local" || embed;
   const accentOverride = params.get("accent");
+  const embedLayout = parseEmbedLayout(params);
   const prefillEmail = params.get("email") ?? "";
   const prefillOrder = params.get("order") ?? "";
   const loggedInCustomerId =
@@ -176,6 +178,9 @@ function ClaimFormInner() {
         embed={embed}
         themeLocal={themeLocal}
         accentOverride={accentOverride}
+        embedCols={embedLayout.cols}
+        embedWidth={embedLayout.width}
+        embedStyle={embedLayout.style}
         steps={["Describe", "Evidence", "Submitted"]}
         activeStep={2}
       >
@@ -211,6 +216,9 @@ function ClaimFormInner() {
       embed={embed}
       themeLocal={themeLocal}
       accentOverride={accentOverride}
+      embedCols={embedLayout.cols}
+      embedWidth={embedLayout.width}
+      embedStyle={embedLayout.style}
       steps={["Describe", "Evidence", "Submitted"]}
       activeStep={summary.trim() ? 1 : 0}
     >

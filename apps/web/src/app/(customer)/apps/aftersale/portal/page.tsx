@@ -9,6 +9,7 @@ import {
   type CachedWarranty,
 } from "@/lib/customer-order-session";
 import { useCustomerOrderSession } from "@/lib/use-customer-order-session";
+import { parseEmbedLayout } from "@/lib/embed-layout";
 import { BrandLoader } from "../../../components/BrandLoader";
 import { CustomerShell } from "../../../components/CustomerShell";
 
@@ -22,6 +23,7 @@ function PortalInner() {
   const embed = params.get("embed") === "1";
   const themeLocal = params.get("theme") === "local" || embed;
   const accentOverride = params.get("accent");
+  const embedLayout = parseEmbedLayout(params);
   const prefillEmail = params.get("email") ?? "";
   const loggedInCustomerId =
     params.get("logged_in_customer_id") ?? params.get("customer_id") ?? "";
@@ -167,6 +169,9 @@ function PortalInner() {
       embed={embed}
       themeLocal={themeLocal}
       accentOverride={accentOverride}
+      embedCols={embedLayout.cols}
+      embedWidth={embedLayout.width}
+      embedStyle={embedLayout.style}
       steps={open ? ["Verify", "Your orders", "Manage"] : ["Verify", "Open portal", "Manage"]}
       activeStep={open ? 1 : 0}
       footer={

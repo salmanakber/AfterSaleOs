@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { publicApiUrl } from "@/lib/public-api";
+import type { EmbedCols, EmbedStyle, EmbedWidth } from "@/lib/embed-layout";
 import { ThemeToggle } from "./ThemeToggle";
 
 const SYSTEM_LOGO = "/images/logo.png";
@@ -20,6 +21,9 @@ export function CustomerShell({
   /** Theme Liquid embeds: use block colors only — never fetch hosted brand kit. */
   themeLocal = false,
   accentOverride,
+  embedCols = "2",
+  embedWidth = "wide",
+  embedStyle = "cards",
 }: {
   brand?: string;
   title: string;
@@ -32,6 +36,9 @@ export function CustomerShell({
   embed?: boolean;
   themeLocal?: boolean;
   accentOverride?: string | null;
+  embedCols?: EmbedCols;
+  embedWidth?: EmbedWidth;
+  embedStyle?: EmbedStyle;
 }) {
   const skipHostedBrand = embed || themeLocal;
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -123,12 +130,15 @@ export function CustomerShell({
         : "";
 
   if (embed) {
-    // Full-width form only — no intro column. Fields use .as-field-grid for 2-column layout.
+    // Full-width form; merchant picks 1/2 columns + width in theme customizer.
     return (
       <div
-        className={`as-shell as-shell-embed${skipHostedBrand ? " as-shell-theme-local" : ""}${fontClass}${buttonClass}`}
+        className={`as-shell as-shell-embed as-shell-embed--${embedWidth} as-shell-embed--${embedStyle}${skipHostedBrand ? " as-shell-theme-local" : ""}${fontClass}${buttonClass}`}
         style={brandStyle}
         data-embed="1"
+        data-cols={embedCols}
+        data-width={embedWidth}
+        data-style={embedStyle}
       >
         <div className="as-embed-main">{children}</div>
       </div>
