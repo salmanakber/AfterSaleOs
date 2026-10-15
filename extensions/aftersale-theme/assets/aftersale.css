@@ -36,33 +36,39 @@
 /* Form embeds — fill parent section width; theme-local design only */
 .as-embed-block {
   margin: 0;
-  width: 100%;
-  max-width: 100%;
+  width: 100% !important;
+  max-width: none !important;
   display: block;
   box-sizing: border-box;
+}
+
+/* Stretch Shopify app-block wrappers so the embed isn't stuck in a narrow column */
+.shopify-block:has(.as-embed-block),
+.shopify-app-block:has(.as-embed-block),
+.shopify-block:has([data-as-embed]),
+[id^="shopify-block"]:has(.as-embed-block) {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 100% !important;
+  grid-column: 1 / -1;
 }
 
 .as-embed-block__frame {
   display: block;
   width: 100% !important;
-  max-width: 100%;
+  max-width: 100% !important;
   border: 0;
   border-radius: var(--as-embed-radius, 0);
   background: var(--as-embed-surface, transparent);
-}
-
-.as-embed-block__frame--editor {
-  /* Theme editor often blocks third-party iframes — keep a tiny live attempt but rely on preview card */
-  min-height: 1px !important;
-  height: 1px !important;
-  opacity: 0;
-  pointer-events: none;
-  position: absolute;
+  box-sizing: border-box;
 }
 
 .as-block-preview {
-  margin: 0 0 10px;
-  padding: 14px;
+  margin: 0;
+  padding: 18px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   background: #fff;
