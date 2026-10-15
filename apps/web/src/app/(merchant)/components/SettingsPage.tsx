@@ -2,14 +2,17 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Autocomplete,
   Banner,
   Button,
   FormLayout,
+  Icon,
   InlineStack,
   Page,
   Text,
   TextField,
 } from "@shopify/polaris";
+import { SearchIcon } from "@shopify/polaris-icons";
 import { gqlRequest } from "@/lib/graphql";
 import { appHref } from "@/lib/shop-context";
 import { clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
@@ -91,6 +94,10 @@ export function SettingsPage() {
   const [feeEnabled, setFeeEnabled] = useState(false);
   const [feeVariantId, setFeeVariantId] = useState("");
   const [feeLabel, setFeeLabel] = useState("Product warranty registration");
+  const [feeSearch, setFeeSearch] = useState("");
+  const [feeOptions, setFeeOptions] = useState<{ value: string; label: string }[]>([]);
+  const [feeSelectedLabel, setFeeSelectedLabel] = useState("");
+  const [feeSearchBusy, setFeeSearchBusy] = useState(false);
   const [shopDomain, setShopDomain] = useState("");
   const [shopName, setShopName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -163,6 +170,9 @@ export function SettingsPage() {
         setFeeEnabled(Boolean(d.home.shop.warrantyFeeEnabled));
         setFeeVariantId(d.home.shop.warrantyFeeVariantId ?? "");
         setFeeLabel(d.home.shop.warrantyFeeLabel ?? "Product warranty registration");
+        if (d.home.shop.warrantyFeeVariantId) {
+          setFeeSelectedLabel(`Variant ${d.home.shop.warrantyFeeVariantId}`);
+        }
         setShopDomain(d.home.shop.shopDomain);
         setShopName(d.home.shop.shopName ?? d.home.shop.shopDomain);
       })
@@ -198,6 +208,40 @@ export function SettingsPage() {
       claim: frame(hosted.claim, "Warranty claim"),
     };
   }, [hosted, embedHeight]);
+
+  useEffect(() => {
+    if (!feeEnabled) return;
+    const q = feeSearch.trim();
+    const handle = window.setTimeout(() => {
+      setFeeSearchBusy(true);
+      gqlRequest<{
+        feeProductOptions: Array<{
+          shopifyVariantId: string;
+          label: string;
+        }>;
+      }>(
+        `#graphql
+        query FeeProducts($query: String) {
+          feeProductOptions(query: $query, limit: 25) {
+            shopifyVariantId
+            label
+          }
+        }`,
+        { query: q || null },
+      )
+        .then((d) => {
+          setFeeOptions(
+            d.feeProductOptions.map((o) => ({
+              value: o.shopifyVariantId,
+              label: o.label,
+            })),
+          );
+        })
+        .catch(() => setFeeOptions([]))
+        .finally(() => setFeeSearchBusy(false));
+    }, 280);
+    return () => window.clearTimeout(handle);
+  }, [feeSearch, feeEnabled]);
 
   async function onSavePreferences(e?: FormEvent) {
     e?.preventDefault();
@@ -511,10 +555,12 @@ export function SettingsPage() {
             <h3>Checkout warranty registration</h3>
           </div>
           <p className="as-m-guide-lead">
-            When the storefront checkbox is checked, the order is marked for warranty registration.
-            Coverage is created after checkout (requires a matching warranty rule and the{" "}
-            <code>orders/create</code> webhook). Optionally charge a fee by adding a Shopify product
-            variant to the cart when the box is checked.
+            Customer flow: check the box → add to cart → checkout → AfterSale creates a warranty for
+            that ordered product automatically (matching warranty rule required). Until Shopify
+            approves Protected Customer Data webhooks, the app syncs new orders via Admin API when
+            you open the dashboard, on the thank-you page, or via{" "}
+            <strong>Warranties → Sync recent orders</strong>. Optionally charge a fee by adding a
+            Shopify product variant when the box is checked.
           </p>
           <form
             onSubmit={(e) => {
@@ -556,13 +602,39 @@ export function SettingsPage() {
               </label>
               {feeEnabled ? (
                 <>
-                  <TextField
-                    label="Fee product variant ID"
-                    helpText="Shopify Admin → Products → your fee product → variant. Use the numeric variant ID (or paste the GID)."
-                    value={feeVariantId}
-                    onChange={setFeeVariantId}
-                    autoComplete="off"
-                    placeholder="e.g. 40123456789012"
+                  <Autocomplete
+                    options={feeOptions}
+                    selected={feeVariantId ? [feeVariantId] : []}
+                    onSelect={(selected) => {
+                      const id = selected[0] ?? "";
+                      setFeeVariantId(id);
+                      const match = feeOptions.find((o) => o.value === id);
+                      setFeeSelectedLabel(match?.label ?? id);
+                    }}
+                    textField={
+                      <Autocomplete.TextField
+                        label="Fee product"
+                        value={feeSearch}
+                        onChange={setFeeSearch}
+                        autoComplete="off"
+                        placeholder="Search products to use as the warranty fee…"
+                        prefix={<Icon source={SearchIcon} tone="base" />}
+                        helpText={
+                          feeSelectedLabel
+                            ? `Selected: ${feeSelectedLabel}`
+                            : "Create a product like “Warranty registration”, sync products, then pick it here."
+                        }
+                      />
+                    }
+                    loading={feeSearchBusy}
+                    emptyState={
+                      <div style={{ padding: 12 }}>
+                        <Text as="p" tone="subdued">
+                          No matching products. Sync products from Shopify or create a fee product
+                          first.
+                        </Text>
+                      </div>
+                    }
                   />
                   <TextField
                     label="Fee label on storefront"

@@ -12,12 +12,18 @@ import {
   assertBackfillLookback,
   assertMonthlyQuota,
   assertPlanFeature,
+  runWarrantyExpiryCampaign,
+  runMarketingBroadcast,
 } from "@aftersale/db";
 import {
   resolveMerchantContext,
   SessionTokenStaleError,
 } from "@/lib/auth/merchant";
 import { enqueueBackfill } from "@/lib/queue";
+import {
+  maybeAutoSyncRecentOrders,
+  syncRecentOrdersForShop,
+} from "@/lib/shopify/sync-orders";
 import {
   claimsTypeDefs,
   claimsResolvers,
@@ -182,6 +188,23 @@ const typeDefs = /* GraphQL */ `
     coverageLabel: String!
   }
 
+  type FeeProductOption {
+    productTitle: String!
+    shopifyProductId: String!
+    shopifyVariantId: String!
+    variantTitle: String!
+    priceCents: Int
+    label: String!
+  }
+
+  type CampaignResult {
+    matched: Int!
+    sent: Int!
+    skipped: Int!
+    errors: Int!
+    message: String!
+  }
+
   type JobStatus {
     id: ID!
     type: String!
@@ -191,6 +214,13 @@ const typeDefs = /* GraphQL */ `
     errorSummary: String
     result: String
     createdAt: String!
+  }
+
+  type SyncOrdersResult {
+    processedOrders: Int!
+    warrantiesCreatedApprox: Int!
+    lookbackDays: Int!
+    message: String!
   }
 
   type Registration {
@@ -244,7 +274,8 @@ const typeDefs = /* GraphQL */ `
     warrantyRule(id: ID!): WarrantyRule
     warranties(query: String, status: String, limit: Int, offset: Int): WarrantyConnection!
     warranty(id: ID!): Warranty
-    products(limit: Int): [ProductCoverage!]!
+    products(limit: Int, query: String): [ProductCoverage!]!
+    feeProductOptions(query: String, limit: Int): [FeeProductOption!]!
     jobs(type: String, limit: Int): [JobStatus!]!
     registrations(status: String, limit: Int): [Registration!]!
   }
@@ -258,6 +289,9 @@ const typeDefs = /* GraphQL */ `
     voidWarranty(id: ID!, reason: String!): Warranty!
     extendWarranty(id: ID!, extraMonths: Int!, reason: String!): Warranty!
     startBackfill(lookbackMonths: Int!): JobStatus!
+    syncRecentOrders(lookbackDays: Int): SyncOrdersResult!
+    runExpiryCampaign(daysAhead: Int, dryRun: Boolean): CampaignResult!
+    runMarketingBroadcast(subject: String!, bodyHtml: String!, dryRun: Boolean): CampaignResult!
     updateShopSettings(
       voidWarrantyOnRefund: Boolean
       warrantyOptInRequired: Boolean
@@ -428,6 +462,12 @@ const yoga = createYoga({
         home: async (_: unknown, __: unknown, ctx: { request: Request }) => {
           const merchant = await resolveMerchantContext(ctx.request);
           const shop = await prisma.shop.findUniqueOrThrow({ where: { id: merchant.shopId } });
+          // Without PCD order webhooks: pull recent Shopify orders → create warranties.
+          void maybeAutoSyncRecentOrders({
+            shopId: shop.id,
+            shopDomain: shop.shopDomain,
+            lookbackDays: 7,
+          }).catch(() => {});
           const openClaims = await prisma.claim.count({
             where: { shopId: shop.id, status: { in: ["OPEN", "IN_REVIEW", "WAITING_CUSTOMER"] } },
           });
@@ -567,10 +607,20 @@ const yoga = createYoga({
           });
           return w ? mapWarranty(w) : null;
         },
-        products: async (_: unknown, args: { limit?: number }, ctx: { request: Request }) => {
+        products: async (
+          _: unknown,
+          args: { limit?: number; query?: string | null },
+          ctx: { request: Request },
+        ) => {
           const merchant = await resolveMerchantContext(ctx.request);
+          const q = (args.query ?? "").trim();
           const products = await prisma.product.findMany({
-            where: { shopId: merchant.shopId },
+            where: {
+              shopId: merchant.shopId,
+              ...(q
+                ? { title: { contains: q, mode: "insensitive" as const } }
+                : {}),
+            },
             take: args.limit ?? 50,
             orderBy: { updatedAt: "desc" },
           });
@@ -596,6 +646,53 @@ const yoga = createYoga({
                   : "No coverage",
             };
           });
+        },
+        feeProductOptions: async (
+          _: unknown,
+          args: { query?: string | null; limit?: number },
+          ctx: { request: Request },
+        ) => {
+          const merchant = await resolveMerchantContext(ctx.request);
+          const q = (args.query ?? "").trim();
+          const limit = Math.min(40, args.limit ?? 20);
+          const products = await prisma.product.findMany({
+            where: {
+              shopId: merchant.shopId,
+              ...(q ? { title: { contains: q, mode: "insensitive" as const } } : {}),
+            },
+            include: { variants: { orderBy: { title: "asc" }, take: 20 } },
+            take: limit,
+            orderBy: { title: "asc" },
+          });
+          const options = [];
+          for (const p of products) {
+            const variants =
+              p.variants.length > 0
+                ? p.variants
+                : [
+                    {
+                      shopifyVariantId: "",
+                      title: "Default",
+                      priceCents: null as number | null,
+                    },
+                  ];
+            for (const v of variants) {
+              if (!v.shopifyVariantId) continue;
+              const price =
+                v.priceCents != null ? ` · $${(v.priceCents / 100).toFixed(2)}` : "";
+              const variantLabel =
+                !v.title || v.title === "Default Title" ? "Default" : v.title;
+              options.push({
+                productTitle: p.title,
+                shopifyProductId: p.shopifyProductId,
+                shopifyVariantId: v.shopifyVariantId,
+                variantTitle: variantLabel,
+                priceCents: v.priceCents,
+                label: `${p.title} — ${variantLabel}${price}`,
+              });
+            }
+          }
+          return options.slice(0, limit);
         },
         jobs: async (_: unknown, args: { type?: string; limit?: number }, ctx: { request: Request }) => {
           const merchant = await resolveMerchantContext(ctx.request);
@@ -892,6 +989,69 @@ const yoga = createYoga({
             errorSummary: null,
             result: null,
             createdAt: job.createdAt.toISOString(),
+          };
+        },
+        syncRecentOrders: async (
+          _: unknown,
+          args: { lookbackDays?: number | null },
+          ctx: { request: Request },
+        ) => {
+          const merchant = await resolveMerchantContext(ctx.request);
+          const lookbackDays = Math.min(90, Math.max(1, args.lookbackDays ?? 14));
+          try {
+            const result = await syncRecentOrdersForShop({
+              shopId: merchant.shopId,
+              shopDomain: merchant.shopDomain,
+              lookbackDays,
+            });
+            return {
+              ...result,
+              message: `Synced ${result.processedOrders} order(s) from the last ${result.lookbackDays} days. ~${result.warrantiesCreatedApprox} new warranties.`,
+            };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Sync failed";
+            throw new Error(
+              `${msg}. If Shopify blocks order fields, request Protected Customer Data in Partners, or use Backfill after approval.`,
+            );
+          }
+        },
+        runExpiryCampaign: async (
+          _: unknown,
+          args: { daysAhead?: number | null; dryRun?: boolean | null },
+          ctx: { request: Request },
+        ) => {
+          const merchant = await resolveMerchantContext(ctx.request);
+          await assertPlanFeature(merchant.shopId, "expiryCampaigns", "Expiry campaigns");
+          const result = await runWarrantyExpiryCampaign({
+            shopId: merchant.shopId,
+            daysAhead: args.daysAhead ?? 30,
+            dryRun: Boolean(args.dryRun),
+          });
+          return {
+            ...result,
+            message: args.dryRun
+              ? `Dry run: ${result.matched} warranties match in the next ${args.daysAhead ?? 30} days.`
+              : `Sent ${result.sent} of ${result.matched} expiry emails (${result.skipped} skipped, ${result.errors} errors).`,
+          };
+        },
+        runMarketingBroadcast: async (
+          _: unknown,
+          args: { subject: string; bodyHtml: string; dryRun?: boolean | null },
+          ctx: { request: Request },
+        ) => {
+          const merchant = await resolveMerchantContext(ctx.request);
+          await assertPlanFeature(merchant.shopId, "expiryCampaigns", "Marketing emails");
+          const result = await runMarketingBroadcast({
+            shopId: merchant.shopId,
+            subject: args.subject,
+            bodyHtml: args.bodyHtml,
+            dryRun: Boolean(args.dryRun),
+          });
+          return {
+            ...result,
+            message: args.dryRun
+              ? `Dry run: ${result.matched} unique customers with active warranties.`
+              : `Sent ${result.sent} marketing emails (${result.skipped} skipped, ${result.errors} errors).`,
           };
         },
         updateShopSettings: async (

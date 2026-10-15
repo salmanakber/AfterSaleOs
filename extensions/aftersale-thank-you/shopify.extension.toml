@@ -11,5 +11,5 @@ handle = "aftersale-thank-you"
 
   [extensions.capabilities]
   api_access = true
-  network_access = false
+  network_access = true
   block_progress = false

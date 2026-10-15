@@ -150,7 +150,8 @@ function PortalInner() {
 
   const open = warranties !== null;
 
-  if ((loading || session.loading) && !open) {
+  // Only block the whole page for magic-link token exchange — never for session lookup.
+  if (loading && token && !open) {
     return (
       <div className="as-shell">
         <BrandLoader label="Opening your portal" />
@@ -278,8 +279,9 @@ function PortalInner() {
       ) : (
         <form onSubmit={requestLink}>
           <p className="as-muted" style={{ marginTop: 0 }}>
-            Enter the email and order number from your purchase. We’ll open your portal right away when
-            they match — and email a secure link when mail is configured.
+            Enter the email and order number from your purchase once. We’ll open your orders here and
+            remember them in this browser for register / claim. Tip: open this page from your store
+            while logged in, or use a link that includes your email.
           </p>
           <label className="as-label">Email</label>
           <input

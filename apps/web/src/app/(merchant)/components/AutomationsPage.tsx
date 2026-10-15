@@ -13,11 +13,13 @@ import {
   Layout,
   Modal,
   Page,
+  Select,
   Text,
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 import { TourTrigger } from "./ProductTour";
+import { FeatureLock } from "./FeatureLock";
 import { friendlyError } from "@/lib/merchant-errors";
 
 type Workflow = {
@@ -82,6 +84,11 @@ export function AutomationsPage() {
   const [tplSubject, setTplSubject] = useState("");
   const [tplBody, setTplBody] = useState("");
   const [busy, setBusy] = useState(false);
+  const [expiryDays, setExpiryDays] = useState("30");
+  const [mktSubject, setMktSubject] = useState("A note about your warranty coverage");
+  const [mktBody, setMktBody] = useState(
+    "<p>Hi — thanks for being a customer. Open your warranty portal anytime to view coverage or file a claim.</p>",
+  );
 
   const load = useCallback(() => {
     gqlRequest<{ claimWorkflow: Workflow; notificationTemplates: Template[] }>(QUERY)
@@ -165,8 +172,48 @@ export function AutomationsPage() {
       </InlineStack>,
     ]) ?? [];
 
+  async function runExpiry(dryRun: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await gqlRequest<{ runExpiryCampaign: { message: string } }>(
+        `#graphql
+        mutation RunExpiry($days: Int, $dryRun: Boolean) {
+          runExpiryCampaign(daysAhead: $days, dryRun: $dryRun) { message matched sent }
+        }`,
+        { days: Number(expiryDays) || 30, dryRun },
+      );
+      setSuccess(res.runExpiryCampaign.message);
+    } catch (e) {
+      setError(friendlyError(e, "Campaign failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runMarketing(dryRun: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await gqlRequest<{ runMarketingBroadcast: { message: string } }>(
+        `#graphql
+        mutation RunMkt($subject: String!, $bodyHtml: String!, $dryRun: Boolean) {
+          runMarketingBroadcast(subject: $subject, bodyHtml: $bodyHtml, dryRun: $dryRun) {
+            message matched sent
+          }
+        }`,
+        { subject: mktSubject, bodyHtml: mktBody, dryRun },
+      );
+      setSuccess(res.runMarketingBroadcast.message);
+    } catch (e) {
+      setError(friendlyError(e, "Broadcast failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <Page title="Automations" subtitle="Claim workflow statuses and customer email templates">
+    <Page title="Automations" subtitle="Claim workflow, email templates, and marketing campaigns">
       <div style={{ marginBottom: 12 }}>
         <TourTrigger tourId="automations" />
       </div>
@@ -185,6 +232,65 @@ export function AutomationsPage() {
             </Banner>
           </Layout.Section>
         ) : null}
+
+        <Layout.Section>
+          <FeatureLock feature="expiryCampaigns">
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h2" variant="headingMd">
+                  Marketing &amp; expiry emails
+                </Text>
+                <Text as="p" tone="subdued">
+                  Remind customers before coverage ends, or send a broadcast to customers with active
+                  warranties. Requires Resend email to be configured on the server.
+                </Text>
+                <Select
+                  label="Expiry window"
+                  options={[
+                    { label: "Next 7 days", value: "7" },
+                    { label: "Next 14 days", value: "14" },
+                    { label: "Next 30 days", value: "30" },
+                    { label: "Next 60 days", value: "60" },
+                  ]}
+                  value={expiryDays}
+                  onChange={setExpiryDays}
+                />
+                <InlineStack gap="200">
+                  <Button onClick={() => void runExpiry(true)} loading={busy}>
+                    Preview expiry count
+                  </Button>
+                  <Button variant="primary" onClick={() => void runExpiry(false)} loading={busy}>
+                    Send expiry reminders
+                  </Button>
+                </InlineStack>
+                <FormLayout>
+                  <TextField
+                    label="Broadcast subject"
+                    value={mktSubject}
+                    onChange={setMktSubject}
+                    autoComplete="off"
+                  />
+                  <TextField
+                    label="Broadcast body (HTML)"
+                    value={mktBody}
+                    onChange={setMktBody}
+                    multiline={4}
+                    autoComplete="off"
+                    helpText="Sent to unique customers who have at least one active warranty."
+                  />
+                </FormLayout>
+                <InlineStack gap="200">
+                  <Button onClick={() => void runMarketing(true)} loading={busy}>
+                    Preview audience
+                  </Button>
+                  <Button variant="primary" onClick={() => void runMarketing(false)} loading={busy}>
+                    Send marketing email
+                  </Button>
+                </InlineStack>
+              </BlockStack>
+            </Card>
+          </FeatureLock>
+        </Layout.Section>
 
         {!workflow ? (
           <Layout.Section>

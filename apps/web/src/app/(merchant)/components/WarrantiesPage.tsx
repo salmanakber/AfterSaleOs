@@ -356,7 +356,41 @@ export function WarrantiesPage() {
       title="Warranties"
       subtitle={hasLoaded ? `${total} total` : "Loading…"}
       primaryAction={{ content: "Create manual", onAction: () => setManualOpen(true) }}
-      secondaryActions={[{ content: "Run backfill", onAction: () => setBackfillOpen(true) }]}
+      secondaryActions={[
+        {
+          content: "Sync recent orders",
+          onAction: () => {
+            void (async () => {
+              setError(null);
+              setSuccess(null);
+              try {
+                const res = await gqlRequest<{
+                  syncRecentOrders: {
+                    message: string;
+                    processedOrders: number;
+                    warrantiesCreatedApprox: number;
+                  };
+                }>(
+                  `#graphql
+                  mutation SyncRecent($days: Int) {
+                    syncRecentOrders(lookbackDays: $days) {
+                      message
+                      processedOrders
+                      warrantiesCreatedApprox
+                    }
+                  }`,
+                  { days: 14 },
+                );
+                setSuccess(res.syncRecentOrders.message);
+                await load();
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Sync failed");
+              }
+            })();
+          },
+        },
+        { content: "Run backfill", onAction: () => setBackfillOpen(true) },
+      ]}
     >
       <div className="as-m-ops-surface">
         <div className="as-m-ops-banner">

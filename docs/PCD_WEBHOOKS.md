@@ -33,11 +33,14 @@ uri = "/api/webhooks/shopify"
 - Void/sync on refund when **Void warranty on refund** is enabled
 - Customer profile sync from `customers/update`
 
-## Until approved
+## Until approved (workarounds already in the app)
 
 - Deploy theme / thank-you extensions with PCD topics **commented out** (current default)
-- Use **Historical backfill** on Warranties for existing Shopify orders
-- Customer portal / register / claim still work via email + order verify
+- **Warranties → Sync recent orders** — pulls last 14 days via Admin API and creates warranties
+- **Thank-you block** — calls `/api/public/checkout-sync` after checkout (enable network access + block in checkout editor)
+- **Historical backfill** for older orders
+- Customer portal / register / claim: open with `?email=` or verify with email + order #
 
 Worker handler: `apps/worker/src/processors/webhooks.ts`  
-Inline order sync (when webhooks fire): `apps/web/src/app/api/webhooks/shopify/route.ts`
+Inline order sync (when webhooks fire): `apps/web/src/app/api/webhooks/shopify/route.ts`  
+Admin API sync: `apps/web/src/lib/shopify/sync-orders.ts`

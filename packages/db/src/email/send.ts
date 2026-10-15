@@ -119,6 +119,41 @@ function builtinTemplate(template: string, data: Record<string, unknown>, brand:
       ),
     };
   }
+  if (template === "warranty_expiring") {
+    return {
+      subject: `${brand.shopName}: your warranty expires soon`,
+      html: wrapEmail(
+        brand,
+        `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">Coverage ending soon</h1>
+        <p>Your warranty for <strong>${esc(data.productTitle)}</strong> (order <strong>${esc(data.orderNumber)}</strong>) ends on <strong>${esc(data.endAt)}</strong>.</p>
+        <p>Open your portal to view the certificate or start a claim while you’re still covered.</p>
+        ${cta(brand, String(data.link ?? "#"), "Open warranty portal")}
+        ${data.claimLink ? `<p style="margin-top:12px;"><a href="${escAttr(data.claimLink)}" style="color:${escAttr(brand.accent)};font-weight:600;">Start a claim</a></p>` : ""}`,
+      ),
+    };
+  }
+  if (template === "warranty_registered") {
+    return {
+      subject: `${brand.shopName}: warranty registered`,
+      html: wrapEmail(
+        brand,
+        `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">You’re covered</h1>
+        <p>Thanks for registering <strong>${esc(data.productTitle)}</strong> with ${shopName}.</p>
+        ${cta(brand, String(data.link ?? "#"), "View your warranty")}`,
+      ),
+    };
+  }
+  if (template === "marketing_broadcast") {
+    const customBody = String(data.bodyHtml ?? "");
+    return {
+      subject: String(data.subject ?? `${brand.shopName}: an update from us`),
+      html: wrapEmail(
+        brand,
+        `${customBody || "<p>We have an update about your warranty coverage.</p>"}
+        ${cta(brand, String(data.link ?? "#"), "Open warranty portal")}`,
+      ),
+    };
+  }
   return {
     subject: `${brand.shopName}: ${template}`,
     html: wrapEmail(brand, `<pre>${esc(JSON.stringify(data, null, 2))}</pre>`),

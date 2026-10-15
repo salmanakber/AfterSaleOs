@@ -28,7 +28,7 @@ export function useCustomerOrderSession(opts: Options) {
   const [sessionReady, setSessionReady] = useState(Boolean(emailFromUrl || loggedInCustomerId));
   const [orderNumber, setOrderNumber] = useState(orderFromUrl);
   const [hydrated, setHydrated] = useState(false);
-  const [loading, setLoading] = useState(Boolean(emailFromUrl || loggedInCustomerId));
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (emailFromUrl) setEmail(emailFromUrl);
@@ -42,6 +42,8 @@ export function useCustomerOrderSession(opts: Options) {
     }
 
     let cancelled = false;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
 
     async function run() {
       const cached = loadCustomerOrderSession(shop);
@@ -51,6 +53,8 @@ export function useCustomerOrderSession(opts: Options) {
         setWarranties(cached.warranties);
         setSessionReady(true);
         if (!orderFromUrl && cached.orders[0]) setOrderNumber(cached.orders[0].orderNumber);
+        // Show UI immediately from cache; refresh in background.
+        setHydrated(true);
       }
 
       const customerId = loggedInCustomerId.replace(/\D/g, "");
@@ -74,6 +78,7 @@ export function useCustomerOrderSession(opts: Options) {
             email: email || undefined,
             loggedInCustomerId: customerId || undefined,
           }),
+          signal: controller.signal,
         });
         const json = await res.json();
         if (!cancelled && res.ok && (json.orders || json.email)) {
@@ -96,8 +101,9 @@ export function useCustomerOrderSession(opts: Options) {
           }
         }
       } catch {
-        /* keep cache */
+        /* keep cache / show verify form */
       } finally {
+        window.clearTimeout(timeout);
         if (!cancelled) {
           setLoading(false);
           setHydrated(true);
@@ -108,6 +114,8 @@ export function useCustomerOrderSession(opts: Options) {
     void run();
     return () => {
       cancelled = true;
+      controller.abort();
+      window.clearTimeout(timeout);
     };
   }, [shop, emailFromUrl, loggedInCustomerId, orderFromUrl]);
 

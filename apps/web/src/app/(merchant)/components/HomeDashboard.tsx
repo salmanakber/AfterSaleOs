@@ -65,6 +65,29 @@ export function HomeDashboard() {
       .then((d) => setData(d.home))
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
+
+    // Pull recent Shopify orders → warranties (works without PCD webhooks).
+    try {
+      const key = "aftersale.orders_sync_at";
+      const last = Number(sessionStorage.getItem(key) || "0");
+      if (Date.now() - last > 3 * 60 * 1000) {
+        sessionStorage.setItem(key, String(Date.now()));
+        void gqlRequest(
+          `#graphql
+          mutation AutoSyncRecent {
+            syncRecentOrders(lookbackDays: 7) {
+              message
+              processedOrders
+              warrantiesCreatedApprox
+            }
+          }`,
+        ).catch(() => {
+          /* offline token / API limits — ignore on home */
+        });
+      }
+    } catch {
+      /* private mode */
+    }
   }, []);
 
   useEffect(() => {
