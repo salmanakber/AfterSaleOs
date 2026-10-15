@@ -143,6 +143,13 @@ type GqlOrderNode = {
   fulfillments?: Array<{ createdAt?: string; status?: string }>;
 };
 
+type OrdersPageResult = {
+  orders: {
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    edges: Array<{ node: GqlOrderNode }>;
+  };
+};
+
 function gidNum(gid: string | null | undefined): string | null {
   if (!gid) return null;
   const parts = gid.split("/");
@@ -225,12 +232,12 @@ export async function syncRecentOrdersForShop(params: {
   const countBefore = await prisma.warranty.count({ where: { shopId: params.shopId } });
 
   for (let page = 0; page < maxPages; page++) {
-    const data = await shopifyGraphqlRequest<{
-      orders: {
-        pageInfo: { hasNextPage: boolean; endCursor: string | null };
-        edges: Array<{ node: GqlOrderNode }>;
-      };
-    }>(params.shopDomain, ORDERS_RECENT_QUERY, { cursor, query });
+    // Explicit annotation breaks TS7022 circular inference (cursor ↔ data in the loop).
+    const data: OrdersPageResult = await shopifyGraphqlRequest<OrdersPageResult>(
+      params.shopDomain,
+      ORDERS_RECENT_QUERY,
+      { cursor, query },
+    );
 
     for (const edge of data.orders.edges) {
       const payload = graphqlOrderToWebhookPayload(edge.node);
