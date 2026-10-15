@@ -40,17 +40,20 @@ api_version = "2025-01"
   ]
   uri = "/api/webhooks/shopify"
 
-  # Order / customer topics — require Protected Customer Data approval in Partners.
-  # Without these, live checkout→warranty will not run (backfill still works).
-  [[webhooks.subscriptions]]
-  topics = [
-    "orders/create",
-    "orders/updated",
-    "orders/cancelled",
-    "refunds/create",
-    "customers/update"
-  ]
-  uri = "/api/webhooks/shopify"
+  # Order / customer topics REQUIRE Protected Customer Data approval in Partners.
+  # Keep these commented until Partners → App → API access → Protected customer data
+  # is approved — otherwise `shopify app deploy` fails with PCD webhook errors.
+  # After approval, uncomment this block and redeploy.
+  # Without these, live checkout→warranty will not run (use Warranties → Backfill).
+  # [[webhooks.subscriptions]]
+  # topics = [
+  #   "orders/create",
+  #   "orders/updated",
+  #   "orders/cancelled",
+  #   "refunds/create",
+  #   "customers/update"
+  # ]
+  # uri = "/api/webhooks/shopify"
 
 [pos]
 embedded = false
