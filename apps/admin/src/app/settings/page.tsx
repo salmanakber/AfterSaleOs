@@ -288,7 +288,7 @@ export default function AdminSettingsPage() {
   return (
     <AdminShell
       title="Settings"
-      lede="Platform controls for Shopify review, billing, email, and AI providers."
+      lede="Platform controls for Shopify review, billing, email, and AI providers. "
     >
       <Panel title="Resend email">
         <p className="sa-muted" style={{ marginTop: 0 }}>
