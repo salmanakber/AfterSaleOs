@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma, shopRepository } from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
 import { shopifyGraphqlRequest } from "@/lib/shopify/client";
+import { withPublicCors, publicCorsPreflight } from "@/lib/public-cors";
 
 export const runtime = "nodejs";
+
+export async function OPTIONS(request: NextRequest) {
+  return publicCorsPreflight(request.headers.get("origin"));
+}
 
 async function resolveFeeCents(shopDomain: string, shopId: string, feeVariantId: string) {
   const local = await prisma.productVariant.findFirst({
@@ -65,7 +70,7 @@ export async function GET(request: NextRequest) {
     warrantyFeeCents = await resolveFeeCents(shop.shopDomain, shop.id, feeVariantId);
   }
 
-  return NextResponse.json({
+  const res = NextResponse.json({
     shopName: shop.shopName ?? shop.shopDomain,
     shopDomain: shop.shopDomain,
     logoUrl: shop.brandingLogoUrl,
@@ -84,4 +89,5 @@ export async function GET(request: NextRequest) {
     warrantyFeeCents,
     currency: shop.currency ?? "USD",
   });
+  return withPublicCors(res, request.headers.get("origin"));
 }

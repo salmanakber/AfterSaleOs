@@ -22,6 +22,17 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Storefront theme JS (cross-origin) calling public fee/branding APIs.
+  if (request.method === "OPTIONS" && pathname.startsWith("/api/public/")) {
+    const preflight = new NextResponse(null, { status: 204 });
+    const origin = request.headers.get("origin") || "*";
+    preflight.headers.set("Access-Control-Allow-Origin", origin);
+    preflight.headers.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    preflight.headers.set("Access-Control-Allow-Headers", "Accept, Content-Type");
+    preflight.headers.set("Access-Control-Max-Age", "86400");
+    return preflight;
+  }
+
   const response = NextResponse.next();
   response.headers.delete("X-Frame-Options");
 
@@ -33,6 +44,17 @@ export function middleware(request: NextRequest) {
       "Content-Security-Policy",
       "frame-ancestors https://*.myshopify.com https://admin.shopify.com https://*.account.google.com;",
     );
+  }
+
+  if (pathname.startsWith("/api/public/") || pathname === "/apps/aftersale/fee") {
+    const origin = request.headers.get("origin");
+    if (origin) {
+      response.headers.set("Access-Control-Allow-Origin", origin);
+      response.headers.set("Vary", "Origin");
+    } else {
+      response.headers.set("Access-Control-Allow-Origin", "*");
+    }
+    response.headers.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
   }
 
   return response;

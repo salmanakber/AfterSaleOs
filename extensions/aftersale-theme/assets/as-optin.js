@@ -339,15 +339,30 @@
     });
   }
 
+  function fetchFeeJson(api, shop) {
+    if (!api) return Promise.resolve(null);
+    var url = api + (api.indexOf("?") >= 0 ? "&" : "?") + "shop=" + encodeURIComponent(shop);
+    return fetch(url, { headers: { Accept: "application/json" }, credentials: "same-origin" })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
   function loadFeeConfig(root) {
     var shop = root.getAttribute("data-shop") || "";
     var api = root.getAttribute("data-fee-api") || "";
-    if (!shop || !api || !window.fetch) return;
-    fetch(api + (api.indexOf("?") >= 0 ? "&" : "?") + "shop=" + encodeURIComponent(shop), {
-      headers: { Accept: "application/json" },
-    })
-      .then(function (r) {
-        return r.ok ? r.json() : null;
+    var fallback = root.getAttribute("data-fee-api-fallback") || "";
+    if (!shop || !window.fetch) return;
+    // 1) Same-origin App Proxy  2) Hosted branding API (CORS)
+    fetchFeeJson(api, shop)
+      .then(function (json) {
+        if (json && (json.warrantyFeeEnabled != null || json.warrantyFeeVariantId)) {
+          return json;
+        }
+        return fetchFeeJson(fallback, shop);
       })
       .then(function (json) {
         if (json) return applyFeeConfig(root, json);
