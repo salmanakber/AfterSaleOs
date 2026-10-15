@@ -205,7 +205,7 @@ export function HomeDashboard() {
                     <span className="as-m-list-icon">{String(i + 1).padStart(2, "0")}</span>
                     <span className="as-m-list-body">
                       <strong>{item.title}</strong>
-                      <span>Recommended before go-live</span>
+                      <span>Helpful next step</span>
                     </span>
                   </a>
                 ))}
@@ -216,9 +216,9 @@ export function HomeDashboard() {
 
         <Layout.Section>
           <div className="as-m-kpi-grid">
-            <Kpi label="Open claims" value={data.kpis.openClaims} hint="In workflow" />
+            <Kpi label="Open claims" value={data.kpis.openClaims} hint="Being handled" />
             <Kpi label="Awaiting action" value={data.kpis.awaitingAction} hint="Needs your team" />
-            <Kpi label="Active warranties" value={data.kpis.activeWarranties} hint="Coverage live" />
+            <Kpi label="Active warranties" value={data.kpis.activeWarranties} hint="Customers covered" />
             <Kpi
               label="Expiring soon"
               value={data.kpis.expiringThisMonth}
@@ -228,7 +228,7 @@ export function HomeDashboard() {
             <Kpi
               label="Claim rate 30d"
               value={`${data.kpis.claimRate30d.toFixed(1)}%`}
-              hint="Rolling window"
+              hint="Last 30 days"
             />
           </div>
         </Layout.Section>

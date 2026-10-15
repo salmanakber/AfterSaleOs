@@ -23,7 +23,7 @@
   {% if request.design_mode %}
     <div class="as-block-preview" style="border-radius: {{ radius }}px;">
       <strong>Warranty portal</strong>
-      <p>Customers look up coverage with email + order number, then register products from their orders. Styling comes from this block — not your AfterSale hosted brand kit.</p>
+      <p>Customers look up coverage with email and order number, then manage warranties from one place.</p>
       <span class="as-block-preview__field">Email</span>
       <span class="as-block-preview__field">Order number</span>
       <span class="as-block-preview__btn" style="background:{{ accent }};">Open my warranties</span>
@@ -49,18 +49,18 @@
   "settings": [
     {
       "type": "paragraph",
-      "content": "Fills the full width of the parent section. Design colors below apply only to this theme block — hosted AfterSale pages keep their own brand kit."
+      "content": "Full-width warranty portal for this section. Colors below style this block on your storefront."
     },
     {
       "type": "text",
       "id": "title",
-      "label": "Iframe title (accessibility)",
+      "label": "Accessible name",
       "default": "Warranty portal"
     },
     {
       "type": "range",
       "id": "min_height",
-      "label": "Minimum height (px)",
+      "label": "Minimum height",
       "min": 400,
       "max": 1400,
       "step": 40,

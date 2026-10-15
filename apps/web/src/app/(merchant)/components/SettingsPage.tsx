@@ -555,13 +555,23 @@ export function SettingsPage() {
             <h3>Checkout warranty registration</h3>
           </div>
           <p className="as-m-guide-lead">
-            Customer flow: check the box → add to cart → checkout → AfterSale creates a warranty for
-            that ordered product automatically (matching warranty rule required). Until Shopify
-            approves Protected Customer Data webhooks, the app syncs new orders via Admin API when
-            you open the dashboard, on the thank-you page, or via{" "}
-            <strong>Warranties → Sync recent orders</strong>. Optionally charge a fee by adding a
-            Shopify product variant when the box is checked.
+            Turn every purchase into lasting peace of mind. Shoppers can include warranty at checkout,
+            and AfterSale creates coverage automatically for products that match your rules.
           </p>
+          <div className="as-m-benefit-row">
+            <div className="as-m-benefit">
+              <strong>Shop</strong>
+              <span>Customer checks the warranty option on product or cart.</span>
+            </div>
+            <div className="as-m-benefit">
+              <strong>Pay</strong>
+              <span>They complete checkout as usual — no extra forms required.</span>
+            </div>
+            <div className="as-m-benefit">
+              <strong>Covered</strong>
+              <span>Warranty appears in their portal, ready if they ever need a claim.</span>
+            </div>
+          </div>
           <form
             onSubmit={(e) => {
               void onSavePreferences(e);
@@ -579,8 +589,8 @@ export function SettingsPage() {
                     Only register when checkbox is checked
                   </strong>
                   <span style={{ fontSize: 12, color: "#6b7280" }}>
-                    Recommended: leave off. Matching products get warranty on every order. Turn on only
-                    if coverage should require the storefront checkbox.
+                    Leave off to cover matching products on every order. Turn on if shoppers must
+                    choose warranty at checkout.
                   </span>
                 </span>
               </label>
@@ -595,8 +605,7 @@ export function SettingsPage() {
                     Charge a warranty registration fee
                   </strong>
                   <span style={{ fontSize: 12, color: "#6b7280" }}>
-                    Leave off for free registration. When on, checking the box adds your fee product
-                    to the cart.
+                    Keep registration free, or add a priced product when shoppers opt in.
                   </span>
                 </span>
               </label>
@@ -617,12 +626,12 @@ export function SettingsPage() {
                         value={feeSearch}
                         onChange={setFeeSearch}
                         autoComplete="off"
-                        placeholder="Search products to use as the warranty fee…"
+                        placeholder="Search for your warranty fee product…"
                         prefix={<Icon source={SearchIcon} tone="base" />}
                         helpText={
                           feeSelectedLabel
                             ? `Selected: ${feeSelectedLabel}`
-                            : "Create a product like “Warranty registration”, sync products, then pick it here."
+                            : "Create a product like “Warranty registration”, then select it here."
                         }
                       />
                     }
@@ -630,8 +639,8 @@ export function SettingsPage() {
                     emptyState={
                       <div style={{ padding: 12 }}>
                         <Text as="p" tone="subdued">
-                          No matching products. Sync products from Shopify or create a fee product
-                          first.
+                          No matches yet. Create a simple fee product in Shopify, then search for it
+                          here.
                         </Text>
                       </div>
                     }
@@ -654,7 +663,7 @@ export function SettingsPage() {
                 <span>
                   <strong style={{ display: "block", fontSize: 13 }}>Void warranty on refund</strong>
                   <span style={{ fontSize: 12, color: "#6b7280" }}>
-                    Keep coverage aligned with refunded orders
+                    Automatically end coverage when an order is refunded
                   </span>
                 </span>
               </label>
@@ -663,22 +672,19 @@ export function SettingsPage() {
               </Button>
             </FormLayout>
           </form>
-          <div className="as-m-liquid-guide" style={{ marginTop: 16 }}>
-            <strong>Setup checklist</strong>
+          <div className="as-m-help-card" style={{ marginTop: 16 }}>
+            <p className="as-m-help-card__title">Get the most from checkout registration</p>
             <ol>
               <li>
-                Create a warranty rule that matches the products you sell (Products &amp; rules).
+                Set a warranty rule under <strong>Products &amp; rules</strong> for the items you sell.
               </li>
               <li>
-                Enable <strong>Warranty opt-in (auto)</strong> in theme App embeds — style must be{" "}
-                <em>Checkbox</em> (not portal button).
+                Turn on <strong>Warranty opt-in</strong> in your theme so shoppers see the checkbox
+                beside Add to cart.
               </li>
               <li>
-                For a paid fee: create a simple Shopify product (e.g. “Warranty registration”), set
-                the price, then paste its variant ID above.
-              </li>
-              <li>
-                Usage meters on Plans count each warranty created against Free / paid plan limits.
+                Optional: create a priced “Warranty registration” product and select it above to
+                charge a fee.
               </li>
             </ol>
           </div>
@@ -691,26 +697,23 @@ export function SettingsPage() {
             <h3>Show the warranty checkbox automatically</h3>
           </div>
           <p className="as-m-guide-lead">
-            Enable <strong>one App embed</strong> — no need to add a block on every product template.
-            The checkbox appears next to <strong>Add to cart</strong> and again near checkout on the
-            cart. Checking it registers warranty on the order — it does not open the registration
-            portal. Checkout itself cannot host Liquid; use the thank-you block after payment.
+            Enable warranty once in your theme — it appears beside <strong>Add to cart</strong> and
+            again near checkout on the cart. Shoppers check the box to include coverage; after
+            payment, a thank-you prompt can invite them to view their warranty.
           </p>
 
-          <div className="as-m-liquid-guide" style={{ marginBottom: 14 }}>
-            <strong>Recommended (once)</strong>
+          <div className="as-m-help-card" style={{ marginBottom: 14 }}>
+            <p className="as-m-help-card__title">Recommended setup</p>
             <ol>
-              <li>Open App embeds in your theme editor.</li>
+              <li>Open your theme editor and go to App embeds.</li>
               <li>
-                Turn on <strong>Warranty opt-in (auto)</strong>.
+                Turn on <strong>Warranty opt-in</strong>.
               </li>
-              <li>
-                Set your title, colors, and style (checkbox / text+button / button) — then Save.
-              </li>
+              <li>Choose your title, colors, and style — then Save.</li>
             </ol>
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 4 }}>
               <Button url={appEmbedsUrl()} target="_blank" variant="primary">
-                Enable warranty opt-in (App embeds)
+                Enable warranty opt-in
               </Button>
             </div>
           </div>
@@ -720,8 +723,8 @@ export function SettingsPage() {
               <span className="as-m-way-num">Product</span>
               <strong>Beside Add to cart</strong>
               <p>
-                With the App embed on, the checkbox mounts just above the Add to cart button. You
-                only customize copy and colors — no Mac-style preview chrome.
+                The warranty option appears right where shoppers buy — customize the wording and
+                colors to match your brand.
               </p>
               <Button url={themeEditorUrl("product")} target="_blank">
                 Open product template
@@ -731,8 +734,8 @@ export function SettingsPage() {
               <span className="as-m-way-num">Cart</span>
               <strong>Beside checkout</strong>
               <p>
-                Same App embed places the checkbox near the cart checkout button so shoppers can
-                still opt in before paying.
+                Give shoppers a second chance to add warranty before they pay — same embed, no extra
+                setup.
               </p>
               <Button url={themeEditorUrl("cart")} target="_blank">
                 Open cart template
@@ -742,8 +745,8 @@ export function SettingsPage() {
               <span className="as-m-way-num">After checkout</span>
               <strong>Thank-you page</strong>
               <p>
-                Add <em>AfterSale thank you</em> so customers get a “Register this product” button
-                after the order is placed.
+                Add a friendly “Your warranty is ready” prompt so customers can open their portal
+                right after purchase.
               </p>
               <Button url={checkoutEditorUrl()} target="_blank">
                 Open checkout editor
@@ -874,32 +877,32 @@ export function SettingsPage() {
           <div className="as-m-panel-title">
             <h3>Share links & theme placement</h3>
           </div>
-          <Text as="p" tone="subdued">
-            Hosted links work everywhere. Storefront links keep customers on your shop domain. For
-            checkbox and button placement, use the Product · cart · checkout tab.
-          </Text>
+          <p className="as-m-guide-lead">
+            Share branded warranty links by email or SMS, add them to your store menu, or place the
+            checkbox on product and cart pages. Customers always land on the same polished experience.
+          </p>
 
-          <div className="as-m-liquid-guide">
-            <strong>Add AfterSale in your theme</strong>
+          <div className="as-m-help-card">
+            <p className="as-m-help-card__title">Add AfterSale to your storefront</p>
             <ol>
               <li>
-                Online Store → Customize → open a <em>Product</em> or <em>Cart</em> template.
+                Customize your Online Store and open a <em>Product</em> or <em>Cart</em> page.
               </li>
               <li>
-                <strong>Easiest — App embeds:</strong> theme settings gear → <em>App embeds</em> →
-                enable <strong>Warranty opt-in embed</strong>.
+                Enable <strong>Warranty opt-in</strong> under App embeds — fastest way to show the
+                checkbox everywhere.
               </li>
               <li>
-                <strong>Or Add block:</strong> Product information → <strong>Add block</strong> →{" "}
-                <strong>Apps</strong> → <strong>Warranty register card</strong>. Choose checkbox,
-                banner, or button style and set your brand color.
+                Or add a <strong>Warranty register</strong> block for a custom look on specific
+                templates.
               </li>
               <li>
-                After checkout: Checkout editor → Thank you → add <strong>AfterSale thank you</strong>.
+                After payment, add the <strong>AfterSale thank you</strong> prompt so shoppers can
+                open their warranty right away.
               </li>
             </ol>
-            <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "#1e3a8a" }}>
-              Need a walkthrough? Open the{" "}
+            <p className="as-m-help-card__lead">
+              Prefer a guided walkthrough? Open{" "}
               <button
                 type="button"
                 className="as-m-inline-link"
@@ -907,7 +910,7 @@ export function SettingsPage() {
               >
                 Product · cart · checkout
               </button>{" "}
-              tab or the Setup wizard.
+              or the Setup wizard.
             </p>
           </div>
 
@@ -916,9 +919,8 @@ export function SettingsPage() {
               <h3>Online Store menu links</h3>
             </div>
             <Text as="p" tone="subdued">
-              Shopify does not let apps auto-inject links into your Navigation menus. Copy any URL
-              below, then in Admin → Online Store → Navigation → edit a menu → Add menu item → paste
-              the link. Keep them handy whenever you edit menus.
+              Copy a link below, then add it as a menu item under Online Store → Navigation — perfect
+              for “Warranty”, “Register product”, or “File a claim” in your footer.
             </Text>
             <div className="as-m-link-grid" style={{ marginTop: 10 }}>
               {(
@@ -986,17 +988,18 @@ export function SettingsPage() {
           <div className="as-m-panel-title">
             <h3>Embed anywhere</h3>
           </div>
-          <Text as="p" tone="subdued">
-            Paste into a custom page, help center, or landing builder. Prefer theme blocks when
-            staying inside your Online Store.
-          </Text>
+          <p className="as-m-guide-lead">
+            Paste a ready-made snippet into a help center, landing page, or custom HTML section.
+            For your Online Store theme, prefer the placement options above.
+          </p>
           <div style={{ marginTop: 12, maxWidth: 280 }}>
             <TextField
-              label="Iframe height (px)"
+              label="Embed height"
               type="number"
               value={String(embedHeight)}
               onChange={(v) => setEmbedHeight(Math.max(400, Number(v) || 720))}
               autoComplete="off"
+              helpText="How tall the embedded page appears (pixels)."
             />
           </div>
           <div className="as-m-link-grid">

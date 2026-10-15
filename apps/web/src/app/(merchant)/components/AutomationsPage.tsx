@@ -241,8 +241,8 @@ export function AutomationsPage() {
                   Marketing &amp; expiry emails
                 </Text>
                 <Text as="p" tone="subdued">
-                  Remind customers before coverage ends, or send a broadcast to customers with active
-                  warranties. Requires Resend email to be configured on the server.
+                  Remind customers before coverage ends, or send a broadcast to everyone with an
+                  active warranty. Ask your AfterSale admin if email delivery is not connected yet.
                 </Text>
                 <Select
                   label="Expiry window"
@@ -271,12 +271,12 @@ export function AutomationsPage() {
                     autoComplete="off"
                   />
                   <TextField
-                    label="Broadcast body (HTML)"
+                    label="Broadcast message"
                     value={mktBody}
                     onChange={setMktBody}
                     multiline={4}
                     autoComplete="off"
-                    helpText="Sent to unique customers who have at least one active warranty."
+                    helpText="Sent once to each customer who has at least one active warranty."
                   />
                 </FormLayout>
                 <InlineStack gap="200">

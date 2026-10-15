@@ -30,7 +30,7 @@
   {% if request.design_mode %}
     <div class="as-block-preview" style="border-radius: {{ radius }}px;">
       <strong>File a warranty claim</strong>
-      <p>Customers describe the issue and track status after submit. Theme-local colors only.</p>
+      <p>Customers describe the issue and track status after they submit. Colors below apply to this block.</p>
       <span class="as-block-preview__field">Email</span>
       <span class="as-block-preview__field">Issue summary</span>
       <span class="as-block-preview__btn" style="background:{{ accent }};">Submit claim</span>
@@ -56,18 +56,18 @@
   "settings": [
     {
       "type": "paragraph",
-      "content": "Fills the parent section width. Colors below style this embed only."
+      "content": "Full-width claim form for this section. Colors below style this block on your storefront."
     },
     {
       "type": "text",
       "id": "title",
-      "label": "Iframe title (accessibility)",
+      "label": "Accessible name",
       "default": "File a warranty claim"
     },
     {
       "type": "range",
       "id": "min_height",
-      "label": "Minimum height (px)",
+      "label": "Minimum height",
       "min": 400,
       "max": 1400,
       "step": 40,

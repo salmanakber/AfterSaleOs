@@ -504,7 +504,7 @@ const yoga = createYoga({
             setupChecklist.push({
               id: "run-backfill",
               type: "setup",
-              title: "Backfill historical warranties",
+              title: "Import past orders into warranties",
               href: "/warranties",
             });
           }
@@ -512,7 +512,7 @@ const yoga = createYoga({
             setupChecklist.push({
               id: "customize-pages",
               type: "setup",
-              title: "Customize customer pages",
+              title: "Brand your customer warranty pages",
               href: "/settings",
             });
           }
@@ -1006,12 +1006,12 @@ const yoga = createYoga({
             });
             return {
               ...result,
-              message: `Synced ${result.processedOrders} order(s) from the last ${result.lookbackDays} days. ~${result.warrantiesCreatedApprox} new warranties.`,
+              message: `Imported ${result.processedOrders} order(s) from the last ${result.lookbackDays} days. About ${result.warrantiesCreatedApprox} new warranties created.`,
             };
           } catch (err) {
-            const msg = err instanceof Error ? err.message : "Sync failed";
+            const msg = err instanceof Error ? err.message : "Import failed";
             throw new Error(
-              `${msg}. If Shopify blocks order fields, request Protected Customer Data in Partners, or use Backfill after approval.`,
+              `${msg}. Try again in a moment, or use Historical backfill once order access is available.`,
             );
           }
         },

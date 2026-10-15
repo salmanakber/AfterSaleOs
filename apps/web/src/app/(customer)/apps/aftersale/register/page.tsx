@@ -65,7 +65,7 @@ function RegisterInner() {
     setVerifyMsg(null);
     setError(null);
     try {
-      if (!shop) throw new Error("Missing shop.");
+      if (!shop) throw new Error("Please open registration from your store.");
       const res = await fetch(publicApiUrl(`/api/public/guest-link?shop=${encodeURIComponent(shop)}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -119,7 +119,7 @@ function RegisterInner() {
     setError(null);
     setMessage(null);
     try {
-      if (!shop) throw new Error("Missing shop. Open this page from your store or embed link.");
+      if (!shop) throw new Error("Please open this registration page from your store.");
       const res = await fetch(publicApiUrl(`/api/public/register?${query}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -203,7 +203,7 @@ function RegisterInner() {
     >
       {!shop ? (
         <div className="as-alert as-alert-error">
-          This registration page needs a shop link. Open it from your store, QR code, or theme embed.
+          Please open registration from your store’s warranty link, QR code, or product page.
         </div>
       ) : null}
       {auto || session.sessionReady ? (

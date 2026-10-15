@@ -64,7 +64,7 @@ function ClaimFormInner() {
     setVerifyMsg(null);
     setError(null);
     try {
-      if (!shop) throw new Error("Missing shop.");
+      if (!shop) throw new Error("Please open the claim form from your store.");
       const res = await fetch(publicApiUrl(`/api/public/guest-link?shop=${encodeURIComponent(shop)}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -136,7 +136,7 @@ function ClaimFormInner() {
         }
       }
 
-      if (!shop) throw new Error("Missing shop. Open this claim form from your store or embed.");
+      if (!shop) throw new Error("Please open this claim form from your store.");
       const res = await fetch(publicApiUrl(`/api/public/claims?${query}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },

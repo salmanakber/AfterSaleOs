@@ -276,8 +276,8 @@ export function SetupWizardPage() {
                     Your brand on customer pages
                   </Text>
                   <Text as="p" tone="subdued">
-                    Logo and accent color appear on hosted registration, claims, portal, and PDF
-                    certificates. Theme Liquid blocks use their own colors in the theme editor.
+                    Your logo and accent color appear on registration, claims, the warranty portal,
+                    and PDF certificates. Theme blocks can still use their own colors in the editor.
                   </Text>
                   <FormLayout>
                     <div className="as-m-logo-picker">
@@ -380,16 +380,16 @@ export function SetupWizardPage() {
                     Show the warranty checkbox on your store
                   </Text>
                   <Text as="p" tone="subdued">
-                    Enable one App embed — it appears next to Add to cart and again on the cart near
-                    checkout. Then add the thank-you prompt after payment.
+                    Show a warranty option next to Add to cart and on the cart, then invite shoppers
+                    to their coverage right after they pay.
                   </Text>
                   <div className="as-m-way-grid">
                     <div className="as-m-way-card" style={{ cursor: "default" }}>
                       <span className="as-m-way-num">01</span>
-                      <strong>Product + cart (auto)</strong>
+                      <strong>Product + cart</strong>
                       <p>
-                        Theme gear → App embeds → enable <em>Warranty opt-in (auto)</em>. Set your
-                        own title and colors — no block to place on each page.
+                        Enable <em>Warranty opt-in</em> in App embeds. Set your title and colors once —
+                        it appears automatically on product and cart pages.
                       </p>
                       <Button url={appEmbedsUrl(shop.shopDomain)} target="_blank" variant="primary">
                         Open App embeds
@@ -399,8 +399,8 @@ export function SetupWizardPage() {
                       <span className="as-m-way-num">02</span>
                       <strong>After checkout</strong>
                       <p>
-                        Checkout editor → Thank you → add <em>AfterSale thank you</em> so customers
-                        can register after the order.
+                        Add the <em>AfterSale thank you</em> prompt so customers can open their
+                        warranty portal right after purchase.
                       </p>
                       <Button url={checkoutEditorUrl(shop.shopDomain)} target="_blank">
                         Open checkout editor

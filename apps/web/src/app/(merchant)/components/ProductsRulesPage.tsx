@@ -311,7 +311,7 @@ export function ProductsRulesPage() {
         <Select
           label="Product target"
           options={[
-            { label: "Enter ID below", value: "" },
+            { label: "Choose from list or enter below", value: "" },
             ...products.map((p) => ({ label: p.title, value: p.id })),
           ]}
           value={targetId}
@@ -319,14 +319,21 @@ export function ProductsRulesPage() {
         />
       ) : null}
       {targetType !== "default" ? (
-        <TextField label="Target ID" value={targetId} onChange={setTargetId} autoComplete="off" helpText="Shopify product/variant/collection GID or numeric ID" />
+        <TextField
+          label="Product or collection ID"
+          value={targetId}
+          onChange={setTargetId}
+          autoComplete="off"
+          helpText="Pick a product above, or paste the Shopify ID if you already have it."
+        />
       ) : null}
       <TextField
-        label="Terms (HTML)"
+        label="Warranty terms"
         value={termsHtml}
         onChange={setTermsHtml}
         multiline={6}
         autoComplete="off"
+        helpText="Shown to customers on certificates and claim pages. Simple formatting is fine."
       />
     </FormLayout>
   );
@@ -450,7 +457,8 @@ export function ProductsRulesPage() {
               </Text>
               {products.length === 0 ? (
                 <Text as="p" tone="subdued">
-                  Products appear after Shopify product webhooks sync (or backfill).
+                  Your catalog will show up here once products are imported from Shopify. Open the
+                  app again after a few minutes, or sync products from Settings if the list is empty.
                 </Text>
               ) : (
                 products.map((p) => (

@@ -152,8 +152,8 @@ function formatBackfillSummary(job: Job): string {
     const created = result.warrantiesCreated ?? 0;
     if (orders === 0 && created === 0) {
       return lookback
-        ? `No matching orders were found in ${lookback}. Try a longer lookback or confirm order webhooks / Protected Customer Data access.`
-        : "No matching orders were found. Try a longer lookback or confirm order access.";
+        ? `No matching orders were found in ${lookback}. Try a longer lookback, or make sure products have warranty rules.`
+        : "No matching orders were found. Try a longer lookback, or make sure products have warranty rules.";
     }
     const parts = [
       `Checked ${orders.toLocaleString()} order${orders === 1 ? "" : "s"}`,
@@ -358,7 +358,7 @@ export function WarrantiesPage() {
       primaryAction={{ content: "Create manual", onAction: () => setManualOpen(true) }}
       secondaryActions={[
         {
-          content: "Sync recent orders",
+          content: "Import recent orders",
           onAction: () => {
             void (async () => {
               setError(null);
@@ -478,8 +478,9 @@ export function WarrantiesPage() {
                     No warranties match this view yet.
                   </Text>
                   <Text as="p" tone="subdued">
-                    Create a warranty rule under Products &amp; rules, then run a backfill or wait for
-                    new Shopify orders (order webhooks require Protected Customer Data approval).
+                    Create a warranty rule under Products &amp; rules, then sync recent orders or
+                    import past purchases with Historical backfill. New checkouts will appear here
+                    automatically once coverage is set up.
                   </Text>
                 </BlockStack>
               ) : (
@@ -527,9 +528,8 @@ export function WarrantiesPage() {
         <Modal.Section>
           <BlockStack gap="300">
             <Text as="p">
-              Import orders and create per-unit warranties. Without Shopify{" "}
-              <span style={{ color: theme.light.primary }}>read_all_orders</span> approval, only
-              recent orders (~60 days) may be available.
+              Import past orders and create warranties for matching products. Recent history is
+              available right away; deeper lookbacks depend on your Shopify plan permissions.
             </Text>
             <Select
               label="Lookback"

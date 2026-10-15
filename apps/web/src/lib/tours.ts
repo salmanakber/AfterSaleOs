@@ -57,7 +57,7 @@ export const TOURS: Record<string, TourDefinition> = {
       {
         id: "liquid",
         title: "Theme blocks & placement",
-        body: "Easiest: Theme settings → App embeds → enable Warranty opt-in (auto). The checkbox appears next to Add to cart and on the cart — customize title and colors in that embed.",
+        body: "Enable Warranty opt-in in App embeds. The checkbox appears next to Add to cart and on the cart — customize the title and colors to match your brand.",
         target: "cx-liquid",
         tab: "placement",
       },
@@ -78,7 +78,7 @@ export const TOURS: Record<string, TourDefinition> = {
       {
         id: "preview",
         title: "Preview before you publish",
-        body: "Live preview loads the real customer experience with your branding. Open in a new tab when you want to test outside the admin iframe.",
+        body: "Live preview shows the real customer experience with your branding. Open in a new tab anytime for a full-screen walkthrough.",
         target: "cx-preview",
         tab: "preview",
       },

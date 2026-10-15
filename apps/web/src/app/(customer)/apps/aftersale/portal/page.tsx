@@ -97,7 +97,7 @@ function PortalInner() {
     setMessage(null);
     try {
       if (!shop) {
-        setMessage("Missing shop. Open this portal from your store link or embed.");
+        setMessage("Open this warranty portal from your store’s warranty link to continue.");
         setLoading(false);
         return;
       }
