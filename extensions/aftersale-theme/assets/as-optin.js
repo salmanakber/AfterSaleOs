@@ -1,5 +1,6 @@
 (function () {
   var ATTR_KEY = "aftersale_register_intent";
+  var PROP_KEY = "_aftersale_register";
 
   function moneyLabel(cents, currency) {
     if (cents == null || !Number.isFinite(Number(cents))) return "";
@@ -20,19 +21,16 @@
     if (!check) return;
     if (panel) panel.hidden = !check.checked;
     root.classList.toggle("is-checked", check.checked);
-    root.classList.toggle("is-saving", false);
-    root.classList.toggle("is-saved", false);
     if (status) {
       status.textContent = check.checked
         ? root.getAttribute("data-checked-status") ||
-          "Warranty will be registered when you complete checkout."
+          "Warranty will be registered automatically when you complete checkout."
         : "";
       status.hidden = !check.checked;
     }
     try {
-      if (check.checked) {
-        sessionStorage.setItem(ATTR_KEY, "1");
-      } else {
+      if (check.checked) sessionStorage.setItem(ATTR_KEY, "1");
+      else {
         sessionStorage.removeItem(ATTR_KEY);
         sessionStorage.removeItem("aftersale_register_url");
       }
@@ -40,13 +38,9 @@
       /* ignore */
     }
     injectFormAttributes(check.checked);
+    injectLineProperties(check.checked);
     setCartAttribute(ATTR_KEY, check.checked ? "yes" : "").then(function () {
       root.classList.toggle("is-saved", check.checked);
-      if (status && check.checked) {
-        status.textContent =
-          root.getAttribute("data-checked-status") ||
-          "Warranty will be registered when you complete checkout.";
-      }
     });
     syncWarrantyFee(root, check.checked);
   }
@@ -60,9 +54,7 @@
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ attributes: attrs }),
       credentials: "same-origin",
-    }).catch(function () {
-      /* cart API optional */
-    });
+    }).catch(function () {});
   }
 
   function injectFormAttributes(checked) {
@@ -79,6 +71,25 @@
         existing = document.createElement("input");
         existing.type = "hidden";
         existing.name = "attributes[" + ATTR_KEY + "]";
+        form.appendChild(existing);
+      }
+      existing.value = "yes";
+    });
+  }
+
+  /** Line-item property survives checkout more reliably than cart attributes alone. */
+  function injectLineProperties(checked) {
+    var forms = document.querySelectorAll("form[action*='/cart/add']");
+    forms.forEach(function (form) {
+      var existing = form.querySelector('input[name="properties[' + PROP_KEY + ']"]');
+      if (!checked) {
+        if (existing) existing.remove();
+        return;
+      }
+      if (!existing) {
+        existing = document.createElement("input");
+        existing.type = "hidden";
+        existing.name = "properties[" + PROP_KEY + "]";
         form.appendChild(existing);
       }
       existing.value = "yes";
@@ -124,9 +135,7 @@
           }),
         });
       })
-      .catch(function () {
-        /* fee add optional */
-      });
+      .catch(function () {});
   }
 
   function removeFeeLines(variantId) {
@@ -154,9 +163,7 @@
           body: JSON.stringify({ updates: updates }),
         });
       })
-      .catch(function () {
-        /* ignore */
-      });
+      .catch(function () {});
   }
 
   function applyFeeConfig(root, cfg) {
@@ -191,28 +198,14 @@
       .then(function (json) {
         if (json) applyFeeConfig(root, json);
       })
-      .catch(function () {
-        /* ignore */
-      });
+      .catch(function () {});
   }
 
   function bind(root) {
     if (!root || root.dataset.asBound === "1") return;
     root.dataset.asBound = "1";
     var check = root.querySelector("[data-as-optin-check]");
-    var btn = root.querySelector("[data-as-optin-btn]");
     loadFeeConfig(root);
-    if (btn) {
-      // Portal link styles only — never used as the checkbox control.
-      btn.addEventListener("click", function () {
-        try {
-          sessionStorage.setItem(ATTR_KEY, "1");
-        } catch (e) {
-          /* ignore */
-        }
-        setCartAttribute(ATTR_KEY, "yes");
-      });
-    }
     if (!check) return;
     check.addEventListener("change", function () {
       syncPanel(root);
@@ -324,6 +317,7 @@
     var checked = document.querySelector("[data-as-optin-check]:checked");
     if (!checked) return;
     injectFormAttributes(true);
+    injectLineProperties(true);
     setCartAttribute(ATTR_KEY, "yes");
   }
 

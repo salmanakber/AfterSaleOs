@@ -4,11 +4,11 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { customerPageUrl, publicApiUrl } from "@/lib/public-api";
 import {
-  loadCustomerOrderSession,
   saveCustomerOrderSession,
   type CachedOrder,
   type CachedWarranty,
 } from "@/lib/customer-order-session";
+import { useCustomerOrderSession } from "@/lib/use-customer-order-session";
 import { BrandLoader } from "../../../components/BrandLoader";
 import { CustomerShell } from "../../../components/CustomerShell";
 
@@ -23,6 +23,14 @@ function PortalInner() {
   const themeLocal = params.get("theme") === "local" || embed;
   const accentOverride = params.get("accent");
   const prefillEmail = params.get("email") ?? "";
+  const loggedInCustomerId =
+    params.get("logged_in_customer_id") ?? params.get("customer_id") ?? "";
+
+  const session = useCustomerOrderSession({
+    shop: token ? "" : shop,
+    emailFromUrl: prefillEmail,
+    loggedInCustomerId,
+  });
 
   const [email, setEmail] = useState(prefillEmail);
   const [orderNumber, setOrderNumber] = useState("");
@@ -36,15 +44,15 @@ function PortalInner() {
     if (prefillEmail) setEmail(prefillEmail);
   }, [prefillEmail]);
 
-  // Restore cached session for this shop (shared with register / claim)
+  // Auto-open from Shopify login / cached session / email lookup
   useEffect(() => {
-    if (!shop || token) return;
-    const cached = loadCustomerOrderSession(shop);
-    if (!cached) return;
-    setSessionEmail(cached.email);
-    setWarranties(cached.warranties);
-    setOrders(cached.orders);
-  }, [shop, token]);
+    if (token) return;
+    if (!session.sessionReady || !session.hydrated) return;
+    setSessionEmail(session.email || null);
+    setEmail(session.email || email);
+    setWarranties(session.warranties);
+    setOrders(session.orders);
+  }, [token, session.sessionReady, session.hydrated, session.email, session.orders, session.warranties, email]);
 
   useEffect(() => {
     if (!token) return;
@@ -99,9 +107,9 @@ function PortalInner() {
         body: JSON.stringify({ email, orderNumber, shop }),
       });
       const json = await res.json();
-      if (json.portal?.warranties) {
+      if (json.portal?.orders || json.portal?.warranties) {
         setSessionEmail(json.portal.email);
-        setWarranties(json.portal.warranties);
+        setWarranties(json.portal.warranties ?? []);
         setOrders(json.portal.orders ?? []);
         if (json.portal.email) {
           saveCustomerOrderSession({
@@ -140,9 +148,9 @@ function PortalInner() {
     });
   }
 
-  const open = Boolean(warranties);
+  const open = warranties !== null;
 
-  if (loading && !open) {
+  if ((loading || session.loading) && !open) {
     return (
       <div className="as-shell">
         <BrandLoader label="Opening your portal" />

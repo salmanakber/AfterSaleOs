@@ -25,6 +25,7 @@ export {
   consumeGuestToken,
   getPortalWarranties,
   getPortalOrdersForEmail,
+  getPortalSessionForShopifyCustomer,
   hashToken,
   generateGuestToken,
 } from "./registration";

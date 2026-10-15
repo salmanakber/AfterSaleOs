@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma, shopRepository } from "@aftersale/db";
+import { prisma, shopRepository, syncOrderFromWebhook } from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
 import { shopify } from "@/lib/shopify/client";
 import { enqueueWebhookProcessing } from "@/lib/queue";
@@ -9,6 +9,8 @@ import {
   handleCustomersRedact,
   handleShopRedact,
 } from "@/lib/compliance";
+
+const INLINE_ORDER_TOPICS = new Set(["orders/create", "orders/updated", "orders/cancelled"]);
 
 export const runtime = "nodejs";
 
@@ -94,6 +96,23 @@ export async function POST(request: NextRequest) {
   const shop = shopDomain ? await shopRepository.findByDomain(shopDomain) : null;
 
   try {
+    // Process order topics inline so warranties are created even if the worker/Redis is down.
+    if (shop && INLINE_ORDER_TOPICS.has(topic)) {
+      await syncOrderFromWebhook(shop.id, payload);
+      await prisma.webhookEvent.create({
+        data: {
+          shopId: shop.id,
+          shopDomain: shopDomain || "unknown",
+          topic,
+          eventId,
+          payload: payload as object,
+          status: "COMPLETED",
+          processedAt: new Date(),
+        },
+      });
+      return NextResponse.json({ ok: true, inline: true });
+    }
+
     const event = await prisma.webhookEvent.create({
       data: {
         shopId: shop?.id,

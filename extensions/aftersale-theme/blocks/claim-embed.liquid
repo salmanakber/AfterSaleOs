@@ -14,7 +14,11 @@
   {% assign embed_src = embed_src | append: '&product=' | append: product_q | append: '&product_id=' | append: product.id %}
 {% endif %}
 {% if customer and customer.email != blank %}
-  {% assign embed_src = embed_src | append: '&email=' | append: customer.email %}
+  {% assign as_email_q = customer.email | url_encode %}
+  {% assign embed_src = embed_src | append: '&email=' | append: as_email_q %}
+{% endif %}
+{% if customer and customer.id %}
+  {% assign embed_src = embed_src | append: '&logged_in_customer_id=' | append: customer.id %}
 {% endif %}
 
 <div

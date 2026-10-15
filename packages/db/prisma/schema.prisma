@@ -58,7 +58,8 @@ model Shop {
   brandingHeroStyle     String?        @map("branding_hero_style")
   voidWarrantyOnRefund  Boolean        @default(true) @map("void_warranty_on_refund")
   /// When true, warranties are created from orders only if the customer opted in (checkbox / fee).
-  warrantyOptInRequired Boolean        @default(true) @map("warranty_opt_in_required")
+  /// Default false = auto-create coverage for matching products on every order.
+  warrantyOptInRequired Boolean        @default(false) @map("warranty_opt_in_required")
   /// Charge a Shopify product variant when customer opts into warranty registration.
   warrantyFeeEnabled    Boolean        @default(false) @map("warranty_fee_enabled")
   warrantyFeeVariantId  String?        @map("warranty_fee_variant_id")

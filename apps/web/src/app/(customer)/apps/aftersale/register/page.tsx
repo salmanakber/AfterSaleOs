@@ -4,10 +4,10 @@ import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { customerPageUrl, publicApiUrl } from "@/lib/public-api";
 import {
-  loadCustomerOrderSession,
   saveCustomerOrderSession,
   type CachedOrder,
 } from "@/lib/customer-order-session";
+import { useCustomerOrderSession } from "@/lib/use-customer-order-session";
 import { BrandLoader } from "../../../components/BrandLoader";
 import { CustomerShell } from "../../../components/CustomerShell";
 import { OrderPicker } from "../../../components/OrderPicker";
@@ -25,57 +25,39 @@ function RegisterInner() {
   const auto = params.get("auto") === "1";
   const prefillEmail = params.get("email") ?? "";
   const prefillOrder = params.get("order") ?? "";
+  const loggedInCustomerId =
+    params.get("logged_in_customer_id") ?? params.get("customer_id") ?? "";
 
-  const [email, setEmail] = useState(prefillEmail);
+  const session = useCustomerOrderSession({
+    shop,
+    emailFromUrl: prefillEmail,
+    loggedInCustomerId,
+    orderFromUrl: prefillOrder,
+  });
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [serial, setSerial] = useState("");
-  const [orderNumber, setOrderNumber] = useState(prefillOrder);
   const [productTitle, setProductTitle] = useState(productTitleParam);
   const [productId, setProductId] = useState(productIdParam);
   const [variantId, setVariantId] = useState(variantIdParam);
   const [selectedLineId, setSelectedLineId] = useState("");
-  const [seedOrders, setSeedOrders] = useState<CachedOrder[]>([]);
-  const [sessionReady, setSessionReady] = useState(Boolean(prefillEmail));
   const [message, setMessage] = useState<string | null>(null);
   const [cert, setCert] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
 
   const query = useMemo(() => params.toString(), [params]);
   const done = Boolean(cert || message);
-  const showPicker = sessionReady && Boolean(email && shop);
+  const showPicker = session.sessionReady && Boolean(session.email && shop);
 
   useEffect(() => {
-    if (prefillEmail) {
-      setEmail(prefillEmail);
-      setSessionReady(true);
-    }
-    if (prefillOrder) setOrderNumber(prefillOrder);
     if (productTitleParam) setProductTitle(productTitleParam);
     if (productIdParam) setProductId(productIdParam);
     if (variantIdParam) setVariantId(variantIdParam);
-  }, [prefillEmail, prefillOrder, productTitleParam, productIdParam, variantIdParam]);
-
-  // Restore browser session (orders from portal / prior verify) for this shop
-  useEffect(() => {
-    if (!shop) return;
-    const cached = loadCustomerOrderSession(shop);
-    if (!cached) {
-      setHydrated(true);
-      return;
-    }
-    if (!prefillEmail) setEmail(cached.email);
-    setSeedOrders(cached.orders);
-    setSessionReady(true);
-    if (!prefillOrder && cached.orders[0]) {
-      setOrderNumber(cached.orders[0].orderNumber);
-    }
-    setHydrated(true);
-  }, [shop, prefillEmail, prefillOrder]);
+  }, [productTitleParam, productIdParam, variantIdParam]);
 
   async function requestVerify(e: FormEvent) {
     e.preventDefault();
@@ -87,22 +69,26 @@ function RegisterInner() {
       const res = await fetch(publicApiUrl(`/api/public/guest-link?shop=${encodeURIComponent(shop)}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, orderNumber, shop }),
+        body: JSON.stringify({
+          email: session.email,
+          orderNumber: session.orderNumber,
+          shop,
+        }),
       });
       const json = await res.json();
       if (json.portal?.orders?.length) {
         const orders = json.portal.orders as CachedOrder[];
-        setSeedOrders(orders);
-        setSessionReady(true);
-        setOrderNumber(orders[0]?.orderNumber ?? orderNumber);
+        session.setOrders(orders);
+        session.setSessionReady(true);
+        session.setOrderNumber(orders[0]?.orderNumber ?? session.orderNumber);
+        if (json.portal.email) session.setEmail(json.portal.email);
         saveCustomerOrderSession({
           shop,
-          email: json.portal.email ?? email,
+          email: json.portal.email ?? session.email,
           orders,
           warranties: json.portal.warranties ?? [],
           source: "guest_verify",
         });
-        if (json.portal.email) setEmail(json.portal.email);
         setVerifyMsg(json.emailHint ?? "Verified — pick which product to register.");
       } else {
         setVerifyMsg(json.message ?? "If we find a matching order, you will receive an email shortly.");
@@ -115,7 +101,7 @@ function RegisterInner() {
   }
 
   function onPickOrder(o: CachedOrder, lineItemId?: string) {
-    setOrderNumber(o.orderNumber);
+    session.setOrderNumber(o.orderNumber);
     const line = lineItemId
       ? o.lineItems.find((li) => li.id === lineItemId)
       : o.lineItems[0];
@@ -138,11 +124,11 @@ function RegisterInner() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
+          email: session.email,
           firstName,
           lastName,
           serialNumber: serial || undefined,
-          orderNumber: orderNumber || undefined,
+          orderNumber: session.orderNumber || undefined,
           productTitle: productTitle || undefined,
           shopifyProductId: productId || undefined,
           shopifyVariantId: variantId || undefined,
@@ -220,30 +206,30 @@ function RegisterInner() {
           This registration page needs a shop link. Open it from your store, QR code, or theme embed.
         </div>
       ) : null}
-      {auto || sessionReady ? (
+      {auto || session.sessionReady ? (
         <div className="as-alert as-alert-ok">
-          {sessionReady
+          {session.sessionReady
             ? "Your orders are ready — pick the product to register."
             : "Registering from your order — no extra email verification needed for this purchase."}
         </div>
       ) : null}
 
-      {showPicker && hydrated ? (
+      {showPicker && session.hydrated ? (
         <div style={{ marginBottom: 16 }}>
           <OrderPicker
             shop={shop}
-            email={email}
-            selectedOrderNumber={orderNumber}
+            email={session.email}
+            selectedOrderNumber={session.orderNumber}
             selectedLineId={selectedLineId}
             mode="line"
-            seedOrders={seedOrders}
+            seedOrders={session.orders}
             purpose="register"
             onSelect={onPickOrder}
           />
         </div>
       ) : null}
 
-      {!sessionReady ? (
+      {!session.sessionReady ? (
         <form onSubmit={requestVerify} style={{ marginBottom: 18 }}>
           <p className="as-muted" style={{ marginTop: 0 }}>
             Verify once with the email and order number from your purchase. We’ll remember your
@@ -254,16 +240,16 @@ function RegisterInner() {
             className="as-input"
             type="email"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={session.email}
+            onChange={(e) => session.setEmail(e.target.value)}
             autoComplete="email"
           />
           <label className="as-label">Order number</label>
           <input
             className="as-input"
             required
-            value={orderNumber}
-            onChange={(e) => setOrderNumber(e.target.value)}
+            value={session.orderNumber}
+            onChange={(e) => session.setOrderNumber(e.target.value)}
             placeholder="#1001"
           />
           {verifyMsg ? <div className="as-alert as-alert-ok">{verifyMsg}</div> : null}
@@ -274,16 +260,16 @@ function RegisterInner() {
       ) : null}
 
       <form onSubmit={onSubmit}>
-        {sessionReady ? (
+        {session.sessionReady ? (
           <>
             <label className="as-label">Email</label>
-            <input className="as-input" type="email" required value={email} readOnly />
+            <input className="as-input" type="email" required value={session.email} readOnly />
             <label className="as-label">Order number</label>
             <input
               className="as-input"
               required
-              value={orderNumber}
-              onChange={(e) => setOrderNumber(e.target.value)}
+              value={session.orderNumber}
+              onChange={(e) => session.setOrderNumber(e.target.value)}
               placeholder="Select an order above or type #"
             />
             {productTitle ? (
@@ -316,7 +302,11 @@ function RegisterInner() {
 
         {error ? <div className="as-alert as-alert-error">{error}</div> : null}
 
-        <button className="as-btn" type="submit" disabled={loading || !shop || !orderNumber}>
+        <button
+          className="as-btn"
+          type="submit"
+          disabled={loading || !shop || !session.orderNumber}
+        >
           {loading ? "Submitting…" : "Register product"}
         </button>
       </form>

@@ -479,6 +479,98 @@ export async function requestGuestMagicLink(params: {
   return { accepted: true, token, orderNumber: order.orderNumber };
 }
 
+/** Resolve a Shopify storefront customer (app proxy logged_in_customer_id) to portal data. */
+export async function getPortalSessionForShopifyCustomer(params: {
+  shopId: string;
+  shopifyCustomerId: string;
+}) {
+  const shopifyCustomerId = String(params.shopifyCustomerId).replace(/\D/g, "");
+  if (!shopifyCustomerId) return null;
+
+  const customer = await prisma.customer.findFirst({
+    where: { shopId: params.shopId, shopifyCustomerId },
+  });
+
+  let email = customer?.email?.toLowerCase() ?? null;
+
+  // Fall back to orders linked by customer id even if email row is sparse.
+  if (!email) {
+    const order = await prisma.order.findFirst({
+      where: {
+        shopId: params.shopId,
+        OR: [
+          { customerId: customer?.id },
+          { customer: { shopifyCustomerId } },
+        ],
+        email: { not: null },
+      },
+      orderBy: { processedAt: "desc" },
+      select: { email: true },
+    });
+    email = order?.email?.toLowerCase() ?? null;
+  }
+
+  if (!email) {
+    // Still return orders by customer id when email unknown.
+    const orders = await prisma.order.findMany({
+      where: {
+        shopId: params.shopId,
+        cancelledAt: null,
+        OR: [
+          ...(customer?.id ? [{ customerId: customer.id }] : []),
+          { customer: { shopifyCustomerId } },
+        ],
+      },
+      orderBy: { processedAt: "desc" },
+      take: 25,
+      include: {
+        lineItems: {
+          select: {
+            id: true,
+            title: true,
+            quantity: true,
+            shopifyProductId: true,
+            shopifyVariantId: true,
+            warrantyUnits: {
+              select: {
+                id: true,
+                warranties: { select: { id: true, status: true, certificateToken: true }, take: 3 },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (orders.length === 0) return null;
+    return {
+      email: orders[0]?.email?.toLowerCase() ?? "",
+      orders: orders.map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        processedAt: o.processedAt?.toISOString() ?? o.createdAt.toISOString(),
+        lineItems: o.lineItems.map((li) => ({
+          id: li.id,
+          title: li.title,
+          quantity: li.quantity,
+          shopifyProductId: li.shopifyProductId,
+          shopifyVariantId: li.shopifyVariantId,
+          hasWarranty: li.warrantyUnits.some((u) => u.warranties.some((w) => w.status !== "VOID")),
+          certificateToken:
+            li.warrantyUnits.flatMap((u) => u.warranties).find((w) => w.status !== "VOID")
+              ?.certificateToken ?? null,
+        })),
+      })),
+      warranties: [] as Awaited<ReturnType<typeof getPortalWarranties>>,
+    };
+  }
+
+  const [orders, warranties] = await Promise.all([
+    getPortalOrdersForEmail({ shopId: params.shopId, email }),
+    getPortalWarranties({ shopId: params.shopId, email }),
+  ]);
+  return { email, orders, warranties };
+}
+
 /** List orders for an email after a valid guest session (no extra email verify). */
 export async function getPortalOrdersForEmail(params: { shopId: string; email: string }) {
   const email = params.email.toLowerCase();

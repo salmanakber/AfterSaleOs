@@ -87,7 +87,7 @@ export function SettingsPage() {
   const [heroStyle, setHeroStyle] = useState("bold");
   const [timezone, setTimezone] = useState("UTC");
   const [voidOnRefund, setVoidOnRefund] = useState(true);
-  const [optInRequired, setOptInRequired] = useState(true);
+  const [optInRequired, setOptInRequired] = useState(false);
   const [feeEnabled, setFeeEnabled] = useState(false);
   const [feeVariantId, setFeeVariantId] = useState("");
   const [feeLabel, setFeeLabel] = useState("Product warranty registration");
@@ -159,7 +159,7 @@ export function SettingsPage() {
         setHeroStyle(d.home.shop.brandingHeroStyle ?? "bold");
         setTimezone(d.home.shop.timezone ?? "UTC");
         setVoidOnRefund(d.home.shop.voidWarrantyOnRefund);
-        setOptInRequired(d.home.shop.warrantyOptInRequired !== false);
+        setOptInRequired(Boolean(d.home.shop.warrantyOptInRequired));
         setFeeEnabled(Boolean(d.home.shop.warrantyFeeEnabled));
         setFeeVariantId(d.home.shop.warrantyFeeVariantId ?? "");
         setFeeLabel(d.home.shop.warrantyFeeLabel ?? "Product warranty registration");
@@ -533,7 +533,8 @@ export function SettingsPage() {
                     Only register when checkbox is checked
                   </strong>
                   <span style={{ fontSize: 12, color: "#6b7280" }}>
-                    Off = create warranties for every matching order automatically (no opt-in needed)
+                    Recommended: leave off. Matching products get warranty on every order. Turn on only
+                    if coverage should require the storefront checkbox.
                   </span>
                 </span>
               </label>

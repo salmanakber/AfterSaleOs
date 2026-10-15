@@ -7,7 +7,11 @@
 {% assign embed_src = as_app_url | append: '/apps/aftersale/portal?shop=' | append: shop.permanent_domain | append: '&embed=1&theme=local' %}
 {% assign embed_src = embed_src | append: '&accent=' | append: accent | url_encode %}
 {% if customer and customer.email != blank %}
-  {% assign embed_src = embed_src | append: '&email=' | append: customer.email %}
+  {% assign as_email_q = customer.email | url_encode %}
+  {% assign embed_src = embed_src | append: '&email=' | append: as_email_q %}
+{% endif %}
+{% if customer and customer.id %}
+  {% assign embed_src = embed_src | append: '&logged_in_customer_id=' | append: customer.id %}
 {% endif %}
 
 <div

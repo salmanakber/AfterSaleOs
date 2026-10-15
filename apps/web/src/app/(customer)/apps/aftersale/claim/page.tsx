@@ -4,10 +4,10 @@ import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { publicApiUrl } from "@/lib/public-api";
 import {
-  loadCustomerOrderSession,
   saveCustomerOrderSession,
   type CachedOrder,
 } from "@/lib/customer-order-session";
+import { useCustomerOrderSession } from "@/lib/use-customer-order-session";
 import { BrandLoader } from "../../../components/BrandLoader";
 import { CustomerShell } from "../../../components/CustomerShell";
 import { OrderPicker } from "../../../components/OrderPicker";
@@ -21,17 +21,22 @@ function ClaimFormInner() {
   const accentOverride = params.get("accent");
   const prefillEmail = params.get("email") ?? "";
   const prefillOrder = params.get("order") ?? "";
+  const loggedInCustomerId =
+    params.get("logged_in_customer_id") ?? params.get("customer_id") ?? "";
   const query = useMemo(() => params.toString(), [params]);
 
-  const [email, setEmail] = useState(prefillEmail);
+  const session = useCustomerOrderSession({
+    shop,
+    emailFromUrl: prefillEmail,
+    loggedInCustomerId,
+    orderFromUrl: prefillOrder,
+  });
+
   const [name, setName] = useState("");
-  const [orderNumber, setOrderNumber] = useState(prefillOrder);
   const [serial, setSerial] = useState("");
   const [certificateToken, setCertificateToken] = useState(certificateFromUrl);
   const [selectedLineId, setSelectedLineId] = useState("");
   const [productTitle, setProductTitle] = useState("");
-  const [seedOrders, setSeedOrders] = useState<CachedOrder[]>([]);
-  const [sessionReady, setSessionReady] = useState(Boolean(prefillEmail));
   const [category, setCategory] = useState("defect");
   const [summary, setSummary] = useState("");
   const [details, setDetails] = useState("");
@@ -40,7 +45,6 @@ function ClaimFormInner() {
   const [error, setError] = useState<string | null>(null);
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
   const [result, setResult] = useState<{
     claimNumber: string;
     trackingUrl: string;
@@ -48,32 +52,11 @@ function ClaimFormInner() {
     eligibility: string;
   } | null>(null);
 
-  const showPicker = sessionReady && Boolean(email && shop);
+  const showPicker = session.sessionReady && Boolean(session.email && shop);
 
   useEffect(() => {
-    if (prefillEmail) {
-      setEmail(prefillEmail);
-      setSessionReady(true);
-    }
-    if (prefillOrder) setOrderNumber(prefillOrder);
     if (certificateFromUrl) setCertificateToken(certificateFromUrl);
-  }, [prefillEmail, prefillOrder, certificateFromUrl]);
-
-  useEffect(() => {
-    if (!shop) return;
-    const cached = loadCustomerOrderSession(shop);
-    if (!cached) {
-      setHydrated(true);
-      return;
-    }
-    if (!prefillEmail) setEmail(cached.email);
-    setSeedOrders(cached.orders);
-    setSessionReady(true);
-    if (!prefillOrder && cached.orders[0]) {
-      setOrderNumber(cached.orders[0].orderNumber);
-    }
-    setHydrated(true);
-  }, [shop, prefillEmail, prefillOrder]);
+  }, [certificateFromUrl]);
 
   async function requestVerify(e: FormEvent) {
     e.preventDefault();
@@ -85,22 +68,26 @@ function ClaimFormInner() {
       const res = await fetch(publicApiUrl(`/api/public/guest-link?shop=${encodeURIComponent(shop)}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, orderNumber, shop }),
+        body: JSON.stringify({
+          email: session.email,
+          orderNumber: session.orderNumber,
+          shop,
+        }),
       });
       const json = await res.json();
       if (json.portal?.orders?.length) {
         const orders = json.portal.orders as CachedOrder[];
-        setSeedOrders(orders);
-        setSessionReady(true);
-        setOrderNumber(orders[0]?.orderNumber ?? orderNumber);
+        session.setOrders(orders);
+        session.setSessionReady(true);
+        session.setOrderNumber(orders[0]?.orderNumber ?? session.orderNumber);
+        if (json.portal.email) session.setEmail(json.portal.email);
         saveCustomerOrderSession({
           shop,
-          email: json.portal.email ?? email,
+          email: json.portal.email ?? session.email,
           orders,
           warranties: json.portal.warranties ?? [],
           source: "guest_verify",
         });
-        if (json.portal.email) setEmail(json.portal.email);
         setVerifyMsg(json.emailHint ?? "Verified — pick the product to claim.");
       } else {
         setVerifyMsg(json.message ?? "If we find a matching order, you will receive an email shortly.");
@@ -113,7 +100,7 @@ function ClaimFormInner() {
   }
 
   function onPickOrder(o: CachedOrder, lineItemId?: string) {
-    setOrderNumber(o.orderNumber);
+    session.setOrderNumber(o.orderNumber);
     const line = lineItemId
       ? o.lineItems.find((li) => li.id === lineItemId)
       : undefined;
@@ -154,10 +141,10 @@ function ClaimFormInner() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
+          email: session.email,
           customerName: name || undefined,
           certificateToken: certificateToken || undefined,
-          orderNumber: orderNumber || undefined,
+          orderNumber: session.orderNumber || undefined,
           serialNumber: serial || undefined,
           issueCategory: category,
           issueSummary: summary,
@@ -227,22 +214,22 @@ function ClaimFormInner() {
       steps={["Describe", "Evidence", "Submitted"]}
       activeStep={summary.trim() ? 1 : 0}
     >
-      {showPicker && hydrated ? (
+      {showPicker && session.hydrated ? (
         <div style={{ marginBottom: 16 }}>
           <OrderPicker
             shop={shop}
-            email={email}
-            selectedOrderNumber={orderNumber}
+            email={session.email}
+            selectedOrderNumber={session.orderNumber}
             selectedLineId={selectedLineId}
             mode="line"
-            seedOrders={seedOrders}
+            seedOrders={session.orders}
             purpose="claim"
             onSelect={onPickOrder}
           />
         </div>
       ) : null}
 
-      {!sessionReady ? (
+      {!session.sessionReady ? (
         <form onSubmit={requestVerify} style={{ marginBottom: 18 }}>
           <p className="as-muted" style={{ marginTop: 0 }}>
             Verify once with the email and order from your purchase. We’ll save your orders in this
@@ -253,16 +240,16 @@ function ClaimFormInner() {
             className="as-input"
             type="email"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={session.email}
+            onChange={(e) => session.setEmail(e.target.value)}
             autoComplete="email"
           />
           <label className="as-label">Order number</label>
           <input
             className="as-input"
             required
-            value={orderNumber}
-            onChange={(e) => setOrderNumber(e.target.value)}
+            value={session.orderNumber}
+            onChange={(e) => session.setOrderNumber(e.target.value)}
             placeholder="#1001"
           />
           {verifyMsg ? <div className="as-alert as-alert-ok">{verifyMsg}</div> : null}
@@ -272,7 +259,7 @@ function ClaimFormInner() {
         </form>
       ) : (
         <div className="as-alert as-alert-ok" style={{ marginBottom: 16 }}>
-          Orders loaded for {email}. Select a product above, then finish the claim details.
+          Orders loaded for {session.email}. Select a product above, then finish the claim details.
         </div>
       )}
 
@@ -285,10 +272,10 @@ function ClaimFormInner() {
               className="as-input"
               type="email"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={session.email}
+              onChange={(e) => session.setEmail(e.target.value)}
               autoComplete="email"
-              readOnly={sessionReady}
+              readOnly={session.sessionReady}
             />
           </div>
           <div>
@@ -302,8 +289,8 @@ function ClaimFormInner() {
             <label className="as-label">Order number</label>
             <input
               className="as-input"
-              value={orderNumber}
-              onChange={(e) => setOrderNumber(e.target.value)}
+              value={session.orderNumber}
+              onChange={(e) => session.setOrderNumber(e.target.value)}
               placeholder="#1001"
             />
           </div>
