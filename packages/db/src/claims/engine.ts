@@ -115,7 +115,7 @@ export async function createClaim(params: {
   issueSummary: string;
   issueDetails?: string;
   attachmentIds?: string[];
-  /** Merchant desk / admin — enforce plan claims quota. Customer portal never sets this. */
+  /** Merchant desk / admin — enforce plan claims quota. Public API checks quota before calling. */
   enforcePlanQuota?: boolean;
 }) {
   if (params.enforcePlanQuota) {

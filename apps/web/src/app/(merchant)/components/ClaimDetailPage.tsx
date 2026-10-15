@@ -19,6 +19,7 @@ import { gqlRequest } from "@/lib/graphql";
 import { friendlyError } from "@/lib/merchant-errors";
 import { appHref } from "@/lib/shop-context";
 import { BrandLoader } from "./BrandLoader";
+import { ClaimResolvePanel } from "./ClaimResolvePanel";
 import { useMerchantAuth } from "../providers";
 
 type ClaimDetail = {
@@ -29,6 +30,15 @@ type ClaimDetail = {
   customerEmail: string | null;
   customerName: string | null;
   productTitle: string | null;
+  productSku: string | null;
+  productPriceCents: number | null;
+  productQuantity: number | null;
+  currency: string | null;
+  shopifyOrderId: string | null;
+  shopifyVariantId: string | null;
+  shopifyProductId: string | null;
+  orderAdminUrl: string | null;
+  productAdminUrl: string | null;
   orderNumber: string | null;
   serialNumber: string | null;
   issueCategory: string | null;
@@ -64,7 +74,10 @@ type Supplier = { id: string; name: string };
 const DETAIL = `#graphql
   query Claim($id: ID!) {
     claim(id: $id) {
-      id claimNumber status workflowStatusKey customerEmail customerName productTitle orderNumber serialNumber
+      id claimNumber status workflowStatusKey customerEmail customerName
+      productTitle productSku productPriceCents productQuantity currency
+      shopifyOrderId shopifyVariantId shopifyProductId orderAdminUrl productAdminUrl
+      orderNumber serialNumber
       issueCategory issueSummary issueDetails eligibilityLabel eligibilityReasons eligibilityOverride
       trackingUrl slaDueAt aiAssistAt
       aiAssist {
@@ -79,6 +92,15 @@ const DETAIL = `#graphql
     claimWorkflow { statuses { key label } }
     suppliers { id name }
     aiCreditBalance { used limit remaining }
+    replacements(limit: 50) {
+      id claimId status productTitle shopifyDraftOrderName adminOrderUrl warrantyMode
+    }
+    resolutions(type: "REFUND", limit: 50) {
+      id claimId amountCents currency reason adminDeepLink issuedInShopify createdAt
+    }
+    repairs(limit: 50) {
+      id claimId repairNumber status
+    }
   }
 `;
 
@@ -120,6 +142,30 @@ export function ClaimDetailPage() {
     null,
   );
   const [deskTab, setDeskTab] = useState<"overview" | "work" | "resolve">("overview");
+  const [claimReplacements, setClaimReplacements] = useState<
+    {
+      id: string;
+      status: string;
+      productTitle: string | null;
+      shopifyDraftOrderName: string | null;
+      adminOrderUrl: string | null;
+      warrantyMode: string;
+    }[]
+  >([]);
+  const [claimRefunds, setClaimRefunds] = useState<
+    {
+      id: string;
+      amountCents: number | null;
+      currency: string;
+      reason: string | null;
+      adminDeepLink: string | null;
+      issuedInShopify: boolean;
+      createdAt: string;
+    }[]
+  >([]);
+  const [claimRepairs, setClaimRepairs] = useState<
+    { id: string; repairNumber: string; status: string }[]
+  >([]);
 
   const load = useCallback(() => {
     gqlRequest<{
@@ -128,6 +174,26 @@ export function ClaimDetailPage() {
       claimWorkflow: { statuses: WorkflowStatus[] };
       suppliers: Supplier[];
       aiCreditBalance: { used: number; limit: number; remaining: number };
+      replacements: {
+        id: string;
+        claimId: string;
+        status: string;
+        productTitle: string | null;
+        shopifyDraftOrderName: string | null;
+        adminOrderUrl: string | null;
+        warrantyMode: string;
+      }[];
+      resolutions: {
+        id: string;
+        claimId: string;
+        amountCents: number | null;
+        currency: string;
+        reason: string | null;
+        adminDeepLink: string | null;
+        issuedInShopify: boolean;
+        createdAt: string;
+      }[];
+      repairs: { id: string; claimId: string; repairNumber: string; status: string }[];
     }>(DETAIL, { id })
       .then((d) => {
         if (!d.claim) throw new Error("Claim not found");
@@ -143,6 +209,9 @@ export function ClaimDetailPage() {
           setAiAssist(d.claim.aiAssist);
         }
         if (!supplierId && d.suppliers[0]) setSupplierId(d.suppliers[0].id);
+        setClaimReplacements((d.replacements ?? []).filter((r) => r.claimId === id));
+        setClaimRefunds((d.resolutions ?? []).filter((r) => r.claimId === id));
+        setClaimRepairs((d.repairs ?? []).filter((r) => r.claimId === id));
       })
       .catch((e) => setError(friendlyError(e)));
   }, [id, supplierId]);
@@ -360,7 +429,7 @@ export function ClaimDetailPage() {
     }
   }
 
-  async function createReplacement() {
+  async function createReplacement(mode?: string) {
     setBusy(true);
     try {
       const data = await gqlRequest<{
@@ -370,7 +439,7 @@ export function ClaimDetailPage() {
         mutation Rep($input: CreateReplacementInput!) {
           createReplacementDraftOrder(input: $input) { id adminOrderUrl }
         }`,
-        { input: { claimId: id, warrantyMode } },
+        { input: { claimId: id, warrantyMode: mode || warrantyMode } },
       );
       load();
       if (data.createReplacementDraftOrder.adminOrderUrl) {
@@ -383,8 +452,31 @@ export function ClaimDetailPage() {
     }
   }
 
-  async function recordRefundAction() {
-    const cents = Math.round(parseFloat(refundAmount || "0") * 100);
+  async function completeReplacementAction(replacementId: string) {
+    setBusy(true);
+    try {
+      await gqlRequest(
+        `#graphql
+        mutation CompleteRep($id: ID!) {
+          completeReplacement(id: $id) { id status }
+        }`,
+        { id: replacementId },
+      );
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not mark replacement dispatched");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function recordRefundAction(input?: {
+    amountCents: number;
+    reason: string;
+    issuedInShopify: boolean;
+  }) {
+    const cents =
+      input?.amountCents ?? Math.round(parseFloat(refundAmount || "0") * 100);
     if (!cents) {
       setError("Enter a refund amount");
       return;
@@ -400,8 +492,10 @@ export function ClaimDetailPage() {
           input: {
             claimId: id,
             amountCents: cents,
-            reason: refundReason || null,
-            issuedInShopify: false,
+            reason: input?.reason || refundReason || null,
+            shopifyOrderId: claim?.shopifyOrderId || null,
+            issuedInShopify: input?.issuedInShopify ?? false,
+            adminDeepLink: claim?.orderAdminUrl || null,
           },
         },
       );
@@ -415,8 +509,13 @@ export function ClaimDetailPage() {
     }
   }
 
-  async function markSupplierRecoverable() {
-    if (!supplierId) {
+  async function markSupplierRecoverable(input?: {
+    supplierId: string;
+    amountCents: number | null;
+    status: string;
+  }) {
+    const sid = input?.supplierId || supplierId;
+    if (!sid) {
       setError("Create a supplier first");
       return;
     }
@@ -430,11 +529,11 @@ export function ClaimDetailPage() {
         {
           input: {
             claimId: id,
-            supplierId,
-            amountCents: supplierAmount
-              ? Math.round(parseFloat(supplierAmount) * 100)
-              : null,
-            status: supplierStatus,
+            supplierId: sid,
+            amountCents:
+              input?.amountCents ??
+              (supplierAmount ? Math.round(parseFloat(supplierAmount) * 100) : null),
+            status: input?.status || supplierStatus,
             recoverable: true,
           },
         },
@@ -583,18 +682,58 @@ export function ClaimDetailPage() {
           <div className="as-claim-workspace">
             <div className="as-claim-desk" style={{ gap: 14 }}>
               <div className="as-claim-grid">
-                <div className="as-claim-tile">
+                <div className="as-claim-tile as-claim-product-card">
                   <h3>Customer & product</h3>
                   <p className="as-claim-issue">{claim.customerName ?? "—"}</p>
                   <Text as="p" tone="subdued">
                     {claim.customerEmail}
                   </Text>
-                  <Text as="p" fontWeight="semibold">
-                    {claim.productTitle ?? "No product linked"}
-                  </Text>
-                  <Text as="p" tone="subdued">
-                    Order {claim.orderNumber ?? "—"} · Serial {claim.serialNumber ?? "—"}
-                  </Text>
+                  <div className="as-claim-product-card__product">
+                    <p className="as-claim-product-card__title">
+                      {claim.productTitle ?? "No product linked"}
+                    </p>
+                    <dl className="as-claim-product-card__meta">
+                      <div>
+                        <dt>Order</dt>
+                        <dd>{claim.orderNumber ?? "—"}</dd>
+                      </div>
+                      <div>
+                        <dt>SKU</dt>
+                        <dd>{claim.productSku ?? "—"}</dd>
+                      </div>
+                      <div>
+                        <dt>Qty</dt>
+                        <dd>{claim.productQuantity ?? "—"}</dd>
+                      </div>
+                      <div>
+                        <dt>Paid</dt>
+                        <dd>
+                          {claim.productPriceCents != null
+                            ? new Intl.NumberFormat(undefined, {
+                                style: "currency",
+                                currency: claim.currency || "USD",
+                              }).format(claim.productPriceCents / 100)
+                            : "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Serial</dt>
+                        <dd>{claim.serialNumber ?? "—"}</dd>
+                      </div>
+                    </dl>
+                    <InlineStack gap="200">
+                      {claim.orderAdminUrl ? (
+                        <Button url={claim.orderAdminUrl} external size="slim">
+                          Shopify order
+                        </Button>
+                      ) : null}
+                      {claim.productAdminUrl ? (
+                        <Button url={claim.productAdminUrl} external size="slim" variant="plain">
+                          Product
+                        </Button>
+                      ) : null}
+                    </InlineStack>
+                  </div>
                   {claim.issueDetails ? <Text as="p">{claim.issueDetails}</Text> : null}
                 </div>
 
@@ -876,82 +1015,29 @@ export function ClaimDetailPage() {
         ) : null}
 
         {deskTab === "resolve" ? (
-          <div className="as-claim-tile">
-            <h3>Resolution tools</h3>
-            <div className="as-claim-grid">
-              <BlockStack gap="300">
-                <Text as="p" tone="subdued">
-                  Repair, replace, refund, or recover from a supplier — all from this claim.
-                </Text>
-                <Button onClick={createRepair} loading={busy} variant="primary">
-                  Create repair
-                </Button>
-                <Select
-                  label="Replacement warranty mode"
-                  options={[
-                    { label: "Inherit remaining term", value: "INHERIT_REMAINING" },
-                    { label: "Restart warranty", value: "RESTART" },
-                  ]}
-                  value={warrantyMode}
-                  onChange={setWarrantyMode}
-                />
-                <Button onClick={createReplacement} loading={busy}>
-                  Create replacement draft order
-                </Button>
-              </BlockStack>
-              <BlockStack gap="300">
-                <TextField
-                  label="Refund amount"
-                  type="number"
-                  value={refundAmount}
-                  onChange={setRefundAmount}
-                  prefix="$"
-                  autoComplete="off"
-                />
-                <TextField
-                  label="Refund reason"
-                  value={refundReason}
-                  onChange={setRefundReason}
-                  autoComplete="off"
-                />
-                <Button onClick={recordRefundAction} loading={busy}>
-                  Record refund
-                </Button>
-                <Select
-                  label="Supplier (recoverable)"
-                  options={[
-                    { label: suppliers.length ? "Select supplier" : "No suppliers yet", value: "" },
-                    ...suppliers.map((s) => ({ label: s.name, value: s.id })),
-                  ]}
-                  value={supplierId}
-                  onChange={setSupplierId}
-                />
-                <TextField
-                  label="Recoverable amount"
-                  type="number"
-                  value={supplierAmount}
-                  onChange={setSupplierAmount}
-                  prefix="$"
-                  autoComplete="off"
-                />
-                <Select
-                  label="Supplier claim status"
-                  options={["NOT_FILED", "FILED", "ACCEPTED", "REJECTED", "REIMBURSED"].map((s) => ({
-                    label: s.replaceAll("_", " "),
-                    value: s,
-                  }))}
-                  value={supplierStatus}
-                  onChange={setSupplierStatus}
-                />
-                <Button onClick={markSupplierRecoverable} loading={busy}>
-                  Save supplier recovery
-                </Button>
-                <Button url={appHref("/suppliers")} variant="plain">
-                  Manage suppliers
-                </Button>
-              </BlockStack>
-            </div>
-          </div>
+          <ClaimResolvePanel
+            product={{
+              productTitle: claim.productTitle,
+              productSku: claim.productSku,
+              productPriceCents: claim.productPriceCents,
+              productQuantity: claim.productQuantity,
+              currency: claim.currency,
+              orderNumber: claim.orderNumber,
+              shopifyVariantId: claim.shopifyVariantId,
+              orderAdminUrl: claim.orderAdminUrl,
+              productAdminUrl: claim.productAdminUrl,
+            }}
+            replacements={claimReplacements}
+            refunds={claimRefunds}
+            repairs={claimRepairs}
+            suppliers={suppliers}
+            busy={busy}
+            onCreateRepair={() => void createRepair()}
+            onCreateReplacement={(mode) => void createReplacement(mode)}
+            onCompleteReplacement={(rid) => void completeReplacementAction(rid)}
+            onRecordRefund={(input) => void recordRefundAction(input)}
+            onSaveSupplier={(input) => void markSupplierRecoverable(input)}
+          />
         ) : null}
       </div>
 

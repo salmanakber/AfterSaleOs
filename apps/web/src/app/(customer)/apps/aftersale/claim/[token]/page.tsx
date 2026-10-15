@@ -1,8 +1,9 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { publicApiUrl } from "@/lib/public-api";
+import { parseEmbedLayout } from "@/lib/embed-layout";
 import { BrandLoader } from "../../../../components/BrandLoader";
 import { CustomerShell } from "../../../../components/CustomerShell";
 
@@ -20,7 +21,12 @@ type ClaimView = {
   attachments: { fileName: string; contentType: string }[];
 };
 
-const RAIL = ["OPEN", "IN_REVIEW", "IN_RESOLUTION", "COMPLETED"] as const;
+const RAIL = [
+  { key: "OPEN", label: "Open" },
+  { key: "IN_REVIEW", label: "Review" },
+  { key: "IN_RESOLUTION", label: "Resolve" },
+  { key: "COMPLETED", label: "Done" },
+] as const;
 
 function railActive(status: string): number {
   if (status === "COMPLETED" || status === "APPROVED") return 3;
@@ -30,8 +36,18 @@ function railActive(status: string): number {
   return 0;
 }
 
+function statusLabel(status: string) {
+  return status.replaceAll("_", " ");
+}
+
 function TrackInner() {
   const { token } = useParams<{ token: string }>();
+  const params = useSearchParams();
+  const embed = params.get("embed") === "1";
+  const themeLocal = params.get("theme") === "local" || embed;
+  const accentOverride = params.get("accent");
+  const embedLayout = parseEmbedLayout(params);
+  const shop = params.get("shop") ?? "";
   const [claim, setClaim] = useState<ClaimView | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,9 +63,19 @@ function TrackInner() {
 
   const activeIdx = useMemo(() => (claim ? railActive(claim.status) : 0), [claim]);
 
+  const shellProps = {
+    shopDomain: shop,
+    embed,
+    themeLocal,
+    accentOverride,
+    embedCols: embedLayout.cols,
+    embedWidth: embedLayout.width,
+    embedStyle: embedLayout.style,
+  } as const;
+
   if (error) {
     return (
-      <CustomerShell title="Claim not found" lede="This tracking link may be invalid or expired.">
+      <CustomerShell title="Claim not found" lede="This tracking link may be invalid or expired." {...shellProps}>
         <div className="as-alert as-alert-error">{error}</div>
       </CustomerShell>
     );
@@ -63,94 +89,82 @@ function TrackInner() {
     );
   }
 
-  const badge =
+  const closed = claim.status === "REJECTED" || claim.status === "CANCELLED";
+  const tone =
     claim.status === "APPROVED" || claim.status === "COMPLETED"
-      ? "as-badge as-badge-active"
-      : claim.status === "REJECTED" || claim.status === "CANCELLED"
-        ? "as-badge as-badge-void"
+      ? "ok"
+      : closed
+        ? "bad"
         : claim.status === "WAITING_CUSTOMER"
-          ? "as-badge as-badge-expiring"
-          : "as-badge as-badge-pending";
+          ? "wait"
+          : "live";
 
   return (
     <CustomerShell
       brand={claim.shopName || "AfterSale"}
-      title="Claim tracking"
-      lede="Live status and updates from the care team — refresh anytime."
+      title="Track claim"
+      lede={claim.productTitle || "Status updates from the care team."}
+      {...shellProps}
     >
-      <div className="as-stack">
-        <div className="as-status-rail" aria-label="Claim progress">
-          {RAIL.map((step, i) => (
-            <span key={step} data-active={activeIdx >= i && activeIdx >= 0 ? "true" : "false"}>
-              {step.replaceAll("_", " ")}
-            </span>
-          ))}
-        </div>
-
-        <div className="as-track-card">
-          <div className="as-warranty-row">
-            <div>
-              <h2 className="as-warranty-title" style={{ marginBottom: 4 }}>
-                {claim.claimNumber}
-              </h2>
-              {claim.productTitle ? <p className="as-muted">{claim.productTitle}</p> : null}
-            </div>
-            <span className={badge}>{claim.status.replaceAll("_", " ")}</span>
-          </div>
-
-          <p style={{ margin: 0, fontSize: "1.08rem", fontWeight: 650 }}>{claim.issueSummary}</p>
-          {claim.issueDetails ? <p className="as-muted" style={{ margin: 0 }}>{claim.issueDetails}</p> : null}
-
-          <div className="as-track-meta">
-            {claim.eligibilityResult ? (
-              <span className="as-chip">
-                Eligibility · {claim.eligibilityResult.replaceAll("_", " ")}
-              </span>
-            ) : null}
-            <span className="as-chip">Opened {new Date(claim.createdAt).toLocaleDateString()}</span>
-            <span className="as-chip">Updated {new Date(claim.updatedAt).toLocaleString()}</span>
-          </div>
-        </div>
-
-        {claim.notes.length > 0 ? (
+      <div className="as-track">
+        <header className="as-track-head">
           <div>
-            <div className="as-section-head">
-              <h2>Updates</h2>
-            </div>
-            <ul className="as-timeline">
+            <p className="as-track-kicker">Claim</p>
+            <h2 className="as-track-number">{claim.claimNumber}</h2>
+            {claim.issueSummary ? <p className="as-track-summary">{claim.issueSummary}</p> : null}
+          </div>
+          <span className={`as-track-pill as-track-pill--${tone}`}>{statusLabel(claim.status)}</span>
+        </header>
+
+        {!closed ? (
+          <ol className="as-track-rail" aria-label="Claim progress">
+            {RAIL.map((step, i) => (
+              <li key={step.key} data-state={activeIdx > i ? "done" : activeIdx === i ? "current" : "upcoming"}>
+                <span className="as-track-rail__tick" aria-hidden />
+                <span className="as-track-rail__label">{step.label}</span>
+              </li>
+            ))}
+          </ol>
+        ) : null}
+
+        <div className="as-track-meta-row">
+          {claim.eligibilityResult ? (
+            <span>Eligibility · {statusLabel(claim.eligibilityResult)}</span>
+          ) : null}
+          <span>Opened {new Date(claim.createdAt).toLocaleDateString()}</span>
+          <span>Updated {new Date(claim.updatedAt).toLocaleString()}</span>
+        </div>
+
+        {claim.issueDetails ? <p className="as-track-details">{claim.issueDetails}</p> : null}
+
+        <section className="as-track-section">
+          <h3>Updates</h3>
+          {claim.notes.length > 0 ? (
+            <ul className="as-track-updates">
               {claim.notes.map((n, i) => (
                 <li key={i}>
-                  <p style={{ margin: 0 }}>{n.body}</p>
-                  <p className="as-muted" style={{ margin: "4px 0 0" }}>
-                    {new Date(n.createdAt).toLocaleString()}
-                  </p>
+                  <p>{n.body}</p>
+                  <time>{new Date(n.createdAt).toLocaleString()}</time>
                 </li>
               ))}
             </ul>
-          </div>
-        ) : (
-          <div className="as-empty">
-            <strong>No updates yet</strong>
-            <p className="as-muted">You’ll see messages here when the team posts an update.</p>
-          </div>
-        )}
+          ) : (
+            <p className="as-muted as-track-empty">No updates yet — check back soon.</p>
+          )}
+        </section>
 
         {claim.attachments.length > 0 ? (
-          <div>
-            <div className="as-section-head">
-              <h2>Attachments</h2>
-            </div>
-            <div className="as-stack">
+          <section className="as-track-section">
+            <h3>Files</h3>
+            <ul className="as-track-files">
               {claim.attachments.map((a, i) => (
-                <div key={i} className="as-line-row">
+                <li key={i}>
                   <strong>{a.fileName}</strong>
-                  <span className="as-muted" style={{ fontSize: 12 }}>
-                    {a.contentType || "File"}
-                  </span>
-                </div>
+                  <span>{a.contentType || "File"}</span>
+                </li>
               ))}
-            </div>
-          </div>
+            </ul>
+          </section>
         ) : null}
       </div>
     </CustomerShell>

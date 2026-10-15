@@ -6,7 +6,7 @@ import {
   type StartDateRuleKind,
 } from "@aftersale/shared";
 import { usageRepository } from "../repositories";
-import { assertMonthlyQuota } from "../plan-limits";
+import { assertMonthlyQuota, canConsumeMonthlyQuota } from "../plan-limits";
 
 export type SerialValidationResult =
   | { ok: true; mode: string; needsReview?: boolean }
@@ -182,33 +182,39 @@ export async function submitRegistration(params: {
   let warrantyId: string | undefined;
 
   if (status === "APPROVED" && version) {
-    const created = await materializeRegistrationWarranty({
-      shopId: params.shopId,
-      shopTimezone: shop.timezone,
-      customerId: customer.id,
-      email,
-      versionId: version.id,
-      startDateRule: version.startDateRule as StartDateRuleKind,
-      durationMonths: version.durationMonths,
-      serialNumber: params.serialNumber,
-      purchaseDate: params.purchaseDate ?? new Date(),
-      productTitle: params.productTitle ?? "Registered product",
-      shopifyProductId: params.shopifyProductId,
-      shopifyVariantId: params.shopifyVariantId,
-      orderNumber: params.orderNumber,
-    });
-    warrantyUnitId = created.unitId;
-    warrantyId = created.warrantyId;
-
-    if (params.serialNumber && serialMode === "VALIDATED_AGAINST_LIST") {
-      await prisma.serialNumber.updateMany({
-        where: {
-          shopId: params.shopId,
-          serial: params.serialNumber.trim(),
-          claimedAt: null,
-        },
-        data: { claimedAt: new Date(), warrantyUnitId },
+    const quota = await canConsumeMonthlyQuota(params.shopId, "warranties_created");
+    if (!quota.ok) {
+      // Customer still gets a registration row; merchant reviews once capacity frees up.
+      status = "PENDING_VERIFICATION";
+    } else {
+      const created = await materializeRegistrationWarranty({
+        shopId: params.shopId,
+        shopTimezone: shop.timezone,
+        customerId: customer.id,
+        email,
+        versionId: version.id,
+        startDateRule: version.startDateRule as StartDateRuleKind,
+        durationMonths: version.durationMonths,
+        serialNumber: params.serialNumber,
+        purchaseDate: params.purchaseDate ?? new Date(),
+        productTitle: params.productTitle ?? "Registered product",
+        shopifyProductId: params.shopifyProductId,
+        shopifyVariantId: params.shopifyVariantId,
+        orderNumber: params.orderNumber,
       });
+      warrantyUnitId = created.unitId;
+      warrantyId = created.warrantyId;
+
+      if (params.serialNumber && serialMode === "VALIDATED_AGAINST_LIST") {
+        await prisma.serialNumber.updateMany({
+          where: {
+            shopId: params.shopId,
+            serial: params.serialNumber.trim(),
+            claimedAt: null,
+          },
+          data: { claimedAt: new Date(), warrantyUnitId },
+        });
+      }
     }
   }
 

@@ -198,7 +198,8 @@ export function PlansPage() {
                 <h2>Start with the plan that fits your volume</h2>
                 <p>
                   Free works for getting started. Upgrade anytime for repairs, replacements, and
-                  deeper automation. Customer claims are never blocked by limits.
+                  deeper automation. When monthly claim or warranty limits are reached,
+                  customer forms pause with a clear message until you upgrade or the month resets.
                 </p>
               </div>
             </Layout.Section>

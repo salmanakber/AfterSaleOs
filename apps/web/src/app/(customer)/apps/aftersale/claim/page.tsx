@@ -278,7 +278,15 @@ function ClaimFormInner() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Claim failed");
+      if (!res.ok) {
+        if (json.code === "PLAN_LIMIT") {
+          throw new Error(
+            json.error ||
+              "This store can’t accept new claims right now. Please contact the store or try again next month.",
+          );
+        }
+        throw new Error(json.error ?? "Claim failed");
+      }
       setResult({
         claimNumber: json.claimNumber,
         trackingUrl: json.trackingUrl,

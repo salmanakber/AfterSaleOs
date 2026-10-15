@@ -1,24 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { NavMenu } from "@shopify/app-bridge-react";
+import { gqlRequest } from "@/lib/graphql";
 import { appHref } from "@/lib/shop-context";
 import type { PlanFeatureKey } from "@/lib/plan-features";
 import { useMerchantAuth } from "../providers";
 
-type NavItem = { href: string; label: string; group?: string; feature?: PlanFeatureKey };
+type NavItem = {
+  href: string;
+  label: string;
+  group?: string;
+  feature?: PlanFeatureKey;
+  badgeKey?: keyof NavCounts;
+};
+
+type NavCounts = {
+  claims: number;
+  warranties: number;
+  registrations: number;
+  repairs: number;
+  resolutions: number;
+};
 
 const NAV: NavItem[] = [
   { href: "/", label: "Home", group: "Overview" },
   { href: "/setup", label: "Setup wizard", group: "Overview" },
-  { href: "/claims", label: "Claims", group: "Operations" },
-  { href: "/repairs", label: "Repairs", group: "Operations", feature: "repairsEnabled" },
-  { href: "/resolutions", label: "Resolutions", group: "Operations" },
+  { href: "/claims", label: "Claims", group: "Operations", badgeKey: "claims" },
+  { href: "/repairs", label: "Repairs", group: "Operations", feature: "repairsEnabled", badgeKey: "repairs" },
+  { href: "/resolutions", label: "Resolutions", group: "Operations", badgeKey: "resolutions" },
   { href: "/suppliers", label: "Suppliers", group: "Operations", feature: "supplierPortal" },
-  { href: "/warranties", label: "Warranties", group: "Coverage" },
-  { href: "/registrations", label: "Registrations", group: "Coverage" },
+  { href: "/warranties", label: "Warranties", group: "Coverage", badgeKey: "warranties" },
+  { href: "/registrations", label: "Registrations", group: "Coverage", badgeKey: "registrations" },
   { href: "/products-rules", label: "Products & Rules", group: "Coverage" },
   { href: "/automations", label: "Automations", group: "Setup" },
   { href: "/qr-codes", label: "QR codes", group: "Setup", feature: "qrCodes" },
@@ -27,10 +42,28 @@ const NAV: NavItem[] = [
   { href: "/plans", label: "Plans & Usage", group: "Setup" },
 ];
 
+const NAV_COUNTS_QUERY = `#graphql
+  query NavCounts {
+    navCounts {
+      claims
+      warranties
+      registrations
+      repairs
+      resolutions
+    }
+  }
+`;
+
 function pathActive(pathname: string | null, href: string) {
   if (!pathname) return false;
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function formatBadge(n: number) {
+  if (n <= 0) return null;
+  if (n > 99) return "99+";
+  return String(n);
 }
 
 /** Shopify admin NavMenu + in-app sidebar (client navigation keeps shell mounted). */
@@ -39,7 +72,25 @@ export function AppNav() {
   const { plan } = useMerchantAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [counts, setCounts] = useState<NavCounts | null>(null);
   const groups = ["Overview", "Operations", "Coverage", "Setup"] as const;
+
+  const refreshCounts = useCallback(() => {
+    gqlRequest<{ navCounts: NavCounts }>(NAV_COUNTS_QUERY)
+      .then((d) => setCounts(d.navCounts))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    refreshCounts();
+    const t = window.setInterval(refreshCounts, 45_000);
+    const onFocus = () => refreshCounts();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(t);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [refreshCounts, pathname]);
 
   function isLocked(item: NavItem) {
     if (!item.feature || !plan) return false;
@@ -109,6 +160,8 @@ export function AppNav() {
                 {!collapsed ? <div className="as-m-sidebar-label">{group}</div> : null}
                 {items.map((item) => {
                   const locked = isLocked(item);
+                  const badge =
+                    item.badgeKey && counts ? formatBadge(counts[item.badgeKey]) : null;
                   return (
                     <Link
                       key={item.href}
@@ -116,16 +169,29 @@ export function AppNav() {
                       className="as-m-sidebar-link"
                       data-active={pathActive(pathname, item.href)}
                       data-locked={locked || undefined}
-                      title={locked ? `${item.label} · upgrade to unlock` : item.label}
+                      title={
+                        locked
+                          ? `${item.label} · upgrade to unlock`
+                          : badge
+                            ? `${item.label} · ${badge} need attention`
+                            : item.label
+                      }
                       prefetch
                       onClick={() => setMobileOpen(false)}
                     >
                       <span className="as-m-sidebar-dot" aria-hidden />
                       {!collapsed ? (
                         <span className="as-m-sidebar-link-label">
-                          {item.label}
+                          <span className="as-m-sidebar-link-text">{item.label}</span>
                           {locked ? <em className="as-m-sidebar-lock">Pro</em> : null}
+                          {badge && !locked ? (
+                            <span className="as-m-sidebar-badge" aria-label={`${badge} new`}>
+                              {badge}
+                            </span>
+                          ) : null}
                         </span>
+                      ) : badge && !locked ? (
+                        <span className="as-m-sidebar-badge as-m-sidebar-badge--dot" aria-hidden />
                       ) : null}
                     </Link>
                   );

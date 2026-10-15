@@ -123,6 +123,15 @@ const typeDefs = /* GraphQL */ `
     setupChecklist: [AttentionItem!]!
   }
 
+  """Sidebar badge counts for actionable / new items."""
+  type NavCounts {
+    claims: Int!
+    warranties: Int!
+    registrations: Int!
+    repairs: Int!
+    resolutions: Int!
+  }
+
   type RuleAssignment {
     id: ID!
     targetType: String!
@@ -270,6 +279,7 @@ const typeDefs = /* GraphQL */ `
   type Query {
     health: String!
     home: HomeDashboard!
+    navCounts: NavCounts!
     warrantyRules: [WarrantyRule!]!
     warrantyRule(id: ID!): WarrantyRule
     warranties(query: String, status: String, limit: Int, offset: Int): WarrantyConnection!
@@ -459,6 +469,50 @@ const yoga = createYoga({
         ...resolutionsResolvers.Query,
         ...merchantOpsResolvers.Query,
         health: () => "ok",
+        navCounts: async (_: unknown, __: unknown, ctx: { request: Request }) => {
+          const merchant = await resolveMerchantContext(ctx.request);
+          const shopId = merchant.shopId;
+          const startOfMonth = new Date();
+          startOfMonth.setUTCDate(1);
+          startOfMonth.setUTCHours(0, 0, 0, 0);
+          const endOfMonth = new Date(
+            Date.UTC(startOfMonth.getUTCFullYear(), startOfMonth.getUTCMonth() + 1, 0, 23, 59, 59),
+          );
+          const [claims, warranties, registrations, repairs, resolutions] = await Promise.all([
+            prisma.claim.count({
+              where: { shopId, status: { in: ["OPEN", "IN_REVIEW", "WAITING_CUSTOMER"] } },
+            }),
+            prisma.warranty.count({
+              where: {
+                shopId,
+                status: { in: ["ACTIVE", "EXPIRING_SOON"] },
+                endAt: { gte: startOfMonth, lte: endOfMonth },
+              },
+            }),
+            prisma.registration.count({
+              where: { shopId, status: { in: ["PENDING_VERIFICATION", "NEEDS_REVIEW"] } },
+            }),
+            prisma.repair.count({
+              where: {
+                shopId,
+                status: {
+                  in: [
+                    "REPAIR_REQUIRED",
+                    "PRODUCT_RECEIVED",
+                    "DIAGNOSIS",
+                    "REPAIRING",
+                    "QUALITY_CHECK",
+                    "READY",
+                  ],
+                },
+              },
+            }),
+            prisma.replacement.count({
+              where: { shopId, status: "draft_created" },
+            }),
+          ]);
+          return { claims, warranties, registrations, repairs, resolutions };
+        },
         home: async (_: unknown, __: unknown, ctx: { request: Request }) => {
           const merchant = await resolveMerchantContext(ctx.request);
           const shop = await prisma.shop.findUniqueOrThrow({ where: { id: merchant.shopId } });
@@ -488,7 +542,7 @@ const yoga = createYoga({
             },
           });
           const pendingRegs = await prisma.registration.count({
-            where: { shopId: shop.id, status: "PENDING_VERIFICATION" },
+            where: { shopId: shop.id, status: { in: ["PENDING_VERIFICATION", "NEEDS_REVIEW"] } },
           });
           const ruleCount = await prisma.warrantyRule.count({ where: { shopId: shop.id } });
           const setupChecklist = [];

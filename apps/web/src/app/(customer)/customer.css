@@ -1345,10 +1345,182 @@
   margin-bottom: 6px;
 }
 
+/* —— Slim claim tracking —— */
+.as-track {
+  display: grid;
+  gap: 14px;
+}
+
+.as-track-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.as-track-kicker {
+  margin: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--as-accent);
+}
+
+.as-track-number {
+  margin: 2px 0 4px;
+  font-family: var(--as-font-display), Fraunces, Georgia, serif;
+  font-size: clamp(1.25rem, 2.5vw, 1.55rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--as-ink);
+}
+
+.as-track-summary {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--as-ink);
+  line-height: 1.35;
+}
+
+.as-track-pill {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.as-track-pill--ok {
+  background: var(--as-ok-bg);
+  color: var(--as-ok-text);
+  border: 1px solid var(--as-ok-border);
+}
+
+.as-track-pill--bad {
+  background: var(--as-err-bg);
+  color: var(--as-err-text);
+  border: 1px solid var(--as-err-border);
+}
+
+.as-track-pill--wait {
+  background: color-mix(in srgb, var(--as-accent) 14%, transparent);
+  color: color-mix(in srgb, var(--as-accent) 70%, var(--as-ink));
+  border: 1px solid color-mix(in srgb, var(--as-accent) 35%, transparent);
+}
+
+.as-track-pill--live {
+  background: var(--as-primary-tint);
+  color: var(--as-primary);
+  border: 1px solid color-mix(in srgb, var(--as-primary) 28%, transparent);
+}
+
+.as-track-rail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.as-track-rail__tick {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--as-border);
+  margin-bottom: 6px;
+}
+
+.as-track-rail li[data-state="done"] .as-track-rail__tick,
+.as-track-rail li[data-state="current"] .as-track-rail__tick {
+  background: var(--as-accent);
+}
+
+.as-track-rail__label {
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: var(--as-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.as-track-rail li[data-state="current"] .as-track-rail__label,
+.as-track-rail li[data-state="done"] .as-track-rail__label {
+  color: var(--as-ink);
+}
+
+.as-track-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 0.75rem;
+  color: var(--as-muted);
+}
+
+.as-track-details {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--as-muted);
+}
+
+.as-track-section h3 {
+  margin: 0 0 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--as-muted);
+}
+
+.as-track-updates,
+.as-track-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.as-track-updates li,
+.as-track-files li {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--as-border);
+  background: var(--as-surface);
+}
+
+.as-track-updates p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--as-ink);
+}
+
+.as-track-updates time,
+.as-track-files span {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--as-muted);
+}
+
+.as-track-files strong {
+  font-size: 0.84rem;
+}
+
+.as-track-empty {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
 /* —— Claim wizard (marketplace-grade stepped claim) —— */
 .as-claim-wizard {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   width: 100%;
 }
 
@@ -1991,26 +2163,67 @@
   color: var(--as-ink);
 }
 
+.as-shell-embed .as-claim-wizard {
+  gap: 10px;
+}
+
 .as-shell-embed .as-claim-rail__blurb {
   display: none;
 }
 
+.as-shell-embed .as-claim-step {
+  gap: 12px;
+}
+
+.as-shell-embed .as-claim-step__head {
+  gap: 2px;
+}
+
 .as-shell-embed .as-claim-step__title {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
+}
+
+.as-shell-embed .as-claim-step__lede {
+  font-size: 0.8rem;
 }
 
 .as-shell-embed .as-evidence-stage {
-  padding: 16px 14px;
+  padding: 14px 12px;
+}
+
+.as-shell-embed .as-evidence-stage__copy strong {
+  font-size: 1.05rem;
 }
 
 .as-shell-embed .as-claim-cats {
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.as-shell-embed .as-claim-cat {
+  padding: 10px;
+}
+
+.as-shell-embed .as-claim-block {
+  padding: 12px;
+  gap: 10px;
 }
 
 .as-shell-embed--flat .as-claim-block {
   padding: 0;
   border: 0;
   background: transparent;
+}
+
+.as-shell-embed .as-claim-nav .as-btn,
+.as-shell-embed .as-claim-submit {
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 0.84rem;
+}
+
+.as-shell-embed .as-track {
+  gap: 10px;
 }
 
 @media (max-width: 560px) {

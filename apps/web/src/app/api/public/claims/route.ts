@@ -4,6 +4,7 @@ import {
   createClaim,
   prisma,
   saveClaimAttachment,
+  canConsumeMonthlyQuota,
 } from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
 import { verifyAppProxySignature, shopDomainFromProxy } from "@/lib/app-proxy";
@@ -58,6 +59,20 @@ export async function POST(request: NextRequest) {
 
   if (!body.email || !body.issueSummary) {
     return NextResponse.json({ error: "Email and issue summary are required" }, { status: 400 });
+  }
+
+  const quota = await canConsumeMonthlyQuota(resolved.shop.id, "claims_created");
+  if (!quota.ok) {
+    return NextResponse.json(
+      {
+        error:
+          "This store has reached its monthly claim limit. Please contact the store or try again next month.",
+        code: "PLAN_LIMIT",
+        used: quota.used,
+        limit: quota.limit,
+      },
+      { status: 403 },
+    );
   }
 
   const { claim, eligibility } = await createClaim({

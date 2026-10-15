@@ -61,6 +61,15 @@ export const claimsTypeDefs = /* GraphQL */ `
     customerEmail: String
     customerName: String
     productTitle: String
+    productSku: String
+    productPriceCents: Int
+    productQuantity: Int
+    currency: String
+    shopifyOrderId: String
+    shopifyVariantId: String
+    shopifyProductId: String
+    orderAdminUrl: String
+    productAdminUrl: String
     orderNumber: String
     serialNumber: String
     certificateToken: String
@@ -198,6 +207,19 @@ export async function mapClaim(claimId: string, shopId: string, shopDomain: stri
     customerEmail: c.customerEmail,
     customerName: c.customerName,
     productTitle: c.warrantyUnit?.orderLineItem.title ?? null,
+    productSku: c.warrantyUnit?.orderLineItem.sku ?? null,
+    productPriceCents: c.warrantyUnit?.orderLineItem.priceCents ?? null,
+    productQuantity: c.warrantyUnit?.orderLineItem.quantity ?? null,
+    currency: c.warrantyUnit?.orderLineItem.order.currency ?? "USD",
+    shopifyOrderId: c.warrantyUnit?.orderLineItem.order.shopifyOrderId ?? null,
+    shopifyVariantId: c.warrantyUnit?.orderLineItem.shopifyVariantId ?? null,
+    shopifyProductId: c.warrantyUnit?.orderLineItem.shopifyProductId ?? null,
+    orderAdminUrl: c.warrantyUnit?.orderLineItem.order.shopifyOrderId
+      ? `https://${shopDomain}/admin/orders/${String(c.warrantyUnit.orderLineItem.order.shopifyOrderId).replace(/\D/g, "")}`
+      : null,
+    productAdminUrl: c.warrantyUnit?.orderLineItem.shopifyProductId
+      ? `https://${shopDomain}/admin/products/${String(c.warrantyUnit.orderLineItem.shopifyProductId).replace(/\D/g, "")}`
+      : null,
     orderNumber: c.warrantyUnit?.orderLineItem.order.orderNumber ?? null,
     serialNumber: c.warrantyUnit?.serialNumber ?? null,
     certificateToken: c.warranty?.certificateToken ?? null,
