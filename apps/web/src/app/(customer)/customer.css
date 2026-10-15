@@ -821,7 +821,49 @@
 .as-field-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0 12px;
+  gap: 4px 12px;
+  align-items: start;
+}
+
+.as-field-span {
+  grid-column: 1 / -1;
+}
+
+.as-form-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.as-form-card {
+  padding: 12px 14px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--as-border);
+  background: color-mix(in srgb, var(--as-surface) 94%, transparent);
+}
+
+.as-form-card .as-section-title {
+  margin-bottom: 8px;
+}
+
+.as-input-compact {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.as-shell-embed .as-form-card {
+  padding: 10px 12px 12px;
+  border-radius: 10px;
+  background: transparent;
+  border-color: color-mix(in srgb, var(--as-border) 85%, transparent);
+}
+
+.as-shell-embed .as-form-stack {
+  gap: 10px;
+}
+
+.as-shell-embed .as-embed-main {
+  /* Let nested form cards define structure; avoid double boxing */
+  padding: 8px 10px;
 }
 
 .as-alert {

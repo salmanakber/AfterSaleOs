@@ -230,28 +230,34 @@ function RegisterInner() {
       ) : null}
 
       {!session.sessionReady ? (
-        <form onSubmit={requestVerify} style={{ marginBottom: 18 }}>
-          <p className="as-muted" style={{ marginTop: 0 }}>
-            Verify once with the email and order number from your purchase. We’ll remember your
-            orders in this browser so you can pick products on register and claim pages.
+        <form onSubmit={requestVerify} className="as-form-card" style={{ marginBottom: 14 }}>
+          <p className="as-section-title">Find your order</p>
+          <p className="as-muted" style={{ marginTop: 0, marginBottom: 8 }}>
+            Use the email and order number from your purchase.
           </p>
-          <label className="as-label">Email</label>
-          <input
-            className="as-input"
-            type="email"
-            required
-            value={session.email}
-            onChange={(e) => session.setEmail(e.target.value)}
-            autoComplete="email"
-          />
-          <label className="as-label">Order number</label>
-          <input
-            className="as-input"
-            required
-            value={session.orderNumber}
-            onChange={(e) => session.setOrderNumber(e.target.value)}
-            placeholder="#1001"
-          />
+          <div className="as-field-grid">
+            <div>
+              <label className="as-label">Email</label>
+              <input
+                className="as-input"
+                type="email"
+                required
+                value={session.email}
+                onChange={(e) => session.setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
+            <div>
+              <label className="as-label">Order number</label>
+              <input
+                className="as-input"
+                required
+                value={session.orderNumber}
+                onChange={(e) => session.setOrderNumber(e.target.value)}
+                placeholder="#1001"
+              />
+            </div>
+          </div>
           {verifyMsg ? <div className="as-alert as-alert-ok">{verifyMsg}</div> : null}
           <button className="as-btn as-btn-secondary" type="submit" disabled={verifying || !shop}>
             {verifying ? "Checking…" : "Find my orders"}
@@ -259,46 +265,61 @@ function RegisterInner() {
         </form>
       ) : null}
 
-      <form onSubmit={onSubmit}>
-        {session.sessionReady ? (
-          <>
-            <label className="as-label">Email</label>
-            <input className="as-input" type="email" required value={session.email} readOnly />
-            <label className="as-label">Order number</label>
-            <input
-              className="as-input"
-              required
-              value={session.orderNumber}
-              onChange={(e) => session.setOrderNumber(e.target.value)}
-              placeholder="Select an order above or type #"
-            />
-            {productTitle ? (
+      <form onSubmit={onSubmit} className="as-form-stack">
+        <div className="as-form-card">
+          <p className="as-section-title">Registration details</p>
+          <div className="as-field-grid">
+            {session.sessionReady ? (
               <>
-                <label className="as-label">Product</label>
-                <input className="as-input" value={productTitle} readOnly />
+                <div>
+                  <label className="as-label">Email</label>
+                  <input className="as-input" type="email" required value={session.email} readOnly />
+                </div>
+                <div>
+                  <label className="as-label">Order number</label>
+                  <input
+                    className="as-input"
+                    required
+                    value={session.orderNumber}
+                    onChange={(e) => session.setOrderNumber(e.target.value)}
+                    placeholder="Select an order above"
+                  />
+                </div>
+                {productTitle ? (
+                  <div className="as-field-span">
+                    <label className="as-label">Product</label>
+                    <input className="as-input" value={productTitle} readOnly />
+                  </div>
+                ) : null}
               </>
             ) : null}
-          </>
-        ) : null}
-
-        <div className="as-field-grid">
-          <div>
-            <label className="as-label">First name</label>
-            <input className="as-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-          </div>
-          <div>
-            <label className="as-label">Last name</label>
-            <input className="as-input" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            <div>
+              <label className="as-label">First name</label>
+              <input
+                className="as-input"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="as-label">Last name</label>
+              <input
+                className="as-input"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+              />
+            </div>
+            <div className="as-field-span">
+              <label className="as-label">Serial number</label>
+              <input
+                className="as-input"
+                value={serial}
+                onChange={(e) => setSerial(e.target.value)}
+                placeholder="If your product requires one"
+              />
+            </div>
           </div>
         </div>
-
-        <label className="as-label">Serial number</label>
-        <input
-          className="as-input"
-          value={serial}
-          onChange={(e) => setSerial(e.target.value)}
-          placeholder="If your product requires one"
-        />
 
         {error ? <div className="as-alert as-alert-error">{error}</div> : null}
 

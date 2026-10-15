@@ -26,6 +26,7 @@ export {
   getPortalWarranties,
   getPortalOrdersForEmail,
   getPortalSessionForShopifyCustomer,
+  isWarrantyFeeLineItem,
   hashToken,
   generateGuestToken,
 } from "./registration";

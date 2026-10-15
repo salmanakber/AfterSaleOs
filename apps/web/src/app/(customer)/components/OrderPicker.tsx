@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { publicApiUrl } from "@/lib/public-api";
 import {
   saveCustomerOrderSession,
+  stripWarrantyFeeFromOrders,
   type CachedOrder,
 } from "@/lib/customer-order-session";
 
@@ -30,14 +31,16 @@ export function OrderPicker({
   seedOrders?: OrderOption[];
   purpose?: "register" | "claim";
 }) {
-  const [orders, setOrders] = useState<OrderOption[]>(seedOrders ?? []);
+  const [orders, setOrders] = useState<OrderOption[]>(() =>
+    stripWarrantyFeeFromOrders(seedOrders ?? []),
+  );
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(!(seedOrders && seedOrders.length > 0));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (seedOrders && seedOrders.length > 0) {
-      setOrders(seedOrders);
+      setOrders(stripWarrantyFeeFromOrders(seedOrders));
       setLoading(false);
     }
   }, [seedOrders]);
@@ -55,7 +58,7 @@ export function OrderPicker({
       .then(async (r) => {
         const json = await r.json();
         if (!r.ok) throw new Error(json.error ?? "Could not load orders");
-        const next = (json.orders ?? []) as OrderOption[];
+        const next = stripWarrantyFeeFromOrders((json.orders ?? []) as OrderOption[]);
         if (cancelled) return;
         setOrders(next);
         saveCustomerOrderSession({

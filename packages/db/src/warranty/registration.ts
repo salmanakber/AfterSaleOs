@@ -542,24 +542,16 @@ export async function getPortalSessionForShopifyCustomer(params: {
       },
     });
     if (orders.length === 0) return null;
+    const shopRow = await prisma.shop.findUnique({
+      where: { id: params.shopId },
+      select: { warrantyFeeVariantId: true },
+    });
+    const feeVariantId = shopRow?.warrantyFeeVariantId?.replace(/\D/g, "") || null;
     return {
       email: orders[0]?.email?.toLowerCase() ?? "",
-      orders: orders.map((o) => ({
-        id: o.id,
-        orderNumber: o.orderNumber,
-        processedAt: o.processedAt?.toISOString() ?? o.createdAt.toISOString(),
-        lineItems: o.lineItems.map((li) => ({
-          id: li.id,
-          title: li.title,
-          quantity: li.quantity,
-          shopifyProductId: li.shopifyProductId,
-          shopifyVariantId: li.shopifyVariantId,
-          hasWarranty: li.warrantyUnits.some((u) => u.warranties.some((w) => w.status !== "VOID")),
-          certificateToken:
-            li.warrantyUnits.flatMap((u) => u.warranties).find((w) => w.status !== "VOID")
-              ?.certificateToken ?? null,
-        })),
-      })),
+      orders: orders
+        .map((o) => mapPortalOrder(o, feeVariantId))
+        .filter((o) => o.lineItems.length > 0),
       warranties: [] as Awaited<ReturnType<typeof getPortalWarranties>>,
     };
   }
@@ -571,9 +563,74 @@ export async function getPortalSessionForShopifyCustomer(params: {
   return { email, orders, warranties };
 }
 
+/** Warranty fee SKU is a checkout charge — never surface as a registerable product. */
+export function isWarrantyFeeLineItem(
+  li: { shopifyVariantId?: string | null; title?: string | null },
+  feeVariantId?: string | null,
+): boolean {
+  if (feeVariantId) {
+    const want = String(feeVariantId).replace(/\D/g, "");
+    const vid = String(li.shopifyVariantId ?? "").replace(/\D/g, "");
+    if (want && vid && want === vid) return true;
+  }
+  const t = (li.title ?? "").toLowerCase().trim();
+  return (
+    t === "warranty fee" ||
+    t === "warranty registration" ||
+    t === "product warranty registration" ||
+    /^warranty\s+(fee|registration)\b/.test(t)
+  );
+}
+
+function mapPortalOrder(
+  o: {
+    id: string;
+    orderNumber: string;
+    processedAt: Date | null;
+    createdAt: Date;
+    lineItems: Array<{
+      id: string;
+      title: string;
+      quantity: number;
+      shopifyProductId: string | null;
+      shopifyVariantId: string | null;
+      warrantyUnits: Array<{
+        warranties: Array<{ id: string; status: string; certificateToken: string }>;
+      }>;
+    }>;
+  },
+  feeVariantId: string | null,
+) {
+  const lineItems = o.lineItems
+    .filter((li) => !isWarrantyFeeLineItem(li, feeVariantId))
+    .map((li) => ({
+      id: li.id,
+      title: li.title,
+      quantity: li.quantity,
+      shopifyProductId: li.shopifyProductId,
+      shopifyVariantId: li.shopifyVariantId,
+      hasWarranty: li.warrantyUnits.some((u) => u.warranties.some((w) => w.status !== "VOID")),
+      certificateToken:
+        li.warrantyUnits.flatMap((u) => u.warranties).find((w) => w.status !== "VOID")
+          ?.certificateToken ?? null,
+    }));
+  return {
+    id: o.id,
+    orderNumber: o.orderNumber,
+    processedAt: o.processedAt?.toISOString() ?? o.createdAt.toISOString(),
+    lineItems,
+  };
+}
+
 /** List orders for an email after a valid guest session (no extra email verify). */
 export async function getPortalOrdersForEmail(params: { shopId: string; email: string }) {
   const email = params.email.toLowerCase();
+  const shop = await prisma.shop.findUnique({
+    where: { id: params.shopId },
+    select: { warrantyFeeVariantId: true },
+  });
+  const feeVariantId = shop?.warrantyFeeVariantId?.replace(/\D/g, "") || null;
+
   const orders = await prisma.order.findMany({
     where: {
       shopId: params.shopId,
@@ -601,22 +658,9 @@ export async function getPortalOrdersForEmail(params: { shopId: string; email: s
     },
   });
 
-  return orders.map((o) => ({
-    id: o.id,
-    orderNumber: o.orderNumber,
-    processedAt: o.processedAt?.toISOString() ?? o.createdAt.toISOString(),
-    lineItems: o.lineItems.map((li) => ({
-      id: li.id,
-      title: li.title,
-      quantity: li.quantity,
-      shopifyProductId: li.shopifyProductId,
-      shopifyVariantId: li.shopifyVariantId,
-      hasWarranty: li.warrantyUnits.some((u) => u.warranties.some((w) => w.status !== "VOID")),
-      certificateToken:
-        li.warrantyUnits.flatMap((u) => u.warranties).find((w) => w.status !== "VOID")
-          ?.certificateToken ?? null,
-    })),
-  }));
+  return orders
+    .map((o) => mapPortalOrder(o, feeVariantId))
+    .filter((o) => o.lineItems.length > 0);
 }
 
 export async function consumeGuestToken(token: string) {
@@ -640,7 +684,13 @@ export async function getPortalWarranties(params: {
   orderNumber?: string | null;
 }) {
   const email = params.email.toLowerCase();
-  return prisma.warranty.findMany({
+  const shop = await prisma.shop.findUnique({
+    where: { id: params.shopId },
+    select: { warrantyFeeVariantId: true },
+  });
+  const feeVariantId = shop?.warrantyFeeVariantId?.replace(/\D/g, "") || null;
+
+  const rows = await prisma.warranty.findMany({
     where: {
       shopId: params.shopId,
       status: { not: "VOID" },
@@ -667,6 +717,17 @@ export async function getPortalWarranties(params: {
     },
     orderBy: { createdAt: "desc" },
   });
+
+  return rows.filter(
+    (w) =>
+      !isWarrantyFeeLineItem(
+        {
+          shopifyVariantId: w.warrantyUnit.orderLineItem.shopifyVariantId,
+          title: w.warrantyUnit.orderLineItem.title,
+        },
+        feeVariantId,
+      ),
+  );
 }
 
 export function safeEqual(a: string, b: string) {

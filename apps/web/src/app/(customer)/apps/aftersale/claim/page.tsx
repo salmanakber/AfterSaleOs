@@ -230,122 +230,141 @@ function ClaimFormInner() {
       ) : null}
 
       {!session.sessionReady ? (
-        <form onSubmit={requestVerify} style={{ marginBottom: 18 }}>
-          <p className="as-muted" style={{ marginTop: 0 }}>
-            Verify once with the email and order from your purchase. We’ll save your orders in this
-            browser so claim and register stay easy.
+        <form onSubmit={requestVerify} className="as-form-card" style={{ marginBottom: 14 }}>
+          <p className="as-section-title">Find your order</p>
+          <p className="as-muted" style={{ marginTop: 0, marginBottom: 8 }}>
+            Use the email and order number from your purchase.
           </p>
-          <label className="as-label">Email</label>
-          <input
-            className="as-input"
-            type="email"
-            required
-            value={session.email}
-            onChange={(e) => session.setEmail(e.target.value)}
-            autoComplete="email"
-          />
-          <label className="as-label">Order number</label>
-          <input
-            className="as-input"
-            required
-            value={session.orderNumber}
-            onChange={(e) => session.setOrderNumber(e.target.value)}
-            placeholder="#1001"
-          />
+          <div className="as-field-grid">
+            <div>
+              <label className="as-label">Email</label>
+              <input
+                className="as-input"
+                type="email"
+                required
+                value={session.email}
+                onChange={(e) => session.setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
+            <div>
+              <label className="as-label">Order number</label>
+              <input
+                className="as-input"
+                required
+                value={session.orderNumber}
+                onChange={(e) => session.setOrderNumber(e.target.value)}
+                placeholder="#1001"
+              />
+            </div>
+          </div>
           {verifyMsg ? <div className="as-alert as-alert-ok">{verifyMsg}</div> : null}
           <button className="as-btn as-btn-secondary" type="submit" disabled={verifying || !shop}>
             {verifying ? "Checking…" : "Find my orders"}
           </button>
         </form>
       ) : (
-        <div className="as-alert as-alert-ok" style={{ marginBottom: 16 }}>
-          Orders loaded for {session.email}. Select a product above, then finish the claim details.
+        <div className="as-alert as-alert-ok" style={{ marginBottom: 12 }}>
+          Orders loaded for {session.email}. Pick a product above, then finish below.
         </div>
       )}
 
-      <form onSubmit={onSubmit}>
-        <p className="as-section-title">Contact & product</p>
-        <div className="as-field-grid">
-          <div>
-            <label className="as-label">Email</label>
-            <input
-              className="as-input"
-              type="email"
-              required
-              value={session.email}
-              onChange={(e) => session.setEmail(e.target.value)}
-              autoComplete="email"
-              readOnly={session.sessionReady}
-            />
-          </div>
-          <div>
-            <label className="as-label">Name</label>
-            <input className="as-input" value={name} onChange={(e) => setName(e.target.value)} />
+      <form onSubmit={onSubmit} className="as-form-stack">
+        <div className="as-form-card">
+          <p className="as-section-title">Contact &amp; product</p>
+          <div className="as-field-grid">
+            <div>
+              <label className="as-label">Email</label>
+              <input
+                className="as-input"
+                type="email"
+                required
+                value={session.email}
+                onChange={(e) => session.setEmail(e.target.value)}
+                autoComplete="email"
+                readOnly={session.sessionReady}
+              />
+            </div>
+            <div>
+              <label className="as-label">Name</label>
+              <input className="as-input" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div>
+              <label className="as-label">Order number</label>
+              <input
+                className="as-input"
+                value={session.orderNumber}
+                onChange={(e) => session.setOrderNumber(e.target.value)}
+                placeholder="#1001"
+              />
+            </div>
+            <div>
+              <label className="as-label">Serial number</label>
+              <input
+                className="as-input"
+                value={serial}
+                onChange={(e) => setSerial(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+            {productTitle ? (
+              <div className="as-field-span">
+                <label className="as-label">Product</label>
+                <input className="as-input" value={productTitle} readOnly />
+              </div>
+            ) : null}
           </div>
         </div>
 
-        <div className="as-field-grid">
-          <div>
-            <label className="as-label">Order number</label>
-            <input
-              className="as-input"
-              value={session.orderNumber}
-              onChange={(e) => session.setOrderNumber(e.target.value)}
-              placeholder="#1001"
-            />
-          </div>
-          <div>
-            <label className="as-label">Serial number</label>
-            <input className="as-input" value={serial} onChange={(e) => setSerial(e.target.value)} />
+        <div className="as-form-card">
+          <p className="as-section-title">What happened</p>
+          <div className="as-field-grid">
+            <div>
+              <label className="as-label">Issue category</label>
+              <select
+                className="as-input"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="defect">Product defect</option>
+                <option value="damage">Damage</option>
+                <option value="missing_parts">Missing parts</option>
+                <option value="performance">Performance</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="as-label">Summary</label>
+              <input
+                className="as-input"
+                required
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                placeholder="Short description"
+              />
+            </div>
+            <div className="as-field-span">
+              <label className="as-label">Details</label>
+              <textarea
+                className="as-input as-input-compact"
+                rows={3}
+                value={details}
+                onChange={(e) => setDetails(e.target.value)}
+                placeholder="When it started, what you tried…"
+              />
+            </div>
+            <div className="as-field-span">
+              <label className="as-label">Photos / files (max 5)</label>
+              <input
+                className="as-input"
+                type="file"
+                accept="image/*,application/pdf,video/mp4"
+                multiple
+                onChange={(e) => setFiles(e.target.files)}
+              />
+            </div>
           </div>
         </div>
-
-        {productTitle ? (
-          <>
-            <label className="as-label">Product</label>
-            <input className="as-input" value={productTitle} readOnly />
-          </>
-        ) : null}
-
-        <hr className="as-divider" />
-        <p className="as-section-title">What happened</p>
-
-        <label className="as-label">Issue category</label>
-        <select className="as-input" value={category} onChange={(e) => setCategory(e.target.value)}>
-          <option value="defect">Product defect</option>
-          <option value="damage">Damage</option>
-          <option value="missing_parts">Missing parts</option>
-          <option value="performance">Performance</option>
-          <option value="other">Other</option>
-        </select>
-
-        <label className="as-label">Summary</label>
-        <input
-          className="as-input"
-          required
-          value={summary}
-          onChange={(e) => setSummary(e.target.value)}
-          placeholder="Short description of the issue"
-        />
-
-        <label className="as-label">Details</label>
-        <textarea
-          className="as-input"
-          rows={4}
-          value={details}
-          onChange={(e) => setDetails(e.target.value)}
-          style={{ resize: "vertical", minHeight: 110 }}
-          placeholder="When it started, what you tried, and anything else we should know"
-        />
-
-        <label className="as-label">Photos / files (max 5)</label>
-        <input
-          className="as-input"
-          type="file"
-          accept="image/*,application/pdf,video/mp4"
-          multiple
-          onChange={(e) => setFiles(e.target.files)}
-        />
 
         {certificateToken ? (
           <p className="as-muted">Linked to warranty certificate for this product.</p>
