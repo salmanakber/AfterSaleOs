@@ -123,22 +123,14 @@ export function CustomerShell({
         : "";
 
   if (embed) {
+    // Full-width form only — no intro column. Fields use .as-field-grid for 2-column layout.
     return (
       <div
         className={`as-shell as-shell-embed${skipHostedBrand ? " as-shell-theme-local" : ""}${fontClass}${buttonClass}`}
         style={brandStyle}
         data-embed="1"
       >
-        <div className="as-embed-layout">
-          <aside className="as-embed-intro">
-            <p className="as-embed-kicker">
-              {isSystemBrand ? "Warranty" : displayBrand}
-            </p>
-            <h2 className="as-embed-title">{title}</h2>
-            {lede ? <p className="as-embed-lede">{lede}</p> : null}
-          </aside>
-          <div className="as-embed-main">{children}</div>
-        </div>
+        <div className="as-embed-main">{children}</div>
       </div>
     );
   }
