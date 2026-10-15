@@ -4,6 +4,7 @@
  */
 import { prisma } from "../client";
 import { getNotificationTemplateForSend } from "../merchant-ops";
+import { getResendConfig } from "../platform";
 
 export type SendEmailInput = {
   shopId: string;
@@ -181,7 +182,8 @@ export async function sendTransactionalEmail(input: SendEmailInput): Promise<{
     html = built.html;
   }
 
-  if (!process.env.RESEND_API_KEY) {
+  const resend = await getResendConfig();
+  if (!resend.apiKey) {
     console.warn(
       JSON.stringify({
         event: "email.skipped",
@@ -193,7 +195,7 @@ export async function sendTransactionalEmail(input: SendEmailInput): Promise<{
     );
     return { sent: false, reason: "missing_resend_api_key", subject };
   }
-  if (!process.env.RESEND_FROM_EMAIL) {
+  if (!resend.fromEmail) {
     console.warn(
       JSON.stringify({
         event: "email.skipped",
@@ -206,19 +208,19 @@ export async function sendTransactionalEmail(input: SendEmailInput): Promise<{
     return { sent: false, reason: "missing_resend_from_email", subject };
   }
 
-  const fromName = process.env.RESEND_FROM_NAME?.trim() || brand.shopName;
+  const fromName = resend.fromName || brand.shopName;
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      Authorization: `Bearer ${resend.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: `${fromName} <${process.env.RESEND_FROM_EMAIL}>`,
+      from: `${fromName} <${resend.fromEmail}>`,
       to: [input.to],
       subject,
       html,
-      reply_to: process.env.RESEND_REPLY_TO || undefined,
+      reply_to: resend.replyTo || undefined,
     }),
   });
 

@@ -49,6 +49,18 @@ export default function AdminSettingsPage() {
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
 
+  const [resendApiKey, setResendApiKey] = useState("");
+  const [resendFromEmail, setResendFromEmail] = useState("");
+  const [resendFromName, setResendFromName] = useState("");
+  const [resendReplyTo, setResendReplyTo] = useState("");
+  const [resendMeta, setResendMeta] = useState<{
+    configured: boolean;
+    apiKeySource: string;
+    apiKeyHint: string | null;
+  } | null>(null);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+
   function token() {
     return localStorage.getItem("aftersale_admin_token");
   }
@@ -66,6 +78,16 @@ export default function AdminSettingsPage() {
         setBillingTest(Boolean(json.shopifyBillingTest));
         setSource(json.source === "platform" ? "platform" : "env");
         setEnvFallback(Boolean(json.envFallback));
+        if (json.resend) {
+          setResendMeta({
+            configured: Boolean(json.resend.configured),
+            apiKeySource: json.resend.apiKeySource ?? "none",
+            apiKeyHint: json.resend.apiKeyHint ?? null,
+          });
+          setResendFromEmail(json.resend.fromEmail ?? "");
+          setResendFromName(json.resend.fromName ?? "");
+          setResendReplyTo(json.resend.replyTo ?? "");
+        }
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
 
@@ -81,6 +103,80 @@ export default function AdminSettingsPage() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load AI settings"));
   }, [router]);
+
+  async function saveResend() {
+    const t = token();
+    if (!t) return;
+    setResendBusy(true);
+    setResendMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(adminApi("/api/settings"), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${t}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          resend: {
+            apiKey: resendApiKey.trim() || undefined,
+            fromEmail: resendFromEmail,
+            fromName: resendFromName,
+            replyTo: resendReplyTo,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Save failed");
+      setResendApiKey("");
+      if (json.resend) {
+        setResendMeta({
+          configured: Boolean(json.resend.configured),
+          apiKeySource: json.resend.apiKeySource ?? "none",
+          apiKeyHint: json.resend.apiKeyHint ?? null,
+        });
+        setResendFromEmail(json.resend.fromEmail ?? "");
+        setResendFromName(json.resend.fromName ?? "");
+        setResendReplyTo(json.resend.replyTo ?? "");
+      }
+      setResendMessage("Resend email settings saved. Marketing and transactional mail will use these.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setResendBusy(false);
+    }
+  }
+
+  async function clearResendKey() {
+    const t = token();
+    if (!t) return;
+    setResendBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(adminApi("/api/settings"), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${t}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ resend: { clearApiKey: true } }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Clear failed");
+      if (json.resend) {
+        setResendMeta({
+          configured: Boolean(json.resend.configured),
+          apiKeySource: json.resend.apiKeySource ?? "none",
+          apiKeyHint: json.resend.apiKeyHint ?? null,
+        });
+      }
+      setResendMessage("Platform Resend API key cleared (env fallback still used if set).");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Clear failed");
+    } finally {
+      setResendBusy(false);
+    }
+  }
 
   async function saveBilling(next: boolean) {
     const t = token();
@@ -192,8 +288,100 @@ export default function AdminSettingsPage() {
   return (
     <AdminShell
       title="Settings"
-      lede="Platform controls for Shopify review, billing, and AI providers."
+      lede="Platform controls for Shopify review, billing, email, and AI providers."
     >
+      <Panel title="Resend email">
+        <p className="sa-muted" style={{ marginTop: 0 }}>
+          Used for portal magic links, claim updates, expiry reminders, and marketing broadcasts.
+          Values saved here override server env vars. Get a key at{" "}
+          <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer">
+            resend.com/api-keys
+          </a>
+          . The from-address must be a verified domain in Resend.
+        </p>
+        <div style={{ display: "grid", gap: 12, maxWidth: 520 }}>
+          <div className="sa-muted" style={{ fontSize: 12 }}>
+            Status:{" "}
+            {resendMeta?.configured ? (
+              <span className="sa-pill sa-pill-ok">Configured ({resendMeta.apiKeySource})</span>
+            ) : (
+              <span className="sa-pill sa-pill-warn">Not configured</span>
+            )}
+            {resendMeta?.apiKeyHint ? ` · key ${resendMeta.apiKeyHint}` : null}
+          </div>
+          <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
+            Resend API key
+            <input
+              type="password"
+              autoComplete="off"
+              placeholder={
+                resendMeta?.apiKeyHint
+                  ? `Stored ${resendMeta.apiKeyHint} — paste to replace`
+                  : "re_••••••••"
+              }
+              value={resendApiKey}
+              onChange={(e) => setResendApiKey(e.target.value)}
+              style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #d1d5db" }}
+            />
+          </label>
+          <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
+            From email (verified in Resend)
+            <input
+              type="email"
+              value={resendFromEmail}
+              onChange={(e) => setResendFromEmail(e.target.value)}
+              placeholder="warranties@yourdomain.com"
+              style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #d1d5db" }}
+            />
+          </label>
+          <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
+            From name
+            <input
+              type="text"
+              value={resendFromName}
+              onChange={(e) => setResendFromName(e.target.value)}
+              placeholder="AfterSale"
+              style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #d1d5db" }}
+            />
+          </label>
+          <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
+            Reply-to (optional)
+            <input
+              type="email"
+              value={resendReplyTo}
+              onChange={(e) => setResendReplyTo(e.target.value)}
+              placeholder="support@yourdomain.com"
+              style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #d1d5db" }}
+            />
+          </label>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="sa-btn"
+              disabled={resendBusy}
+              onClick={() => void saveResend()}
+            >
+              Save Resend settings
+            </button>
+            {resendMeta?.apiKeySource === "platform" ? (
+              <button
+                type="button"
+                className="sa-btn sa-btn-ghost"
+                disabled={resendBusy}
+                onClick={() => void clearResendKey()}
+              >
+                Clear platform API key
+              </button>
+            ) : null}
+          </div>
+          {resendMessage ? (
+            <p className="sa-muted" style={{ margin: 0 }}>
+              {resendMessage}
+            </p>
+          ) : null}
+        </div>
+      </Panel>
+
       <Panel title="Shopify subscription sandbox">
         <p className="sa-muted" style={{ marginTop: 0 }}>
           When enabled, paid plan subscriptions are created with{" "}

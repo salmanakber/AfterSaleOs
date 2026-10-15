@@ -12,6 +12,7 @@ export {
   getPlatformSetting,
   setPlatformSetting,
   isShopifyBillingTestMode,
+  getResendConfig,
   PLATFORM_KEYS,
 } from "./platform";
 export {
