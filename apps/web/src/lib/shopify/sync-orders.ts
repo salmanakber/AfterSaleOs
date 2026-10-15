@@ -227,7 +227,7 @@ export async function syncRecentOrdersForShop(params: {
   const query = `created_at:>=${daysAgoIso(lookbackDays)}`;
 
   let cursor: string | null = null;
-  let processed = 0;
+  let processed = 0;  
 
   const countBefore = await prisma.warranty.count({ where: { shopId: params.shopId } });
 
