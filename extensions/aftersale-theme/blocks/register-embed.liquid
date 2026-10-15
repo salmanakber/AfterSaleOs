@@ -31,12 +31,17 @@
   style="--as-embed-radius: {{ radius }}px; --as-embed-surface: {{ surface }}; width:100%; max-width:100%;"
 >
   {% if request.design_mode %}
-    <div class="as-block-preview" style="border-radius: {{ radius }}px;">
-      <strong>Register for warranty</strong>
-      <p>Customers activate coverage for this product. Colors below apply to this block.</p>
-      <span class="as-block-preview__field">Email</span>
-      <span class="as-block-preview__field">Order number</span>
-      <span class="as-block-preview__btn" style="background:{{ accent }};">Register product</span>
+    <div class="as-block-preview as-block-preview--slim" style="border-radius: {{ radius }}px;">
+      <div class="as-block-preview__col">
+        <span class="as-block-preview__kicker">Warranty</span>
+        <strong>Register your product</strong>
+        <p>Activate coverage for this purchase.</p>
+      </div>
+      <div class="as-block-preview__col as-block-preview__col--form">
+        <span class="as-block-preview__field">Email</span>
+        <span class="as-block-preview__field">Order number</span>
+        <span class="as-block-preview__btn" style="background:{{ accent }};">Register product</span>
+      </div>
       <a class="as-block-preview__link" href="{{ embed_src }}" target="_blank" rel="noopener">Open live preview ↗</a>
     </div>
   {% else %}
@@ -72,10 +77,10 @@
       "type": "range",
       "id": "min_height",
       "label": "Minimum height",
-      "min": 400,
-      "max": 1400,
-      "step": 40,
-      "default": 720
+      "min": 280,
+      "max": 1200,
+      "step": 20,
+      "default": 420
     },
     {
       "type": "color",

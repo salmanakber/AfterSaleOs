@@ -122,28 +122,47 @@ export function CustomerShell({
         ? " as-btn-style-outline"
         : "";
 
+  if (embed) {
+    return (
+      <div
+        className={`as-shell as-shell-embed${skipHostedBrand ? " as-shell-theme-local" : ""}${fontClass}${buttonClass}`}
+        style={brandStyle}
+        data-embed="1"
+      >
+        <div className="as-embed-layout">
+          <aside className="as-embed-intro">
+            <p className="as-embed-kicker">
+              {isSystemBrand ? "Warranty" : displayBrand}
+            </p>
+            <h2 className="as-embed-title">{title}</h2>
+            {lede ? <p className="as-embed-lede">{lede}</p> : null}
+          </aside>
+          <div className="as-embed-main">{children}</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`as-shell${embed ? " as-shell-embed" : ""}${skipHostedBrand ? " as-shell-theme-local" : ""}${fontClass}${buttonClass}`}
+      className={`as-shell${skipHostedBrand ? " as-shell-theme-local" : ""}${fontClass}${buttonClass}`}
       style={brandStyle}
       data-hero={design.heroStyle || "bold"}
     >
-      {!embed ? (
-        <div className="as-topbar as-no-print">
-          <div className="as-mark-lockup">
-            {resolvedLogo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={resolvedLogo} alt={displayBrand} className="as-brand-logo" />
-            ) : (
-              <span className="as-mark-text">{displayBrand}</span>
-            )}
-            {!isSystemBrand && resolvedLogo ? (
-              <span className="as-mark-text">{displayBrand}</span>
-            ) : null}
-          </div>
-          <ThemeToggle />
+      <div className="as-topbar as-no-print">
+        <div className="as-mark-lockup">
+          {resolvedLogo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={resolvedLogo} alt={displayBrand} className="as-brand-logo" />
+          ) : (
+            <span className="as-mark-text">{displayBrand}</span>
+          )}
+          {!isSystemBrand && resolvedLogo ? (
+            <span className="as-mark-text">{displayBrand}</span>
+          ) : null}
         </div>
-      ) : null}
+        <ThemeToggle />
+      </div>
 
       <header className={`as-hero${heroClass}`}>
         <div className="as-kicker">
@@ -165,7 +184,7 @@ export function CustomerShell({
         {lede ? <p className="as-hero-sub">{lede}</p> : null}
       </header>
 
-      {steps && steps.length > 0 && !embed ? (
+      {steps && steps.length > 0 ? (
         <ol className="as-steps as-no-print" aria-label="Progress">
           {steps.map((label, index) => {
             const state =
@@ -187,7 +206,7 @@ export function CustomerShell({
       ) : null}
 
       <div className="as-panel">{children}</div>
-      {footer && !embed ? <div className="as-footer-note">{footer}</div> : null}
+      {footer ? <div className="as-footer-note">{footer}</div> : null}
     </div>
   );
 }

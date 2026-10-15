@@ -21,12 +21,17 @@
   style="--as-embed-radius: {{ radius }}px; --as-embed-surface: {{ surface }}; width:100%; max-width:100%;"
 >
   {% if request.design_mode %}
-    <div class="as-block-preview" style="border-radius: {{ radius }}px;">
-      <strong>Warranty portal</strong>
-      <p>Customers look up coverage with email and order number, then manage warranties from one place.</p>
-      <span class="as-block-preview__field">Email</span>
-      <span class="as-block-preview__field">Order number</span>
-      <span class="as-block-preview__btn" style="background:{{ accent }};">Open my warranties</span>
+    <div class="as-block-preview as-block-preview--slim" style="border-radius: {{ radius }}px;">
+      <div class="as-block-preview__col">
+        <span class="as-block-preview__kicker">Warranty</span>
+        <strong>Warranty portal</strong>
+        <p>Look up coverage with email and order number.</p>
+      </div>
+      <div class="as-block-preview__col as-block-preview__col--form">
+        <span class="as-block-preview__field">Email</span>
+        <span class="as-block-preview__field">Order number</span>
+        <span class="as-block-preview__btn" style="background:{{ accent }};">Open my warranties</span>
+      </div>
       <a class="as-block-preview__link" href="{{ embed_src }}" target="_blank" rel="noopener">Open live preview ↗</a>
     </div>
   {% else %}
@@ -62,10 +67,10 @@
       "type": "range",
       "id": "min_height",
       "label": "Minimum height",
-      "min": 400,
-      "max": 1400,
-      "step": 40,
-      "default": 720
+      "min": 280,
+      "max": 1200,
+      "step": 20,
+      "default": 420
     },
     {
       "type": "color",
