@@ -1,6 +1,7 @@
 (function () {
   var ATTR_KEY = "aftersale_register_intent";
   var PROP_KEY = "_aftersale_register";
+  var FEE_PROP = "_aftersale_warranty_fee";
 
   function moneyLabel(cents, currency) {
     if (cents == null || !Number.isFinite(Number(cents))) return "";
@@ -14,6 +15,14 @@
     }
   }
 
+  function parseShopifyPrice(raw) {
+    if (raw == null || raw === "") return null;
+    var n = Number(raw);
+    if (!Number.isFinite(n)) return null;
+    // Ajax /variants/{id}.js returns price in cents (e.g. 1999 for $19.99).
+    return Math.round(n);
+  }
+
   function syncPanel(root) {
     var check = root.querySelector("[data-as-optin-check]");
     var panel = root.querySelector("[data-as-optin-panel]");
@@ -22,10 +31,12 @@
     if (panel) panel.hidden = !check.checked;
     root.classList.toggle("is-checked", check.checked);
     if (status) {
-      status.textContent = check.checked
-        ? root.getAttribute("data-checked-status") ||
-          "Warranty will be registered automatically when you complete checkout."
-        : "";
+      var feePrice = root.getAttribute("data-fee-price-label") || "";
+      var paidHint = feePrice
+        ? "Warranty registration (" + feePrice + ") will be added to your cart."
+        : root.getAttribute("data-checked-status") ||
+          "Warranty will be registered automatically when you complete checkout.";
+      status.textContent = check.checked ? paidHint : "";
       status.hidden = !check.checked;
     }
     try {
@@ -100,14 +111,39 @@
     return (root.getAttribute("data-fee-variant-id") || "").replace(/\D/g, "");
   }
 
+  function refreshCartUi() {
+    try {
+      document.dispatchEvent(new CustomEvent("cart:refresh"));
+      document.dispatchEvent(new CustomEvent("cart:updated"));
+      document.documentElement.dispatchEvent(new CustomEvent("cart:refresh"));
+      if (window.Shopify && window.Shopify.onCartUpdate) {
+        fetch("/cart.js", { credentials: "same-origin", headers: { Accept: "application/json" } })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (cart) {
+            try {
+              window.Shopify.onCartUpdate(cart);
+            } catch (e) {
+              /* ignore */
+            }
+          })
+          .catch(function () {});
+      }
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
   function syncWarrantyFee(root, enabled) {
     var variantId = getFeeVariantId(root);
-    if (!variantId || !window.fetch) return;
+    if (!variantId || !window.fetch) return Promise.resolve();
     if (!enabled) {
-      removeFeeLines(variantId);
-      return;
+      return removeFeeLines(variantId).then(function () {
+        refreshCartUi();
+      });
     }
-    fetch("/cart.js", { credentials: "same-origin", headers: { Accept: "application/json" } })
+    return fetch("/cart.js", { credentials: "same-origin", headers: { Accept: "application/json" } })
       .then(function (r) {
         return r.json();
       })
@@ -116,10 +152,10 @@
         var already = items.some(function (it) {
           return (
             String(it.variant_id) === variantId ||
-            (it.properties && it.properties._aftersale_warranty_fee === "1")
+            (it.properties && String(it.properties[FEE_PROP]) === "1")
           );
         });
-        if (already) return;
+        if (already) return null;
         return fetch("/cart/add.js", {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -133,13 +169,38 @@
               },
             ],
           }),
+        }).then(function (res) {
+          if (!res.ok) {
+            return res.json().then(function (err) {
+              showFeeError(
+                root,
+                (err && (err.description || err.message)) ||
+                  "Could not add warranty fee to cart. Check that the fee product is available.",
+              );
+              return null;
+            });
+          }
+          return res.json();
         });
       })
-      .catch(function () {});
+      .then(function (added) {
+        if (added) refreshCartUi();
+      })
+      .catch(function () {
+        showFeeError(root, "Could not add warranty fee to cart. Please try again.");
+      });
+  }
+
+  function showFeeError(root, message) {
+    var note = root.querySelector("[data-as-fee-note]");
+    if (!note) return;
+    note.hidden = false;
+    note.classList.add("as-optin__fee--error");
+    note.textContent = message;
   }
 
   function removeFeeLines(variantId) {
-    fetch("/cart.js", { credentials: "same-origin", headers: { Accept: "application/json" } })
+    return fetch("/cart.js", { credentials: "same-origin", headers: { Accept: "application/json" } })
       .then(function (r) {
         return r.json();
       })
@@ -149,13 +210,13 @@
         ((cart && cart.items) || []).forEach(function (it) {
           var isFee =
             String(it.variant_id) === variantId ||
-            (it.properties && it.properties._aftersale_warranty_fee === "1");
+            (it.properties && String(it.properties[FEE_PROP]) === "1");
           if (isFee) {
             updates[it.key] = 0;
             changed = true;
           }
         });
-        if (!changed) return;
+        if (!changed) return null;
         return fetch("/cart/update.js", {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -166,23 +227,116 @@
       .catch(function () {});
   }
 
+  function fetchLiveVariantPrice(variantId) {
+    if (!variantId || !window.fetch) return Promise.resolve(null);
+    return fetch("/variants/" + variantId + ".js", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (r) {
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then(function (v) {
+        if (!v) return null;
+        var cents = parseShopifyPrice(v.price);
+        return {
+          cents: cents,
+          title: v.name || v.title || "",
+        };
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function renderFeeNote(root, cfg, live) {
+    var note = root.querySelector("[data-as-fee-note]");
+    var titleEl = root.querySelector(".as-optin__title");
+    var currency = (cfg && cfg.currency) || "USD";
+    var cents =
+      live && live.cents != null
+        ? live.cents
+        : cfg && cfg.warrantyFeeCents != null
+          ? Number(cfg.warrantyFeeCents)
+          : null;
+    var price = moneyLabel(cents, currency);
+    var label = (cfg && cfg.warrantyFeeLabel) || "Warranty registration";
+
+    root.setAttribute("data-fee-price-label", price || "");
+    if (cents != null) root.setAttribute("data-fee-cents", String(cents));
+    else root.removeAttribute("data-fee-cents");
+
+    if (note) {
+      note.classList.remove("as-optin__fee--error");
+      if (price) {
+        note.innerHTML =
+          '<span class="as-optin__fee-label">' +
+          escapeHtml(label) +
+          '</span> <span class="as-optin__fee-price">' +
+          escapeHtml(price) +
+          "</span>";
+        note.hidden = false;
+      } else if (cfg && cfg.warrantyFeeEnabled) {
+        note.textContent = label + " — price will be added at checkout when checked";
+        note.hidden = false;
+      } else {
+        note.hidden = true;
+        note.textContent = "";
+      }
+    }
+
+    if (titleEl && price) {
+      var base = titleEl.getAttribute("data-as-title-base");
+      if (!base) {
+        base = titleEl.textContent || "Include warranty registration";
+        titleEl.setAttribute("data-as-title-base", base);
+      }
+      // Replace misleading "free" wording when a fee is configured.
+      var cleaned = base.replace(/\bfree\b/gi, "").replace(/\s{2,}/g, " ").trim();
+      if (!cleaned || /^include\s*warranty/i.test(cleaned) || /registration/i.test(cleaned)) {
+        titleEl.textContent = "Include warranty registration — " + price;
+      } else {
+        titleEl.textContent = cleaned + " — " + price;
+      }
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
   function applyFeeConfig(root, cfg) {
     if (!cfg || !cfg.warrantyFeeEnabled || !cfg.warrantyFeeVariantId) {
       root.removeAttribute("data-fee-variant-id");
+      root.removeAttribute("data-fee-price-label");
+      root.removeAttribute("data-fee-cents");
       var feeNote = root.querySelector("[data-as-fee-note]");
-      if (feeNote) feeNote.hidden = true;
-      return;
+      if (feeNote) {
+        feeNote.hidden = true;
+        feeNote.textContent = "";
+      }
+      return Promise.resolve();
     }
-    root.setAttribute("data-fee-variant-id", String(cfg.warrantyFeeVariantId));
-    var note = root.querySelector("[data-as-fee-note]");
-    if (note) {
-      var label = cfg.warrantyFeeLabel || "Warranty registration";
-      var price = moneyLabel(cfg.warrantyFeeCents, cfg.currency);
-      note.textContent = price
-        ? label + " · " + price + " added at checkout when checked"
-        : label + " fee applies when checked";
-      note.hidden = false;
-    }
+
+    var variantId = String(cfg.warrantyFeeVariantId).replace(/\D/g, "");
+    root.setAttribute("data-fee-variant-id", variantId);
+    renderFeeNote(root, cfg, null);
+
+    return fetchLiveVariantPrice(variantId).then(function (live) {
+      if (live && live.cents != null) {
+        renderFeeNote(root, cfg, live);
+      }
+      var check = root.querySelector("[data-as-optin-check]");
+      if (check && check.checked) {
+        return syncWarrantyFee(root, true);
+      }
+      return null;
+    });
   }
 
   function loadFeeConfig(root) {
@@ -196,7 +350,8 @@
         return r.ok ? r.json() : null;
       })
       .then(function (json) {
-        if (json) applyFeeConfig(root, json);
+        if (json) return applyFeeConfig(root, json);
+        return null;
       })
       .catch(function () {});
   }
@@ -316,9 +471,11 @@
     if (!checkout) return;
     var checked = document.querySelector("[data-as-optin-check]:checked");
     if (!checked) return;
+    var root = checked.closest("[data-as-optin]");
     injectFormAttributes(true);
     injectLineProperties(true);
     setCartAttribute(ATTR_KEY, "yes");
+    if (root) syncWarrantyFee(root, true);
   }
 
   function init() {

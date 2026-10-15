@@ -1,8 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma, shopRepository } from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
+import { shopifyGraphqlRequest } from "@/lib/shopify/client";
 
 export const runtime = "nodejs";
+
+async function resolveFeeCents(shopDomain: string, shopId: string, feeVariantId: string) {
+  const local = await prisma.productVariant.findFirst({
+    where: { shopId, shopifyVariantId: feeVariantId },
+    select: { priceCents: true },
+  });
+  if (local?.priceCents != null && local.priceCents > 0) {
+    return local.priceCents;
+  }
+
+  // Live Admin price — covers fee products not yet synced into AfterSale.
+  try {
+    const gid = `gid://shopify/ProductVariant/${feeVariantId}`;
+    const data = await shopifyGraphqlRequest<{
+      productVariant: { price?: string | null } | null;
+    }>(
+      shopDomain,
+      `#graphql
+        query WarrantyFeePrice($id: ID!) {
+          productVariant(id: $id) { price }
+        }`,
+      { id: gid },
+    );
+    const price = data.productVariant?.price;
+    if (price != null && price !== "") {
+      const cents = Math.round(parseFloat(price) * 100);
+      if (Number.isFinite(cents)) {
+        // Best-effort cache so next request is fast.
+        if (local) {
+          await prisma.productVariant.updateMany({
+            where: { shopId, shopifyVariantId: feeVariantId },
+            data: { priceCents: cents },
+          });
+        }
+        return cents;
+      }
+    }
+  } catch {
+    /* offline session / missing scope — storefront JS still fetches /variants/{id}.js */
+  }
+
+  return local?.priceCents ?? null;
+}
 
 /** Public branding for customer / embed surfaces (no secrets). */
 export async function GET(request: NextRequest) {
@@ -18,11 +62,7 @@ export async function GET(request: NextRequest) {
   let warrantyFeeCents: number | null = null;
   const feeVariantId = shop.warrantyFeeVariantId?.replace(/\D/g, "") || null;
   if (shop.warrantyFeeEnabled && feeVariantId) {
-    const variant = await prisma.productVariant.findFirst({
-      where: { shopId: shop.id, shopifyVariantId: feeVariantId },
-      select: { priceCents: true },
-    });
-    warrantyFeeCents = variant?.priceCents ?? null;
+    warrantyFeeCents = await resolveFeeCents(shop.shopDomain, shop.id, feeVariantId);
   }
 
   return NextResponse.json({

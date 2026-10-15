@@ -11,5 +11,6 @@ handle = "aftersale-thank-you"
 
   [extensions.capabilities]
   api_access = true
-  network_access = true
+  # Re-enable after Partners approves network access for this extension.
+  network_access = false
   block_progress = false
