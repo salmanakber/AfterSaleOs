@@ -21,6 +21,8 @@ export {
   validateSerial,
   submitRegistration,
   approveRegistration,
+  approveAwaitingFeeRegistrations,
+  buildWarrantyFeeCheckoutUrl,
   requestGuestMagicLink,
   issuePortalAccessToken,
   consumeGuestToken,

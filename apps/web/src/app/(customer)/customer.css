@@ -3040,6 +3040,45 @@
   color: var(--as-muted);
 }
 
+/* Pay-then-activate fee banner */
+.as-fee-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--as-accent) 35%, var(--as-border));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--as-accent) 14%, transparent),
+      color-mix(in srgb, var(--as-accent) 4%, var(--as-surface))
+    );
+}
+
+.as-fee-banner strong {
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.as-fee-banner p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--as-muted);
+  max-width: 42ch;
+}
+
+.as-fee-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 /* Guest register (default logged-out portal) */
 .as-guest-reg {
   display: grid;

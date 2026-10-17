@@ -9,6 +9,7 @@ import {
   type CachedWarranty,
 } from "@/lib/customer-order-session";
 import { ProductSearchSelect, type PickedProduct } from "./ProductSearchSelect";
+import { formatWarrantyFee, type FeePaymentInfo } from "@/lib/warranty-fee";
 
 export type PortalView = "home" | "activate" | "products" | "claim" | "requests";
 
@@ -42,6 +43,8 @@ export function ClientPortal({
   warranties,
   embed,
   initialView = "home",
+  pendingFeePayment = null,
+  onDismissFeePayment,
   onLogout,
   onSessionRefresh,
 }: {
@@ -52,6 +55,8 @@ export function ClientPortal({
   warranties: CachedWarranty[];
   embed?: boolean;
   initialView?: PortalView;
+  pendingFeePayment?: FeePaymentInfo | null;
+  onDismissFeePayment?: () => void;
   onLogout: () => void;
   onSessionRefresh?: () => void;
 }) {
@@ -64,6 +69,11 @@ export function ClientPortal({
   const [regBusy, setRegBusy] = useState(false);
   const [regMsg, setRegMsg] = useState<string | null>(null);
   const [regErr, setRegErr] = useState<string | null>(null);
+  const [feePay, setFeePay] = useState<FeePaymentInfo | null>(pendingFeePayment);
+
+  useEffect(() => {
+    if (pendingFeePayment) setFeePay(pendingFeePayment);
+  }, [pendingFeePayment]);
 
   const [claimSummary, setClaimSummary] = useState("");
   const [claimDetails, setClaimDetails] = useState("");
@@ -135,7 +145,19 @@ export function ClientPortal({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Registration failed");
-      setRegMsg(json.message ?? "Product registered.");
+      if (json.paymentRequired && json.feeCheckoutUrl) {
+        setFeePay({
+          checkoutUrl: json.feeCheckoutUrl,
+          label: json.feeLabel || "Warranty registration",
+          cents: typeof json.feeCents === "number" ? json.feeCents : null,
+          currency: json.currency || "USD",
+          registrationId: json.registrationId || "",
+        });
+        setRegMsg(json.message ?? "Pay the registration fee to activate coverage.");
+      } else {
+        setRegMsg(json.message ?? "Product registered.");
+        setFeePay(null);
+      }
       setPicked(null);
       setSerial("");
       onSessionRefresh?.();
@@ -146,6 +168,8 @@ export function ClientPortal({
       setRegBusy(false);
     }
   }
+
+  const feePriceLabel = feePay ? formatWarrantyFee(feePay.cents, feePay.currency) : null;
 
   async function submitClaim(e: FormEvent) {
     e.preventDefault();
@@ -206,6 +230,34 @@ export function ClientPortal({
       </aside>
 
       <main className="as-dash-main">
+        {feePay ? (
+          <div className="as-fee-banner" role="status">
+            <div>
+              <strong>Pay to activate</strong>
+              <p>
+                {feePay.label}
+                {feePriceLabel ? ` · ${feePriceLabel}` : ""} — complete checkout on the store to
+                activate your warranty.
+              </p>
+            </div>
+            <div className="as-fee-banner__actions">
+              <a className="as-btn" href={feePay.checkoutUrl} target="_top" rel="noopener noreferrer">
+                Pay{feePriceLabel ? ` ${feePriceLabel}` : ""} &amp; activate
+              </a>
+              <button
+                type="button"
+                className="as-btn as-btn-ghost"
+                onClick={() => {
+                  setFeePay(null);
+                  onDismissFeePayment?.();
+                }}
+              >
+                Later
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {view === "home" ? (
           <section className="as-dash-home">
             <header className="as-dash-head">

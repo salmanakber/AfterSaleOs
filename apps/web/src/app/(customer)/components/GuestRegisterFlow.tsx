@@ -10,6 +10,7 @@ import {
   formatE164,
   PhoneCountryField,
 } from "./PhoneCountryField";
+import { type FeePaymentInfo } from "@/lib/warranty-fee";
 
 type SourceMode = "catalog" | "orders" | null;
 
@@ -27,7 +28,7 @@ export function GuestRegisterFlow({
 }: {
   shop: string;
   shopName?: string;
-  onRegistered: (session: GuestRegisterSession) => void;
+  onRegistered: (session: GuestRegisterSession, fee?: FeePaymentInfo | null) => void;
   onNeedSignIn: () => void;
 }) {
   const [step, setStep] = useState<1 | 2>(1);
@@ -140,11 +141,24 @@ export function GuestRegisterFlow({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Registration failed");
-      onRegistered({
-        email: json.session?.email || email,
-        orders: json.session?.orders ?? [],
-        warranties: json.session?.warranties ?? [],
-      });
+      const fee: FeePaymentInfo | null =
+        json.paymentRequired && json.feeCheckoutUrl
+          ? {
+              checkoutUrl: json.feeCheckoutUrl as string,
+              label: (json.feeLabel as string) || "Warranty registration",
+              cents: typeof json.feeCents === "number" ? json.feeCents : null,
+              currency: (json.currency as string) || "USD",
+              registrationId: (json.registrationId as string) || "",
+            }
+          : null;
+      onRegistered(
+        {
+          email: json.session?.email || email,
+          orders: json.session?.orders ?? [],
+          warranties: json.session?.warranties ?? [],
+        },
+        fee,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -364,8 +378,12 @@ export function GuestRegisterFlow({
           </div>
           {error ? <div className="as-alert as-alert-error">{error}</div> : null}
           <button className="as-btn" type="submit" disabled={busy || !shop}>
-            {busy ? "Registering…" : "Register & open portal"}
+            {busy ? "Registering…" : "Register & continue"}
           </button>
+          <p className="as-guest-reg__hint">
+            If this store charges a warranty fee, you’ll pay it on Shopify checkout next — then your
+            coverage activates automatically.
+          </p>
         </form>
       )}
 

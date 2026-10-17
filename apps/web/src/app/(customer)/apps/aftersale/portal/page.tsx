@@ -15,11 +15,59 @@ import {
   type PortalView,
 } from "../../../components/ClientPortal";
 import { GuestRegisterFlow } from "../../../components/GuestRegisterFlow";
+import type { FeePaymentInfo } from "@/lib/warranty-fee";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
 type AuthMode = "signin" | "signup";
 type Gate = "register" | "auth";
+
+/**
+ * Build a Shopify customer login URL that avoids the common
+ * `/account/login` ↔ redirect loop on New Customer Accounts, and always
+ * breaks out of iframes via target=_top on the link.
+ */
+function buildShopifyLoginUrl(opts: {
+  shop: string;
+  embed: boolean;
+  /** Liquid `routes.account_login_url` when passed from the theme embed */
+  loginBase?: string | null;
+  /** Storefront path/URL to return to after login (embed page) */
+  returnTo?: string | null;
+}) {
+  const { shop, embed, loginBase, returnTo } = opts;
+  if (!shop) return "";
+
+  // Prefer returning to the storefront page (embed reloads with customer.id).
+  // Hosted / app-proxy: land on the proxied portal so Shopify injects logged_in_customer_id.
+  const fallbackReturn = embed
+    ? "/"
+    : `https://${shop}/apps/aftersale/portal?shop=${encodeURIComponent(shop)}&from_shopify=1`;
+  const destination = (returnTo && returnTo.trim()) || fallbackReturn;
+  const destEncoded = encodeURIComponent(destination);
+
+  const baseRaw = (loginBase && loginBase.trim()) || "";
+  if (baseRaw) {
+    const base = baseRaw.startsWith("http")
+      ? baseRaw
+      : baseRaw.startsWith("/")
+        ? `https://${shop}${baseRaw}`
+        : `https://${shop}/${baseRaw}`;
+    const join = base.includes("?") ? "&" : "?";
+    // New Customer Accounts use return_to; classic login uses return_url.
+    if (
+      base.includes("customer_authentication") ||
+      base.includes("shopify.com/authentication") ||
+      base.includes("account.shopify.com")
+    ) {
+      return `${base}${join}return_to=${destEncoded}`;
+    }
+    return `${base}${join}return_url=${destEncoded}`;
+  }
+
+  // Default: New Customer Accounts endpoint (avoids /account/login redirect loops).
+  return `https://${shop}/customer_authentication/login?return_to=${destEncoded}`;
+}
 
 function PortalInner() {
   const params = useSearchParams();
@@ -33,6 +81,9 @@ function PortalInner() {
   const viewParam = (params.get("view") as PortalView | null) || "home";
   const loggedInCustomerId =
     params.get("logged_in_customer_id") ?? params.get("customer_id") ?? "";
+  const shopifyLoginBase = params.get("shopify_login");
+  const storefrontReturn = params.get("return_to");
+  const fromShopify = params.get("from_shopify") === "1";
 
   const session = useCustomerOrderSession({
     shop: token ? "" : shop,
@@ -40,11 +91,11 @@ function PortalInner() {
     loggedInCustomerId,
   });
 
-  const [gate, setGate] = useState<Gate>(
-    viewParam === "claim" || viewParam === "requests" || viewParam === "products"
-      ? "auth"
-      : "register",
-  );
+  const [gate, setGate] = useState<Gate>(() => {
+    if (loggedInCustomerId || fromShopify || prefillEmail) return "auth";
+    if (viewParam === "claim" || viewParam === "requests" || viewParam === "products") return "auth";
+    return "register";
+  });
   const [entryView, setEntryView] = useState<PortalView>(
     viewParam === "activate" ? "activate" : viewParam || "home",
   );
@@ -60,12 +111,18 @@ function PortalInner() {
   const [warranties, setWarranties] = useState<CachedWarranty[]>([]);
   const [orders, setOrders] = useState<CachedOrder[]>([]);
   const [shopName, setShopName] = useState<string>("");
+  const [pendingFeePayment, setPendingFeePayment] = useState<FeePaymentInfo | null>(null);
 
-  const shopifyLoginUrl = useMemo(() => {
-    if (!shop) return "";
-    const returnPath = `/apps/aftersale/portal?shop=${encodeURIComponent(shop)}`;
-    return `https://${shop}/account/login?return_url=${encodeURIComponent(returnPath)}`;
-  }, [shop]);
+  const shopifyLoginUrl = useMemo(
+    () =>
+      buildShopifyLoginUrl({
+        shop,
+        embed,
+        loginBase: shopifyLoginBase,
+        returnTo: storefrontReturn,
+      }),
+    [shop, embed, shopifyLoginBase, storefrontReturn],
+  );
 
   useEffect(() => {
     if (prefillEmail) setEmail(prefillEmail);
@@ -312,6 +369,8 @@ function PortalInner() {
           warranties={warranties}
           embed={embed}
           initialView={entryView}
+          pendingFeePayment={pendingFeePayment}
+          onDismissFeePayment={() => setPendingFeePayment(null)}
           onLogout={logout}
           onSessionRefresh={() => void refreshSession()}
         />
@@ -331,8 +390,9 @@ function PortalInner() {
         <GuestRegisterFlow
           shop={shop}
           shopName={shopName}
-          onRegistered={(session) => {
+          onRegistered={(session, fee) => {
             setEntryView("products");
+            if (fee) setPendingFeePayment(fee);
             applySession(session.email, session.orders, session.warranties);
           }}
           onNeedSignIn={() => setGate("auth")}
@@ -363,7 +423,12 @@ function PortalInner() {
 
           <div className="as-portal-login__providers">
             {shopifyLoginUrl ? (
-              <a className="as-portal-login__shopify" href={shopifyLoginUrl}>
+              <a
+                className="as-portal-login__shopify"
+                href={shopifyLoginUrl}
+                target="_top"
+                rel="noopener noreferrer"
+              >
                 <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden fill="none">
                   <path
                     d="M7.5 8.5V7a4.5 4.5 0 0 1 9 0v1.5M6 8.5h12l-.7 11.2a2 2 0 0 1-2 1.8H8.7a2 2 0 0 1-2-1.8L6 8.5Z"
@@ -463,11 +528,10 @@ function PortalInner() {
             </button>
           </form>
 
-          {shopifyLoginUrl ? (
-            <p className="as-portal-login__hint as-muted">
-              Shopify login is optional. Email + password works without a Shopify customer account.
-            </p>
-          ) : null}
+          <p className="as-portal-login__hint as-muted">
+            Shopify login opens on the store (full page). Email + password works without a Shopify
+            account if you prefer.
+          </p>
         </div>
       </div>
     </CustomerShell>

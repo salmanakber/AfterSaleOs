@@ -84,6 +84,8 @@ export async function submitRegistration(params: {
   ruleId?: string;
   source?: string;
   outsideShopify?: boolean;
+  /** When true, keep registration pending until warranty fee is paid at checkout. */
+  holdForFeePayment?: boolean;
 }) {
   const shop = await prisma.shop.findUniqueOrThrow({ where: { id: params.shopId } });
   const email = params.email.trim().toLowerCase();
@@ -148,7 +150,9 @@ export async function submitRegistration(params: {
   }
 
   let status: "PENDING_VERIFICATION" | "APPROVED" | "NEEDS_REVIEW" = "PENDING_VERIFICATION";
-  if (params.outsideShopify) {
+  if (params.holdForFeePayment) {
+    status = "PENDING_VERIFICATION";
+  } else if (params.outsideShopify) {
     status = "PENDING_VERIFICATION";
   } else if (!serialCheck.ok && serialCheck.needsReview) {
     status = "NEEDS_REVIEW";
@@ -184,7 +188,7 @@ export async function submitRegistration(params: {
   let warrantyUnitId: string | undefined;
   let warrantyId: string | undefined;
 
-  if (status === "APPROVED" && version) {
+  if (status === "APPROVED" && version && !params.holdForFeePayment) {
     const quota = await canConsumeMonthlyQuota(params.shopId, "warranties_created");
     if (!quota.ok) {
       // Customer still gets a registration row; merchant reviews once capacity frees up.
@@ -221,6 +225,12 @@ export async function submitRegistration(params: {
     }
   }
 
+  const reviewNote = params.holdForFeePayment
+    ? "awaiting_fee_payment"
+    : !serialCheck.ok
+      ? `serial:${serialCheck.code}`
+      : undefined;
+
   const registration = await prisma.registration.create({
     data: {
       shopId: params.shopId,
@@ -240,7 +250,7 @@ export async function submitRegistration(params: {
       orderNumber: params.orderNumber,
       status,
       source: params.outsideShopify ? "outside_shopify" : params.source ?? "form",
-      reviewNote: !serialCheck.ok ? `serial:${serialCheck.code}` : undefined,
+      reviewNote,
     },
   });
 
@@ -251,15 +261,16 @@ export async function submitRegistration(params: {
       action: "registration.submitted",
       entityType: "registration",
       entityId: registration.id,
-      after: { status, serialOk: serialCheck.ok },
+      after: { status, serialOk: serialCheck.ok, holdForFeePayment: Boolean(params.holdForFeePayment) },
     },
   });
 
   return {
     registration,
     // Customer-facing message must not leak ownership of serials
-    message:
-      status === "APPROVED"
+    message: params.holdForFeePayment
+      ? "Almost done — pay the warranty registration fee to activate coverage."
+      : status === "APPROVED"
         ? "Registration complete. Your warranty is ready."
         : status === "NEEDS_REVIEW"
           ? "We received your registration and will review it shortly."
@@ -271,6 +282,71 @@ export async function submitRegistration(params: {
           )?.certificateToken
         : null,
   };
+}
+
+/** Cart permalink that adds the fee SKU and tags the registration for auto-approve after checkout. */
+export function buildWarrantyFeeCheckoutUrl(params: {
+  shopDomain: string;
+  feeVariantId: string;
+  email: string;
+  registrationId: string;
+}) {
+  const variantId = String(params.feeVariantId).replace(/\D/g, "");
+  const shop = params.shopDomain.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const qs = new URLSearchParams({
+    "checkout[email]": params.email.trim().toLowerCase(),
+    "attributes[aftersale_register_intent]": "yes",
+    "attributes[aftersale_registration_id]": params.registrationId,
+    "properties[_aftersale_warranty_fee]": "1",
+    "properties[_aftersale_registration_id]": params.registrationId,
+  });
+  return `https://${shop}/cart/${variantId}:1?${qs.toString()}`;
+}
+
+/** Approve portal registrations waiting on fee payment (called after checkout sync). */
+export async function approveAwaitingFeeRegistrations(params: {
+  shopId: string;
+  email?: string | null;
+  registrationId?: string | null;
+}) {
+  const email = params.email?.trim().toLowerCase() || null;
+  const where = params.registrationId
+    ? { id: params.registrationId, shopId: params.shopId }
+    : email
+      ? {
+          shopId: params.shopId,
+          email,
+          status: "PENDING_VERIFICATION" as const,
+          reviewNote: "awaiting_fee_payment",
+        }
+      : null;
+  if (!where) return { approved: 0 };
+
+  const rows = await prisma.registration.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    take: params.registrationId ? 1 : 5,
+  });
+
+  let approved = 0;
+  for (const row of rows) {
+    if (row.status === "APPROVED") continue;
+    try {
+      await approveRegistration({
+        shopId: params.shopId,
+        registrationId: row.id,
+        actorId: "fee_checkout",
+      });
+      await prisma.registration.update({
+        where: { id: row.id },
+        data: { reviewNote: "fee_paid" },
+      });
+      approved += 1;
+    } catch (err) {
+      console.warn("approveAwaitingFeeRegistrations failed", row.id, err);
+    }
+  }
+  return { approved };
 }
 
 async function materializeRegistrationWarranty(params: {

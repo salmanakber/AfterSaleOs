@@ -4,6 +4,8 @@ import {
   submitRegistration,
   upsertPortalAccountAfterRegister,
   loadPortalAuthSession,
+  buildWarrantyFeeCheckoutUrl,
+  prisma,
 } from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
 import { verifyAppProxySignature, shopDomainFromProxy } from "@/lib/app-proxy";
@@ -63,6 +65,13 @@ export async function POST(request: NextRequest) {
   const createPortalAccount = Boolean(body.createPortalAccount) && Boolean(password);
   const firstName = typeof body.firstName === "string" ? body.firstName : undefined;
   const lastName = typeof body.lastName === "string" ? body.lastName : undefined;
+  const source = typeof body.source === "string" ? body.source : "form";
+
+  const feeVariantId = shop.warrantyFeeVariantId?.replace(/\D/g, "") || null;
+  const feeEnabled = Boolean(shop.warrantyFeeEnabled) && Boolean(feeVariantId);
+  // Portal / guest manual register must pay the fee when the merchant enabled it.
+  const holdForFeePayment =
+    feeEnabled && (source === "portal" || source === "portal_guest" || source === "form");
 
   try {
     const result = await submitRegistration({
@@ -80,7 +89,8 @@ export async function POST(request: NextRequest) {
       shopifyVariantId: typeof body.shopifyVariantId === "string" ? body.shopifyVariantId : undefined,
       orderNumber: typeof body.orderNumber === "string" ? body.orderNumber : undefined,
       outsideShopify: Boolean(body.outsideShopify),
-      source: typeof body.source === "string" ? body.source : "form",
+      source,
+      holdForFeePayment,
     });
 
     let session = null;
@@ -95,7 +105,6 @@ export async function POST(request: NextRequest) {
         phoneCountry,
       });
     } else {
-      // Still return a soft session payload so the UI can land in the portal.
       session = await loadPortalAuthSession(
         shop.id,
         body.email.trim().toLowerCase(),
@@ -103,6 +112,25 @@ export async function POST(request: NextRequest) {
         { name: [firstName, lastName].filter(Boolean).join(" ") || null, phone: phone ?? null },
       );
     }
+
+    let feeCents: number | null = null;
+    if (holdForFeePayment && feeVariantId) {
+      const variant = await prisma.productVariant.findFirst({
+        where: { shopId: shop.id, shopifyVariantId: feeVariantId },
+        select: { priceCents: true },
+      });
+      feeCents = variant?.priceCents ?? null;
+    }
+
+    const feeCheckoutUrl =
+      holdForFeePayment && feeVariantId
+        ? buildWarrantyFeeCheckoutUrl({
+            shopDomain: shop.shopDomain,
+            feeVariantId,
+            email: body.email,
+            registrationId: result.registration.id,
+          })
+        : null;
 
     return withPublicCors(
       NextResponse.json({
@@ -112,6 +140,11 @@ export async function POST(request: NextRequest) {
         certificateToken: result.certificateToken,
         registrationId: result.registration.id,
         session,
+        paymentRequired: Boolean(feeCheckoutUrl),
+        feeCheckoutUrl,
+        feeLabel: shop.warrantyFeeLabel ?? "Warranty registration",
+        feeCents,
+        currency: shop.currency ?? "USD",
       }),
       origin,
     );
@@ -128,7 +161,10 @@ export async function POST(request: NextRequest) {
     const status =
       message.includes("already has an account") || message.includes("already exists") ? 409 : 500;
     if (status === 409 || message.includes("Password") || message.includes("email")) {
-      return withPublicCors(NextResponse.json({ error: message }, { status: status === 409 ? 409 : 400 }), origin);
+      return withPublicCors(
+        NextResponse.json({ error: message }, { status: status === 409 ? 409 : 400 }),
+        origin,
+      );
     }
     console.error(err);
     return withPublicCors(NextResponse.json({ error: "Registration failed" }, { status: 500 }), origin);

@@ -1,6 +1,7 @@
 import { prisma } from "../client";
 import { canConsumeMonthlyQuota } from "../plan-limits";
 import { createWarrantiesForOrderLine, refreshWarrantiesForOrder, voidWarrantiesOnCancel } from "./engine";
+import { approveAwaitingFeeRegistrations } from "./registration";
 
 type ShopifyOrderPayload = {
   id: number | string;
@@ -44,6 +45,29 @@ function attrYes(
   return (notes ?? []).some(
     (n) => n?.name === name && String(n.value ?? "").toLowerCase() === "yes",
   );
+}
+
+function attrValue(
+  notes: Array<{ name?: string; value?: string }> | undefined,
+  name: string,
+): string | null {
+  const hit = (notes ?? []).find((n) => n?.name === name && n.value != null && String(n.value) !== "");
+  return hit?.value != null ? String(hit.value) : null;
+}
+
+function orderAttr(order: ShopifyOrderPayload, name: string): string | null {
+  const fromNotes = attrValue(order.note_attributes, name);
+  if (fromNotes) return fromNotes;
+  if (order.attributes && !Array.isArray(order.attributes)) {
+    const v = order.attributes[name];
+    return v != null && String(v) !== "" ? String(v) : null;
+  }
+  if (Array.isArray(order.attributes)) return attrValue(order.attributes, name);
+  for (const item of order.line_items ?? []) {
+    const fromProps = attrValue(item.properties, name) || attrValue(item.properties, `_${name}`);
+    if (fromProps) return fromProps;
+  }
+  return null;
 }
 
 function orderWantsWarrantyRegistration(order: ShopifyOrderPayload): boolean {
@@ -241,6 +265,22 @@ export async function syncOrderFromWebhook(shopId: string, payload: unknown) {
       source: "ORDER",
     });
     warrantiesCreated += warranties.length;
+  }
+
+  // Portal “pay then activate”: fee checkout carries aftersale_registration_id.
+  if (paidFee || optedIn) {
+    const registrationId =
+      orderAttr(order, "aftersale_registration_id") ||
+      orderAttr(order, "_aftersale_registration_id");
+    try {
+      await approveAwaitingFeeRegistrations({
+        shopId,
+        email: dbOrder.email,
+        registrationId,
+      });
+    } catch (err) {
+      console.warn("approveAwaitingFeeRegistrations", err);
+    }
   }
 
   if (optedIn || paidFee) {
