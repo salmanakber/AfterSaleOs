@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { publicApiUrl } from "@/lib/public-api";
 import {
+  clearCustomerOrderSession,
   loadCustomerOrderSession,
   saveCustomerOrderSession,
   type CachedOrder,
@@ -14,6 +15,8 @@ type Options = {
   emailFromUrl?: string;
   loggedInCustomerId?: string;
   orderFromUrl?: string;
+  /** When true, skip auto-restore (used after explicit Sign out). */
+  suspendAutoRestore?: boolean;
 };
 
 /**
@@ -21,7 +24,13 @@ type Options = {
  * Sources (in order): URL email, Shopify logged_in_customer_id (app proxy), localStorage cache.
  */
 export function useCustomerOrderSession(opts: Options) {
-  const { shop, emailFromUrl = "", loggedInCustomerId = "", orderFromUrl = "" } = opts;
+  const {
+    shop,
+    emailFromUrl = "",
+    loggedInCustomerId = "",
+    orderFromUrl = "",
+    suspendAutoRestore = false,
+  } = opts;
   const [email, setEmail] = useState(emailFromUrl);
   const [orders, setOrders] = useState<CachedOrder[]>([]);
   const [warranties, setWarranties] = useState<CachedWarranty[]>([]);
@@ -31,11 +40,17 @@ export function useCustomerOrderSession(opts: Options) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (suspendAutoRestore) return;
     if (emailFromUrl) setEmail(emailFromUrl);
     if (orderFromUrl) setOrderNumber(orderFromUrl);
-  }, [emailFromUrl, orderFromUrl]);
+  }, [emailFromUrl, orderFromUrl, suspendAutoRestore]);
 
   useEffect(() => {
+    if (suspendAutoRestore) {
+      setHydrated(true);
+      setLoading(false);
+      return;
+    }
     if (!shop) {
       setHydrated(true);
       return;
@@ -117,7 +132,18 @@ export function useCustomerOrderSession(opts: Options) {
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [shop, emailFromUrl, loggedInCustomerId, orderFromUrl]);
+  }, [shop, emailFromUrl, loggedInCustomerId, orderFromUrl, suspendAutoRestore]);
+
+  function clearSession() {
+    clearCustomerOrderSession(shop);
+    setEmail("");
+    setOrders([]);
+    setWarranties([]);
+    setOrderNumber("");
+    setSessionReady(false);
+    setLoading(false);
+    setHydrated(true);
+  }
 
   return {
     email,
@@ -132,5 +158,6 @@ export function useCustomerOrderSession(opts: Options) {
     setOrderNumber,
     hydrated,
     loading,
+    clearSession,
   };
 }

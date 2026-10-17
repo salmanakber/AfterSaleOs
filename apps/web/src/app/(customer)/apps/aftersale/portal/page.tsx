@@ -87,10 +87,13 @@ function PortalInner() {
   const storefrontReturn = params.get("return_to");
   const fromShopify = params.get("from_shopify") === "1";
 
+  const [signedOut, setSignedOut] = useState(false);
+
   const session = useCustomerOrderSession({
-    shop: token ? "" : shop,
-    emailFromUrl: prefillEmail,
-    loggedInCustomerId,
+    shop: token || signedOut ? "" : shop,
+    emailFromUrl: signedOut ? "" : prefillEmail,
+    loggedInCustomerId: signedOut ? "" : loggedInCustomerId,
+    suspendAutoRestore: signedOut,
   });
 
   const [gate, setGate] = useState<Gate>(() => {
@@ -140,7 +143,7 @@ function PortalInner() {
   }, [shop]);
 
   useEffect(() => {
-    if (token) return;
+    if (token || signedOut) return;
     if (!session.sessionReady || !session.hydrated) return;
     if (session.email) {
       setSessionEmail(session.email);
@@ -150,6 +153,7 @@ function PortalInner() {
     }
   }, [
     token,
+    signedOut,
     session.sessionReady,
     session.hydrated,
     session.email,
@@ -158,7 +162,7 @@ function PortalInner() {
   ]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || signedOut) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -170,7 +174,7 @@ function PortalInner() {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Invalid link");
-        if (cancelled) return;
+        if (cancelled || signedOut) return;
         setSessionEmail(json.email ?? null);
         setWarranties(json.warranties ?? []);
         setOrders(json.orders ?? []);
@@ -191,9 +195,10 @@ function PortalInner() {
     return () => {
       cancelled = true;
     };
-  }, [token, shop]);
+  }, [token, shop, signedOut]);
 
   function applySession(nextEmail: string, nextOrders: CachedOrder[], nextWarranties: CachedWarranty[]) {
+    setSignedOut(false);
     setSessionEmail(nextEmail);
     setEmail(nextEmail);
     setOrders(nextOrders);
@@ -271,12 +276,34 @@ function PortalInner() {
   }
 
   function logout() {
+    setSignedOut(true);
+    session.clearSession();
     clearPortalSession(shop);
     setSessionEmail(null);
     setOrders([]);
     setWarranties([]);
+    setPassword("");
+    setPendingFeePayment(null);
     setMessage(null);
     setError(null);
+    setGate("auth");
+    setMode("signin");
+    // Drop auth query params so a refresh / sync effect cannot bounce them back in.
+    try {
+      const url = new URL(window.location.href);
+      for (const key of [
+        "token",
+        "email",
+        "logged_in_customer_id",
+        "customer_id",
+        "from_shopify",
+      ]) {
+        url.searchParams.delete(key);
+      }
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      /* ignore */
+    }
   }
 
   const shellProps = {
