@@ -386,7 +386,9 @@ export default function AdminSettingsPage() {
         <p className="sa-muted" style={{ marginTop: 0 }}>
           When enabled, paid plan subscriptions are created with{" "}
           <code>test: true</code> so Shopify App Review can approve charges without real payment.
-          Source: <strong>{source}</strong>
+          This does <strong>not</strong> unlock Billing for custom-distribution apps — the Partner
+          app must use <strong>Public distribution</strong> (draft / unpublished is OK). Source:{" "}
+          <strong>{source}</strong>
           {source === "env" ? ` (env fallback is ${envFallback ? "on" : "off"})` : null}.
         </p>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>

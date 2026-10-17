@@ -15,9 +15,11 @@ import {
   type PortalView,
 } from "../../../components/ClientPortal";
 import { GuestRegisterFlow } from "../../../components/GuestRegisterFlow";
+import {
+  GoogleContinueButton,
+  isGoogleSignInConfigured,
+} from "../../../components/GoogleContinueButton";
 import type { FeePaymentInfo } from "@/lib/warranty-fee";
-
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
 type AuthMode = "signin" | "signup";
 type Gate = "register" | "auth";
@@ -106,7 +108,6 @@ function PortalInner() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [googleReady, setGoogleReady] = useState(false);
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [warranties, setWarranties] = useState<CachedWarranty[]>([]);
   const [orders, setOrders] = useState<CachedOrder[]>([]);
@@ -191,70 +192,6 @@ function PortalInner() {
       cancelled = true;
     };
   }, [token, shop]);
-
-  useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || sessionEmail) return;
-    const existing = document.getElementById("as-google-gsi");
-    if (existing) {
-      setGoogleReady(true);
-      return;
-    }
-    const s = document.createElement("script");
-    s.id = "as-google-gsi";
-    s.src = "https://accounts.google.com/gsi/client";
-    s.async = true;
-    s.onload = () => setGoogleReady(true);
-    document.head.appendChild(s);
-  }, [sessionEmail]);
-
-  useEffect(() => {
-    if (!googleReady || !GOOGLE_CLIENT_ID || sessionEmail) return;
-    const g = (
-      window as unknown as {
-        google?: {
-          accounts: {
-            id: {
-              initialize: (c: unknown) => void;
-              renderButton: (el: HTMLElement, c: unknown) => void;
-            };
-          };
-        };
-      }
-    ).google;
-    if (!g?.accounts?.id) return;
-    const el = document.getElementById("as-google-btn");
-    if (!el) return;
-    g.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: async (resp: { credential?: string }) => {
-        if (!resp.credential || !shop) return;
-        setLoading(true);
-        setError(null);
-        try {
-          const res = await fetch(publicApiUrl("/api/public/customer-auth/google"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ shop, credential: resp.credential }),
-          });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error ?? "Google sign-in failed");
-          applySession(json.email, json.orders ?? [], json.warranties ?? []);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Google sign-in failed");
-        } finally {
-          setLoading(false);
-        }
-      },
-    });
-    el.innerHTML = "";
-    g.accounts.id.renderButton(el, {
-      theme: "outline",
-      size: "large",
-      shape: "pill",
-      text: "continue_with",
-      width: 320,
-    });
-  }, [googleReady, sessionEmail, shop]);
 
   function applySession(nextEmail: string, nextOrders: CachedOrder[], nextWarranties: CachedWarranty[]) {
     setSessionEmail(nextEmail);
@@ -390,9 +327,14 @@ function PortalInner() {
         <GuestRegisterFlow
           shop={shop}
           shopName={shopName}
+          shopifyLoginUrl={shopifyLoginUrl || undefined}
           onRegistered={(session, fee) => {
             setEntryView("products");
             if (fee) setPendingFeePayment(fee);
+            applySession(session.email, session.orders, session.warranties);
+          }}
+          onGoogleSession={(session) => {
+            setEntryView("home");
             applySession(session.email, session.orders, session.warranties);
           }}
           onNeedSignIn={() => setGate("auth")}
@@ -442,10 +384,19 @@ function PortalInner() {
               </a>
             ) : null}
 
-            {GOOGLE_CLIENT_ID ? (
-              <div className="as-portal-login__google">
-                <div id="as-google-btn" />
-              </div>
+            {isGoogleSignInConfigured() ? (
+              <GoogleContinueButton
+                shop={shop}
+                onSuccess={(s) =>
+                  applySession(
+                    s.email,
+                    (s.orders as CachedOrder[]) ?? [],
+                    (s.warranties as CachedWarranty[]) ?? [],
+                  )
+                }
+                onError={setError}
+                onBusy={setLoading}
+              />
             ) : null}
           </div>
 

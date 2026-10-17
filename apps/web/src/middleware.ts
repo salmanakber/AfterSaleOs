@@ -11,9 +11,36 @@ function isCustomerSurface(pathname: string) {
   );
 }
 
+function isShopifyAdminEntry(request: NextRequest) {
+  const q = request.nextUrl.searchParams;
+  return (
+    q.has("shop") ||
+    q.has("host") ||
+    q.has("id_token") ||
+    q.has("session") ||
+    q.get("embedded") === "1"
+  );
+}
+
 /** Allow embedding in Shopify admin / storefront; customer pages also embeddable anywhere. */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Public marketing site on the apex URL; Shopify Admin still loads /?shop=&host=.
+  // Redirect (not rewrite): the prod gateway sets Host to 127.0.0.1, so absolute
+  // rewrites become https://localhost:… and fail TLS when Next proxies them.
+  if (pathname === "/" && !isShopifyAdminEntry(request)) {
+    const publicOrigin =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.APP_URL ||
+      request.nextUrl.origin;
+    const dest = new URL("/welcome", publicOrigin);
+    dest.search = request.nextUrl.search;
+    const redirect = NextResponse.redirect(dest);
+    redirect.headers.delete("X-Frame-Options");
+    redirect.headers.set("Content-Security-Policy", "frame-ancestors 'none';");
+    return redirect;
+  }
 
   // Shopify NavMenu sometimes requests /settings/ which 404s in the App Router.
   if (pathname.length > 1 && pathname.endsWith("/") && !pathname.startsWith("/api/")) {

@@ -23,12 +23,12 @@ type ClaimRow = {
   trackingUrl: string;
 };
 
-const NAV: { id: PortalView; label: string; blurb: string }[] = [
-  { id: "home", label: "Home", blurb: "Your care desk" },
-  { id: "activate", label: "Activate warranty", blurb: "Register a product" },
-  { id: "products", label: "My products", blurb: "Registered coverage" },
-  { id: "claim", label: "File a claim", blurb: "Report an issue" },
-  { id: "requests", label: "My requests", blurb: "Claim history" },
+const NAV: { id: PortalView; label: string; blurb: string; icon: string }[] = [
+  { id: "home", label: "Home", blurb: "Your care desk", icon: "◈" },
+  { id: "activate", label: "Activate warranty", blurb: "Register a product", icon: "✦" },
+  { id: "products", label: "My products", blurb: "Registered coverage", icon: "▣" },
+  { id: "claim", label: "File a claim", blurb: "Report an issue", icon: "◇" },
+  { id: "requests", label: "My requests", blurb: "Claim history", icon: "☰" },
 ];
 
 function statusPretty(s: string) {
@@ -107,7 +107,7 @@ export function ClientPortal({
   }, [shop, email]);
 
   useEffect(() => {
-    if (view === "requests") void loadRequests();
+    if (view === "requests" || view === "home") void loadRequests();
   }, [view, loadRequests]);
 
   useEffect(() => {
@@ -219,8 +219,13 @@ export function ClientPortal({
               data-active={view === item.id}
               onClick={() => setView(item.id)}
             >
-              <span>{item.label}</span>
-              <em>{item.blurb}</em>
+              <span className="as-dash-nav__icon" aria-hidden>
+                {item.icon}
+              </span>
+              <span className="as-dash-nav__copy">
+                <span>{item.label}</span>
+                <em>{item.blurb}</em>
+              </span>
             </button>
           ))}
         </nav>
@@ -260,28 +265,48 @@ export function ClientPortal({
 
         {view === "home" ? (
           <section className="as-dash-home">
-            <header className="as-dash-head">
-              <p className="as-dash-head__kicker">Welcome back</p>
-              <h2>Your warranty desk</h2>
-              <p>Activate coverage, review products, or file a claim — all in one place.</p>
+            <header className="as-dash-hero">
+              <div className="as-dash-hero__copy">
+                <p className="as-dash-head__kicker">Welcome back</p>
+                <h2>Your warranty desk</h2>
+                <p>Activate coverage, review products, or file a claim — all in one place.</p>
+              </div>
+              <div className="as-dash-hero__stats" aria-label="Quick stats">
+                <div>
+                  <strong>{warranties.length}</strong>
+                  <span>Products</span>
+                </div>
+                <div>
+                  <strong>{orders.length}</strong>
+                  <span>Orders</span>
+                </div>
+                <div>
+                  <strong>{requests?.length ?? "—"}</strong>
+                  <span>Requests</span>
+                </div>
+              </div>
             </header>
             <div className="as-dash-cards">
               {(
                 [
-                  ["activate", "Activate warranty", "Register a product from the store or your orders"],
-                  ["products", "My products", `${warranties.length} registered`],
-                  ["claim", "File a claim", "Tell us what went wrong"],
-                  ["requests", "My requests", "Track open and past claims"],
+                  ["activate", "✦", "Activate warranty", "Register from the store catalog or a past order"],
+                  ["products", "▣", "My products", `${warranties.length} registered · certificates ready`],
+                  ["claim", "◇", "File a claim", "Tell us what went wrong — we’ll guide next steps"],
+                  ["requests", "☰", "My requests", "Track open and past claims in one list"],
                 ] as const
-              ).map(([id, title, sub]) => (
+              ).map(([id, icon, title, sub]) => (
                 <button
                   key={id}
                   type="button"
                   className="as-dash-card"
                   onClick={() => setView(id)}
                 >
+                  <span className="as-dash-card__icon" aria-hidden>
+                    {icon}
+                  </span>
                   <strong>{title}</strong>
                   <span>{sub}</span>
+                  <em className="as-dash-card__go">Open →</em>
                 </button>
               ))}
             </div>

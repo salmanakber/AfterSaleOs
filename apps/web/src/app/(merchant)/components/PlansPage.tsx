@@ -224,7 +224,11 @@ export function PlansPage() {
           {data?.billingTestMode ? (
             <Layout.Section>
               <Banner tone="warning" title="Shopify billing test mode is on">
-                <p>Subscriptions are created as test charges for App Review / sandbox.</p>
+                <p>
+                  Paid plans create test charges (no real payment). Your app must still use{" "}
+                  <strong>public distribution</strong> in Partner Dashboard — custom apps cannot
+                  call the Billing API even with test mode on.
+                </p>
               </Banner>
             </Layout.Section>
           ) : null}

@@ -144,8 +144,14 @@ export async function POST(request: NextRequest) {
     ).appSubscriptionCreate;
 
     if (payload.userErrors?.length) {
+      const raw = payload.userErrors.map((e) => e.message).join(", ");
+      const needsPublicDistribution = /public distribution|cannot use the Billing API/i.test(raw);
       return NextResponse.json(
-        { error: payload.userErrors.map((e) => e.message).join(", ") },
+        {
+          error: needsPublicDistribution
+            ? `${raw} — Fix: Partner Dashboard → your app → Distribution → select Public distribution (draft is fine; you do not need App Store listing). Billing test mode only marks charges as test; it does not unlock Billing for custom-distribution apps.`
+            : raw,
+        },
         { status: 400 },
       );
     }

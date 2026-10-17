@@ -11,6 +11,7 @@ import {
   PhoneCountryField,
 } from "./PhoneCountryField";
 import { type FeePaymentInfo } from "@/lib/warranty-fee";
+import { GoogleContinueButton, isGoogleSignInConfigured } from "./GoogleContinueButton";
 
 type SourceMode = "catalog" | "orders" | null;
 
@@ -23,13 +24,17 @@ export type GuestRegisterSession = {
 export function GuestRegisterFlow({
   shop,
   shopName,
+  shopifyLoginUrl,
   onRegistered,
   onNeedSignIn,
+  onGoogleSession,
 }: {
   shop: string;
   shopName?: string;
+  shopifyLoginUrl?: string;
   onRegistered: (session: GuestRegisterSession, fee?: FeePaymentInfo | null) => void;
   onNeedSignIn: () => void;
+  onGoogleSession?: (session: GuestRegisterSession) => void;
 }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [source, setSource] = useState<SourceMode>(null);
@@ -166,13 +171,16 @@ export function GuestRegisterFlow({
     }
   }
 
+  const showSocial = Boolean(shopifyLoginUrl) || isGoogleSignInConfigured();
+
   return (
     <div className="as-guest-reg">
       <header className="as-guest-reg__head">
-        <p className="as-guest-reg__kicker">Register a product</p>
+        <p className="as-guest-reg__kicker">Client portal</p>
         <h3>Activate your warranty{shopName ? ` with ${shopName}` : ""}</h3>
         <p className="as-muted">
-          No Shopify account needed — create your portal login while you register.
+          Register a product, or sign in with Google / Shopify — no store account required for email
+          signup.
         </p>
         <ol className="as-guest-reg__steps" aria-label="Progress">
           <li data-active={step === 1} data-done={step > 1}>
@@ -181,6 +189,49 @@ export function GuestRegisterFlow({
           <li data-active={step === 2}>2 · Your details</li>
         </ol>
       </header>
+
+      {step === 1 && !source && showSocial ? (
+        <div className="as-guest-reg__social">
+          {shopifyLoginUrl ? (
+            <a
+              className="as-portal-login__shopify"
+              href={shopifyLoginUrl}
+              target="_top"
+              rel="noopener noreferrer"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden fill="none">
+                <path
+                  d="M7.5 8.5V7a4.5 4.5 0 0 1 9 0v1.5M6 8.5h12l-.7 11.2a2 2 0 0 1-2 1.8H8.7a2 2 0 0 1-2-1.8L6 8.5Z"
+                  stroke="#95BF47"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Continue with Shopify
+            </a>
+          ) : null}
+          {isGoogleSignInConfigured() && onGoogleSession ? (
+            <GoogleContinueButton
+              shop={shop}
+              onSuccess={(s) =>
+                onGoogleSession({
+                  email: s.email,
+                  orders: (s.orders as CachedOrder[]) ?? [],
+                  warranties: (s.warranties as CachedWarranty[]) ?? [],
+                })
+              }
+              onError={setError}
+              onBusy={setBusy}
+            />
+          ) : null}
+          <p className="as-portal-login__or">or register a product</p>
+        </div>
+      ) : null}
+
+      {error && step === 1 && !source ? (
+        <div className="as-alert as-alert-error">{error}</div>
+      ) : null}
 
       {step === 1 ? (
         <div className="as-guest-reg__body">
@@ -191,6 +242,9 @@ export function GuestRegisterFlow({
                 className="as-guest-reg__source"
                 onClick={() => setSource("catalog")}
               >
+                <span className="as-guest-reg__source-icon" aria-hidden>
+                  ⌕
+                </span>
                 <strong>From the store</strong>
                 <span>Search products in the catalog</span>
               </button>
@@ -199,6 +253,9 @@ export function GuestRegisterFlow({
                 className="as-guest-reg__source"
                 onClick={() => setSource("orders")}
               >
+                <span className="as-guest-reg__source-icon" aria-hidden>
+                  #
+                </span>
                 <strong>From my orders</strong>
                 <span>Look up a purchase, then pick the item</span>
               </button>
