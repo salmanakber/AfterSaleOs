@@ -5,7 +5,8 @@
 {% assign surface = block.settings.surface_color | default: 'transparent' %}
 {% assign radius = block.settings.corner_radius | default: 12 %}
 {% assign accent_q = accent | url_encode %}
-{% render 'as-embed-layout' %}
+{% comment %} include (not render) so layout assigns are visible in this block {% endcomment %}
+{% include 'as-embed-layout' %}
 {% assign embed_src = as_app_url | append: '/apps/aftersale/portal?shop=' | append: shop.permanent_domain | append: '&embed=1&theme=local&accent=' | append: accent_q | append: as_layout_qs %}
 {% comment %} Pass theme login URL + current page so “Continue with Shopify” avoids redirect loops and returns here after login. {% endcomment %}
 {% if routes.account_login_url != blank %}

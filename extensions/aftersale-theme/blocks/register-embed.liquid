@@ -5,7 +5,8 @@
 {% assign surface = block.settings.surface_color | default: 'transparent' %}
 {% assign radius = block.settings.corner_radius | default: 12 %}
 {% assign accent_q = accent | url_encode %}
-{% render 'as-embed-layout' %}
+{% comment %} include (not render) so layout assigns are visible in this block {% endcomment %}
+{% include 'as-embed-layout' %}
 {% assign product_q = '' %}
 {% if product %}
   {% assign product_q = product.title | url_encode %}
