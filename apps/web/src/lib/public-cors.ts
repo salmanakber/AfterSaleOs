@@ -5,7 +5,7 @@ export function withPublicCors(response: NextResponse, requestOrigin?: string | 
   // Themes run on *.myshopify.com and custom domains — reflect a safe origin or *.
   const origin = requestOrigin && requestOrigin !== "null" ? requestOrigin : "*";
   response.headers.set("Access-Control-Allow-Origin", origin);
-  response.headers.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  response.headers.set("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS");
   response.headers.set("Access-Control-Allow-Headers", "Accept, Content-Type");
   response.headers.set("Access-Control-Max-Age", "86400");
   if (origin !== "*") {

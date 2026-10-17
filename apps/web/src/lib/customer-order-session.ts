@@ -42,7 +42,7 @@ export type CustomerOrderSession = {
   warranties: CachedWarranty[];
   at: number;
   /** How the session was established */
-  source?: "guest_verify" | "portal_token" | "shopify_email" | "lookup";
+  source?: "guest_verify" | "portal_token" | "shopify_email" | "lookup" | "portal";
 };
 
 const CACHE_KEY = "aftersale.portal.v1";

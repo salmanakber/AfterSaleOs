@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { publicApiUrl } from "@/lib/public-api";
 import type { EmbedCols, EmbedStyle, EmbedWidth } from "@/lib/embed-layout";
+import { PoweredByAfterSale } from "./PoweredByAfterSale";
 import { ThemeToggle } from "./ThemeToggle";
 
 const SYSTEM_LOGO = "/images/logo.png";
@@ -24,6 +25,8 @@ export function CustomerShell({
   embedCols = "2",
   embedWidth = "wide",
   embedStyle = "cards",
+  /** Compact chrome for the unified client portal dashboard */
+  chrome = "default",
 }: {
   brand?: string;
   title: string;
@@ -39,6 +42,7 @@ export function CustomerShell({
   embedCols?: EmbedCols;
   embedWidth?: EmbedWidth;
   embedStyle?: EmbedStyle;
+  chrome?: "default" | "dashboard";
 }) {
   const skipHostedBrand = embed || themeLocal;
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -141,13 +145,16 @@ export function CustomerShell({
         data-style={embedStyle}
       >
         <div className="as-embed-main">{children}</div>
+        <PoweredByAfterSale className="as-powered--embed" />
       </div>
     );
   }
 
+  const isDashboard = chrome === "dashboard";
+
   return (
     <div
-      className={`as-shell${skipHostedBrand ? " as-shell-theme-local" : ""}${fontClass}${buttonClass}`}
+      className={`as-shell${isDashboard ? " as-shell-dash" : ""}${skipHostedBrand ? " as-shell-theme-local" : ""}${fontClass}${buttonClass}`}
       style={brandStyle}
       data-hero={design.heroStyle || "bold"}
     >
@@ -166,27 +173,29 @@ export function CustomerShell({
         <ThemeToggle />
       </div>
 
-      <header className={`as-hero${heroClass}`}>
-        <div className="as-kicker">
-          <span className="as-kicker-dot" />
-          {isSystemBrand ? "Warranty & care" : `${displayBrand} · Warranty & care`}
-        </div>
-        <h1 className="as-brand">
-          {resolvedLogo && !skipHostedBrand ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={resolvedLogo} alt={displayBrand} className="as-brand-logo-lg" />
-          ) : skipHostedBrand && isSystemBrand ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={SYSTEM_LOGO} alt="AfterSale" className="as-brand-logo-lg" />
-          ) : (
-            displayBrand
-          )}
-        </h1>
-        <h2 className="as-hero-title">{title}</h2>
-        {lede ? <p className="as-hero-sub">{lede}</p> : null}
-      </header>
+      {!isDashboard ? (
+        <header className={`as-hero${heroClass}`}>
+          <div className="as-kicker">
+            <span className="as-kicker-dot" />
+            {isSystemBrand ? "Warranty & care" : `${displayBrand} · Warranty & care`}
+          </div>
+          <h1 className="as-brand">
+            {resolvedLogo && !skipHostedBrand ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={resolvedLogo} alt={displayBrand} className="as-brand-logo-lg" />
+            ) : skipHostedBrand && isSystemBrand ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={SYSTEM_LOGO} alt="AfterSale" className="as-brand-logo-lg" />
+            ) : (
+              displayBrand
+            )}
+          </h1>
+          <h2 className="as-hero-title">{title}</h2>
+          {lede ? <p className="as-hero-sub">{lede}</p> : null}
+        </header>
+      ) : null}
 
-      {steps && steps.length > 0 ? (
+      {!isDashboard && steps && steps.length > 0 ? (
         <ol className="as-steps as-no-print" aria-label="Progress">
           {steps.map((label, index) => {
             const state =
@@ -207,8 +216,9 @@ export function CustomerShell({
         </ol>
       ) : null}
 
-      <div className="as-panel">{children}</div>
+      <div className={isDashboard ? "as-panel as-panel-dash" : "as-panel"}>{children}</div>
       {footer ? <div className="as-footer-note">{footer}</div> : null}
+      <PoweredByAfterSale />
     </div>
   );
 }

@@ -2964,6 +2964,47 @@ body {
   background: #111827;
 }
 
+.as-m-color-kit {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+.as-m-color-kit__swatch {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #475569;
+}
+
+.as-m-color-kit__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.as-m-color-kit__row input[type="color"] {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.as-m-color-kit__row .as-m-input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
 .as-m-sidebar-link-label {
   display: inline-flex;
   align-items: center;

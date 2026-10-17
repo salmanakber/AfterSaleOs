@@ -23,13 +23,15 @@
 >
   {% if request.design_mode %}
     <div class="as-block-preview as-block-preview--form as-block-preview--cols-{{ as_cols }}" style="border-radius: {{ radius }}px; max-width: {{ as_max_w }};">
-      <strong>Portal · {% if as_cols == '1' %}1 column{% else %}2 columns{% endif %} · {{ as_cwidth }}</strong>
-      <p>Adjust Form fields, Form width, and Form style in the block settings.</p>
+      <strong>Client portal · {% if as_cols == '1' %}1 column{% else %}2 columns{% endif %} · {{ as_cwidth }}</strong>
+      <p>Customers sign in to activate warranties, view products, file claims, and track requests.</p>
       <div class="as-block-preview__grid as-block-preview__grid--{{ as_cols }}">
-        <span class="as-block-preview__field">Email</span>
-        <span class="as-block-preview__field">Order number</span>
+        <span class="as-block-preview__field">Activate warranty</span>
+        <span class="as-block-preview__field">My products</span>
+        <span class="as-block-preview__field">File a claim</span>
+        <span class="as-block-preview__field">My requests</span>
       </div>
-      <span class="as-block-preview__btn" style="background:{{ accent }};">Open my warranties</span>
+      <span class="as-block-preview__btn" style="background:{{ accent }};">Open client portal</span>
       <a class="as-block-preview__link" href="{{ embed_src }}" target="_blank" rel="noopener">Open live preview ↗</a>
     </div>
   {% else %}
@@ -47,7 +49,7 @@
 
 {% schema %}
 {
-  "name": "Portal embed",
+  "name": "Client portal",
   "target": "section",
   "stylesheet": "aftersale.css",
   "settings": [

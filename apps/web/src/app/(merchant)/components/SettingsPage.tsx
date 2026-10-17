@@ -108,7 +108,8 @@ export function SettingsPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     "brand" | "share" | "embed" | "preview" | "guide" | "placement" | "warranty"
-  >("guide");
+  >("brand");
+  const [studioOpen, setStudioOpen] = useState(false);
   const [previewKind, setPreviewKind] = useState<PreviewKind>("portal");
   const [embedHeight, setEmbedHeight] = useState(720);
   const tour = useOptionalTour();
@@ -401,31 +402,26 @@ export function SettingsPage() {
       <div className="as-m-hero">
         <div className="as-m-hero-kicker">
           <span className="as-m-hero-dot" />
-          Storefront experience
+          Client portal
         </div>
-        <h2>Match your brand. Meet customers where they buy.</h2>
+        <h2>One portal. Your colors.</h2>
         <p>
-          Set logo and colors once — portal, registration, claims, theme blocks, embeds, and PDF
-          certificates all use the same look. Then place a warranty checkbox or button on product,
-          cart, or after checkout.
+          Customers sign in once to activate warranties, see registered products, file claims, and
+          track requests. Set logo and colors here — buttons, backgrounds, and text follow your brand.
         </p>
         <div className="as-m-hero-actions">
           <button type="button" className="as-m-chip as-m-chip-accent" onClick={() => setActiveTab("brand")}>
-            Branding studio
-          </button>
-          <button type="button" className="as-m-chip as-m-chip-accent" onClick={() => setActiveTab("placement")}>
-            Product · cart · checkout
-          </button>
-          <button type="button" className="as-m-chip as-m-chip-accent" onClick={() => setActiveTab("warranty")}>
-            Warranty fee
+            Portal colors
           </button>
           <button type="button" className="as-m-chip" onClick={() => openOutsideAdmin(hosted.portal)}>
-            Open portal
+            Open client portal
           </button>
-          <button type="button" className="as-m-chip" onClick={() => setActiveTab("preview")}>
-            Live preview
+          <button type="button" className="as-m-chip" onClick={() => setActiveTab("share")}>
+            Share link
           </button>
-          <TourTrigger tourId="customer-pages" label="Take customer pages tour" />
+          <button type="button" className="as-m-chip" onClick={() => setActiveTab("warranty")}>
+            Warranty fee
+          </button>
         </div>
       </div>
 
@@ -447,12 +443,9 @@ export function SettingsPage() {
       <div className="as-m-tabs">
         {(
           [
-            ["guide", "How it works"],
-            ["placement", "Product · cart · checkout"],
-            ["warranty", "Warranty checkout"],
-            ["brand", "Branding"],
-            ["share", "Share & theme"],
-            ["embed", "Embed code"],
+            ["brand", "Portal colors"],
+            ["share", "Share link"],
+            ["warranty", "Warranty fee"],
             ["preview", "Live preview"],
           ] as const
         ).map(([id, label]) => (
@@ -467,6 +460,90 @@ export function SettingsPage() {
           </button>
         ))}
       </div>
+
+      {activeTab === "brand" ? (
+        <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-brand">
+          <div className="as-m-panel-title">
+            <h3>Portal color kit</h3>
+          </div>
+          <p className="as-m-guide-lead">
+            These colors drive the client portal — buttons, page background, surfaces, and text.
+          </p>
+          <div className="as-m-color-kit">
+            {(
+              [
+                ["Accent / buttons", accent, setAccent],
+                ["Page background", bgColor, setBgColor],
+                ["Surface / cards", surfaceColor, setSurfaceColor],
+                ["Text", textColor, setTextColor],
+              ] as const
+            ).map(([label, value, setter]) => (
+              <label key={label} className="as-m-color-kit__swatch">
+                <span>{label}</span>
+                <span className="as-m-color-kit__row">
+                  <input
+                    type="color"
+                    value={/^#[0-9A-Fa-f]{6}$/.test(value) ? value : "#000000"}
+                    onChange={(e) => setter(e.target.value.toUpperCase())}
+                  />
+                  <input
+                    className="as-m-input"
+                    value={value}
+                    onChange={(e) => setter(e.target.value)}
+                    placeholder="#000000"
+                  />
+                </span>
+              </label>
+            ))}
+          </div>
+          <FormLayout>
+            <TextField label="Logo URL" value={logoUrl} onChange={setLogoUrl} autoComplete="off" />
+            <InlineStack gap="200">
+              <Button variant="primary" loading={busy} onClick={() => void onSaveBranding()}>
+                Save portal brand
+              </Button>
+              <Button onClick={() => setStudioOpen(true)}>Open full studio</Button>
+              <Button onClick={() => setActiveTab("preview")}>Live preview</Button>
+            </InlineStack>
+          </FormLayout>
+          <BrandingStudio
+            open={studioOpen}
+            draft={{
+              logoUrl,
+              accent,
+              bgColor,
+              surfaceColor,
+              textColor,
+              font,
+              radius,
+              buttonStyle,
+              heroStyle,
+              shopName,
+            }}
+            onChange={(patch) => {
+              if (patch.logoUrl !== undefined) setLogoUrl(patch.logoUrl);
+              if (patch.accent !== undefined) setAccent(patch.accent);
+              if (patch.bgColor !== undefined) setBgColor(patch.bgColor);
+              if (patch.surfaceColor !== undefined) setSurfaceColor(patch.surfaceColor);
+              if (patch.textColor !== undefined) setTextColor(patch.textColor);
+              if (patch.font !== undefined) setFont(patch.font);
+              if (patch.radius !== undefined) setRadius(patch.radius);
+              if (patch.buttonStyle !== undefined) setButtonStyle(patch.buttonStyle);
+              if (patch.heroStyle !== undefined) setHeroStyle(patch.heroStyle);
+              if (patch.shopName !== undefined) setShopName(patch.shopName);
+            }}
+            onClose={() => setStudioOpen(false)}
+            onSave={async () => {
+              await onSaveBranding();
+            }}
+            onUploadLogo={uploadLogo}
+            busy={busy}
+            uploading={uploading}
+            error={error}
+            saved={saved}
+          />
+        </div>
+      ) : null}
 
       {activeTab === "guide" ? (
         <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-ways">
@@ -756,121 +833,7 @@ export function SettingsPage() {
         </div>
       ) : null}
 
-      {activeTab === "brand" ? (
-        <div style={{ marginTop: 14 }} data-tour="cx-brand">
-          <div className="br-brand-card">
-            <h3>Customer page branding</h3>
-            <p>
-              Design logo, colors, type, and button style on a full-screen canvas with a live
-              preview of portal, register, and claim pages.
-            </p>
-            <div className="br-brand-card-actions">
-              <Button variant="primary" onClick={() => setActiveTab("brand")}>
-                Open branding studio
-              </Button>
-              <Button onClick={() => setActiveTab("preview")}>Live hosted preview</Button>
-            </div>
-            <div
-              className="as-m-preview"
-              style={{
-                marginTop: 8,
-                ["--as-preview-accent" as string]: accent || "#3B82F6",
-              }}
-            >
-              <div className="as-m-preview-bar">
-                <i />
-                <i />
-                <i />
-              </div>
-              <div className="as-m-preview-body" style={{ background: bgColor || "#F4F6FB" }}>
-                {logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={logoUrl}
-                    alt=""
-                    style={{ height: 36, marginBottom: 12, objectFit: "contain", maxWidth: "70%" }}
-                  />
-                ) : null}
-                <h4 style={{ color: textColor || "#0F172A" }}>
-                  {shopName || "Your store"} warranty portal
-                </h4>
-                <p>Open the studio to edit with live canvas preview.</p>
-                <span className="as-m-preview-cta" style={{ background: accent || "#3B82F6" }}>
-                  Open branding studio
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="as-m-panel" style={{ marginTop: 14 }}>
-            <div className="as-m-panel-title">
-              <h3>Store preferences</h3>
-            </div>
-            <form
-              onSubmit={(e) => {
-                void onSavePreferences(e);
-              }}
-            >
-              <FormLayout>
-                <TextField label="Timezone" value={timezone} onChange={setTimezone} autoComplete="off" />
-                <label className="as-m-toggle">
-                  <input
-                    type="checkbox"
-                    checked={voidOnRefund}
-                    onChange={(e) => setVoidOnRefund(e.target.checked)}
-                  />
-                  <span>
-                    <strong style={{ display: "block", fontSize: 13 }}>Void warranty on refund</strong>
-                    <span style={{ fontSize: 12, color: "#6b7280" }}>
-                      Keep coverage aligned with refunded orders
-                    </span>
-                  </span>
-                </label>
-                <Button submit variant="primary" loading={busy}>
-                  Save preferences
-                </Button>
-              </FormLayout>
-            </form>
-          </div>
-
-          <BrandingStudio
-            open
-            draft={{
-              logoUrl,
-              accent,
-              bgColor,
-              surfaceColor,
-              textColor,
-              font,
-              radius,
-              buttonStyle,
-              heroStyle,
-              shopName,
-            }}
-            onChange={(patch) => {
-              if (patch.logoUrl !== undefined) setLogoUrl(patch.logoUrl);
-              if (patch.accent !== undefined) setAccent(patch.accent);
-              if (patch.bgColor !== undefined) setBgColor(patch.bgColor);
-              if (patch.surfaceColor !== undefined) setSurfaceColor(patch.surfaceColor);
-              if (patch.textColor !== undefined) setTextColor(patch.textColor);
-              if (patch.font !== undefined) setFont(patch.font);
-              if (patch.radius !== undefined) setRadius(patch.radius);
-              if (patch.buttonStyle !== undefined) setButtonStyle(patch.buttonStyle);
-              if (patch.heroStyle !== undefined) setHeroStyle(patch.heroStyle);
-              if (patch.shopName !== undefined) setShopName(patch.shopName);
-            }}
-            onClose={() => setActiveTab("guide")}
-            onSave={async () => {
-              await onSaveBranding();
-            }}
-            onUploadLogo={uploadLogo}
-            busy={busy}
-            uploading={uploading}
-            error={error}
-            saved={saved}
-          />
-        </div>
-      ) : null}
+      {false ? null : null}
 
       {activeTab === "share" ? (
         <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-liquid">
