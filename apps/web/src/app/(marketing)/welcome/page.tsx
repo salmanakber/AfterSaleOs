@@ -126,13 +126,21 @@ export default function WelcomePage() {
       {/* Floating Header */}
       <header className="sticky top-4 z-50 max-w-6xl mx-auto px-4 sm:px-6">
         <div className="backdrop-blur-md bg-white/80 border border-slate-200/80 shadow-sm rounded-2xl px-5 py-3.5 flex items-center justify-between transition-all">
-          <a href="#" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center shadow-md shadow-indigo-500/20 text-white font-bold text-lg">
-              A
-            </div>
+          <a href="/" className="flex items-center gap-3 group">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/logo.png"
+              alt=""
+              width={36}
+              height={36}
+              className="w-9 h-9 rounded-xl shadow-md shadow-indigo-500/20 object-cover"
+            />
             <div className="flex flex-col">
               <span className="font-bold text-slate-900 tracking-tight text-lg leading-tight flex items-center gap-1.5">
-                AfterSale <span className="text-[10px] uppercase tracking-wider font-extrabold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-200/60">OS</span>
+                AfterSale{" "}
+                <span className="text-[10px] uppercase tracking-wider font-extrabold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-200/60">
+                  OS
+                </span>
               </span>
               <span className="text-[11px] text-slate-400 font-medium">Shopify App</span>
             </div>
@@ -599,9 +607,8 @@ export default function WelcomePage() {
       <footer className="border-t border-slate-200/80 bg-white py-12 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6 text-sm text-slate-500">
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center text-xs">
-              A
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/logo.png" alt="" width={28} height={28} className="w-7 h-7 rounded-lg object-cover" />
             <strong className="text-slate-900 font-semibold">AfterSale OS</strong>
             <span className="text-slate-300">|</span>
             <span>A product by Tidyflow</span>

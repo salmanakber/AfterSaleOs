@@ -3,7 +3,13 @@
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { publicApiUrl } from "@/lib/public-api";
-import { type CachedOrder, type CachedWarranty } from "@/lib/customer-order-session";
+import {
+  type CachedOrder,
+  type CachedWarranty,
+  clearPortalSignedOutFlag,
+  isPortalSignedOut,
+  markPortalSignedOut,
+} from "@/lib/customer-order-session";
 import { useCustomerOrderSession } from "@/lib/use-customer-order-session";
 import { parseEmbedLayout } from "@/lib/embed-layout";
 import { BrandLoader } from "../../../components/BrandLoader";
@@ -87,13 +93,33 @@ function PortalInner() {
   const storefrontReturn = params.get("return_to");
   const fromShopify = params.get("from_shopify") === "1";
 
+  // Shopify embeds re-inject logged_in_customer_id on every refresh — persist opt-out.
+  const [signedOutReady, setSignedOutReady] = useState(false);
   const [signedOut, setSignedOut] = useState(false);
 
+  useEffect(() => {
+    if (!shop) {
+      setSignedOutReady(true);
+      return;
+    }
+    // Returning from intentional Shopify login should clear the opt-out.
+    if (fromShopify) {
+      clearPortalSignedOutFlag(shop);
+      setSignedOut(false);
+      setSignedOutReady(true);
+      return;
+    }
+    setSignedOut(isPortalSignedOut(shop));
+    setSignedOutReady(true);
+  }, [shop, fromShopify]);
+
+  const blockAutoLogin = !signedOutReady || signedOut;
+
   const session = useCustomerOrderSession({
-    shop: token || signedOut ? "" : shop,
-    emailFromUrl: signedOut ? "" : prefillEmail,
-    loggedInCustomerId: signedOut ? "" : loggedInCustomerId,
-    suspendAutoRestore: signedOut,
+    shop: token || blockAutoLogin ? "" : shop,
+    emailFromUrl: blockAutoLogin ? "" : prefillEmail,
+    loggedInCustomerId: blockAutoLogin ? "" : loggedInCustomerId,
+    suspendAutoRestore: blockAutoLogin,
   });
 
   const [gate, setGate] = useState<Gate>(() => {
@@ -143,7 +169,7 @@ function PortalInner() {
   }, [shop]);
 
   useEffect(() => {
-    if (token || signedOut) return;
+    if (token || blockAutoLogin) return;
     if (!session.sessionReady || !session.hydrated) return;
     if (session.email) {
       setSessionEmail(session.email);
@@ -153,7 +179,7 @@ function PortalInner() {
     }
   }, [
     token,
-    signedOut,
+    blockAutoLogin,
     session.sessionReady,
     session.hydrated,
     session.email,
@@ -162,7 +188,7 @@ function PortalInner() {
   ]);
 
   useEffect(() => {
-    if (!token || signedOut) return;
+    if (!token || blockAutoLogin) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -174,7 +200,7 @@ function PortalInner() {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Invalid link");
-        if (cancelled || signedOut) return;
+        if (cancelled || blockAutoLogin) return;
         setSessionEmail(json.email ?? null);
         setWarranties(json.warranties ?? []);
         setOrders(json.orders ?? []);
@@ -195,9 +221,10 @@ function PortalInner() {
     return () => {
       cancelled = true;
     };
-  }, [token, shop, signedOut]);
+  }, [token, shop, blockAutoLogin]);
 
   function applySession(nextEmail: string, nextOrders: CachedOrder[], nextWarranties: CachedWarranty[]) {
+    clearPortalSignedOutFlag(shop);
     setSignedOut(false);
     setSessionEmail(nextEmail);
     setEmail(nextEmail);
@@ -276,6 +303,7 @@ function PortalInner() {
   }
 
   function logout() {
+    markPortalSignedOut(shop);
     setSignedOut(true);
     session.clearSession();
     clearPortalSession(shop);
@@ -288,7 +316,8 @@ function PortalInner() {
     setError(null);
     setGate("auth");
     setMode("signin");
-    // Drop auth query params so a refresh / sync effect cannot bounce them back in.
+    // Drop auth query params in the address bar (Shopify may re-inject customer id on next load —
+    // markPortalSignedOut is what keeps refresh from auto-logging back in).
     try {
       const url = new URL(window.location.href);
       for (const key of [

@@ -158,3 +158,52 @@ export function clearCustomerOrderSession(shop?: string): void {
     /* ignore */
   }
 }
+
+/** Survives refresh so Shopify `logged_in_customer_id` does not auto-login after Sign out. */
+const SIGNED_OUT_KEY = "aftersale.portal.signedOut.v1";
+
+export function markPortalSignedOut(shop: string): void {
+  if (!shop || typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      SIGNED_OUT_KEY,
+      JSON.stringify({ shop, at: Date.now() }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearPortalSignedOutFlag(shop?: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(SIGNED_OUT_KEY);
+    if (!raw) return;
+    if (!shop) {
+      localStorage.removeItem(SIGNED_OUT_KEY);
+      return;
+    }
+    const parsed = JSON.parse(raw) as { shop?: string };
+    if (!parsed.shop || parsed.shop === shop) localStorage.removeItem(SIGNED_OUT_KEY);
+  } catch {
+    localStorage.removeItem(SIGNED_OUT_KEY);
+  }
+}
+
+export function isPortalSignedOut(shop: string): boolean {
+  if (!shop || typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(SIGNED_OUT_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { shop?: string; at?: number };
+    if (parsed.shop !== shop) return false;
+    // Expire opt-out after 30 days so intentional Shopify SSO can recover naturally.
+    if (!parsed.at || Date.now() - parsed.at > 1000 * 60 * 60 * 24 * 30) {
+      localStorage.removeItem(SIGNED_OUT_KEY);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
