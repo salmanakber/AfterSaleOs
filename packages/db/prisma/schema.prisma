@@ -64,6 +64,8 @@ model Shop {
   warrantyFeeEnabled    Boolean        @default(false) @map("warranty_fee_enabled")
   warrantyFeeVariantId  String?        @map("warranty_fee_variant_id")
   warrantyFeeLabel      String?        @map("warranty_fee_label")
+  /// Show the product/cart “register warranty” checkbox on the storefront.
+  warrantyOptInUiEnabled Boolean       @default(true) @map("warranty_opt_in_ui_enabled")
   backfillLookbackMonths Int?          @map("backfill_lookback_months")
   installedAt           DateTime       @default(now()) @map("installed_at")
   uninstalledAt         DateTime?      @map("uninstalled_at")
@@ -79,6 +81,7 @@ model Shop {
   warrantyRules         WarrantyRule[]
   products              Product[]
   customers             Customer[]
+  customerPortalAccounts CustomerPortalAccount[]
   orders                Order[]
   warranties            Warranty[]
   warrantyUnits         WarrantyUnit[]
@@ -401,6 +404,26 @@ model Customer {
   @@unique([shopId, shopifyCustomerId])
   @@index([shopId, email])
   @@map("customers")
+}
+
+/// Email + password accounts for the unified client portal (per shop).
+model CustomerPortalAccount {
+  id           String   @id @default(cuid())
+  shopId       String   @map("shop_id")
+  email        String
+  passwordHash String   @map("password_hash")
+  name         String?
+  phone        String?
+  phoneCountry String?  @map("phone_country")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, email])
+  @@index([shopId])
+  @@map("customer_portal_accounts")
 }
 
 model Order {

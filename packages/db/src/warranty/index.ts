@@ -22,6 +22,7 @@ export {
   submitRegistration,
   approveRegistration,
   requestGuestMagicLink,
+  issuePortalAccessToken,
   consumeGuestToken,
   getPortalWarranties,
   getPortalOrdersForEmail,

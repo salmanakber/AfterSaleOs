@@ -39,12 +39,15 @@ export function ProductSearchSelect({
   orders = [],
   value,
   onChange,
+  mode = "both",
   placeholder = "Search products or pick from your orders…",
 }: {
   shop: string;
   orders?: CachedOrder[];
   value: PickedProduct | null;
   onChange: (next: PickedProduct | null) => void;
+  /** catalog = store only, orders = session orders only, both = default */
+  mode?: "catalog" | "orders" | "both";
   placeholder?: string;
 }) {
   const listId = useId();
@@ -79,7 +82,7 @@ export function ProductSearchSelect({
   }, [orders, q]);
 
   useEffect(() => {
-    if (!shop || !open) return;
+    if (!shop || !open || mode === "orders") return;
     const t = window.setTimeout(() => {
       setLoading(true);
       fetch(
@@ -96,7 +99,7 @@ export function ProductSearchSelect({
         .finally(() => setLoading(false));
     }, 220);
     return () => window.clearTimeout(t);
-  }, [shop, q, open]);
+  }, [shop, q, open, mode]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -158,7 +161,7 @@ export function ProductSearchSelect({
 
       {open ? (
         <div className="as-pselect__panel" id={`${listId}-list`} role="listbox">
-          {orderHits.length > 0 ? (
+          {mode !== "catalog" && orderHits.length > 0 ? (
             <div className="as-pselect__group">
               <p className="as-pselect__group-label">From your orders</p>
               {orderHits.map((row) => (
@@ -181,49 +184,53 @@ export function ProductSearchSelect({
             </div>
           ) : null}
 
-          <div className="as-pselect__group">
-            <p className="as-pselect__group-label">
-              {loading ? "Searching store…" : "Store catalog"}
-            </p>
-            {!loading && catalog.length === 0 ? (
-              <p className="as-pselect__empty">No products match. Try another search.</p>
-            ) : null}
-            {catalog.map((p) => {
-              const v = p.variants[0];
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  role="option"
-                  className="as-pselect__option"
-                  onClick={() =>
-                    pick({
-                      source: "catalog",
-                      title: p.title,
-                      shopifyProductId: p.shopifyProductId,
-                      shopifyVariantId: v?.shopifyVariantId,
-                      imageUrl: p.imageUrl,
-                      sku: v?.sku,
-                    })
-                  }
-                >
-                  {p.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.imageUrl} alt="" className="as-pselect__thumb" />
-                  ) : (
-                    <span className="as-pselect__thumb as-pselect__thumb--blank" aria-hidden />
-                  )}
-                  <span className="as-pselect__copy">
-                    <strong>{p.title}</strong>
-                    <em>
-                      {[p.vendor, v?.sku, money(v?.priceCents)].filter(Boolean).join(" · ") ||
-                        "Product"}
-                    </em>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          {mode !== "orders" ? (
+            <div className="as-pselect__group">
+              <p className="as-pselect__group-label">
+                {loading ? "Searching store…" : "Store catalog"}
+              </p>
+              {!loading && catalog.length === 0 ? (
+                <p className="as-pselect__empty">No products match. Try another search.</p>
+              ) : null}
+              {catalog.map((p) => {
+                const v = p.variants[0];
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    role="option"
+                    className="as-pselect__option"
+                    onClick={() =>
+                      pick({
+                        source: "catalog",
+                        title: p.title,
+                        shopifyProductId: p.shopifyProductId,
+                        shopifyVariantId: v?.shopifyVariantId,
+                        imageUrl: p.imageUrl,
+                        sku: v?.sku,
+                      })
+                    }
+                  >
+                    {p.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.imageUrl} alt="" className="as-pselect__thumb" />
+                    ) : (
+                      <span className="as-pselect__thumb as-pselect__thumb--blank" aria-hidden />
+                    )}
+                    <span className="as-pselect__copy">
+                      <strong>{p.title}</strong>
+                      <em>
+                        {[p.vendor, v?.sku, money(v?.priceCents)].filter(Boolean).join(" · ") ||
+                          "Product"}
+                      </em>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : orderHits.length === 0 ? (
+            <p className="as-pselect__empty">No order products yet. Look up an order first.</p>
+          ) : null}
         </div>
       ) : null}
     </div>

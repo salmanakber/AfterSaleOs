@@ -83,6 +83,7 @@ export async function GET(request: NextRequest) {
     buttonStyle: shop.brandingButtonStyle ?? "solid",
     heroStyle: shop.brandingHeroStyle ?? "bold",
     warrantyOptInRequired: shop.warrantyOptInRequired !== false,
+    warrantyOptInUiEnabled: shop.warrantyOptInUiEnabled !== false,
     warrantyFeeEnabled: Boolean(shop.warrantyFeeEnabled),
     warrantyFeeVariantId: feeVariantId,
     warrantyFeeLabel: shop.warrantyFeeLabel ?? "Product warranty registration",

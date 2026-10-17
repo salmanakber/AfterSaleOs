@@ -72,6 +72,7 @@ export async function submitRegistration(params: {
   email: string;
   firstName?: string;
   lastName?: string;
+  phone?: string;
   serialNumber?: string;
   purchaseDate?: Date | null;
   sellerName?: string;
@@ -171,10 +172,12 @@ export async function submitRegistration(params: {
       email,
       firstName: params.firstName,
       lastName: params.lastName,
+      phone: params.phone || undefined,
     },
     update: {
       firstName: params.firstName,
       lastName: params.lastName,
+      ...(params.phone ? { phone: params.phone } : {}),
     },
   });
 
@@ -421,6 +424,29 @@ export function hashToken(token: string) {
 
 export function generateGuestToken() {
   return randomBytes(32).toString("base64url");
+}
+
+/** Issue a short-lived portal access token (e.g. after checkout opt-in). */
+export async function issuePortalAccessToken(params: {
+  shopId: string;
+  email: string;
+  orderNumber?: string | null;
+  ttlMinutes?: number;
+}) {
+  const email = params.email.trim().toLowerCase();
+  if (!email) return null;
+  const token = generateGuestToken();
+  const ttl = Math.max(5, params.ttlMinutes ?? 60 * 24 * 7);
+  await prisma.guestAccessToken.create({
+    data: {
+      shopId: params.shopId,
+      email,
+      orderNumber: params.orderNumber ?? null,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + ttl * 60_000),
+    },
+  });
+  return token;
 }
 
 /**

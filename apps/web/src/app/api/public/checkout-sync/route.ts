@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { shopRepository } from "@aftersale/db";
+import { issuePortalAccessToken, shopRepository } from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
 import { rateLimit } from "@/lib/rate-limit";
 import { syncOneOrderForShop } from "@/lib/shopify/sync-orders";
@@ -9,6 +9,8 @@ export const runtime = "nodejs";
 /**
  * Called from the thank-you page extension after checkout.
  * Pulls the order via Admin API and creates warranties — works without PCD webhooks.
+ * When the shopper opted in (checkbox) and we have an email, mint a portal access token
+ * so they land in the client portal without needing a Shopify login.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -53,11 +55,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, reason: result.reason }, { status: 404 });
     }
 
+    const email = (body.email || "").trim().toLowerCase() || null;
+    let portalToken: string | null = null;
+    if (email) {
+      portalToken = await issuePortalAccessToken({
+        shopId: shop.id,
+        email,
+        orderNumber: result.orderNumber,
+        ttlMinutes: 60 * 24 * 14,
+      });
+    }
+
+    const appBase =
+      (process.env.NEXT_PUBLIC_APP_URL || "https://aftersale.tidyflowapp.com").replace(/\/$/, "");
+    const qs = new URLSearchParams({ shop: shop.shopDomain });
+    if (email) qs.set("email", email);
+    if (portalToken) qs.set("token", portalToken);
+    qs.set("view", "products");
+
     return NextResponse.json({
       ok: true,
       orderNumber: result.orderNumber,
-      email: body.email ?? null,
-      portalUrl: `https://aftersale.tidyflowapp.com/apps/aftersale/portal?shop=${encodeURIComponent(shop.shopDomain)}${body.email ? `&email=${encodeURIComponent(body.email)}` : ""}`,
+      email,
+      portalToken,
+      portalUrl: `${appBase}/apps/aftersale/portal?${qs.toString()}`,
     });
   } catch (err) {
     console.error("checkout-sync failed", err);

@@ -32,8 +32,8 @@ type Props = {
   saved?: boolean;
 };
 
-type Device = "desktop" | "tablet" | "mobile";
-type PreviewPage = "portal" | "register" | "claim";
+export type Device = "desktop" | "tablet" | "mobile";
+export type PreviewPage = "portal" | "register" | "claim";
 
 function hexOr(value: string, fallback: string) {
   return /^#[0-9A-Fa-f]{6}$/.test(value) ? value : fallback;
@@ -75,7 +75,7 @@ function ColorField({
   );
 }
 
-function LiveCustomerPreview({
+export function LiveCustomerPreview({
   draft,
   page,
   device,
@@ -108,14 +108,14 @@ function LiveCustomerPreview({
 
   const titles: Record<PreviewPage, { title: string; lede: string; cta: string }> = {
     portal: {
-      title: "Your warranties",
-      lede: "Look up coverage, download certificates, or start a claim.",
-      cta: "Open my warranties",
+      title: "Client portal",
+      lede: "Activate warranties, view products, file claims, and track requests.",
+      cta: "Sign in to portal",
     },
     register: {
-      title: "Register a product",
-      lede: "Link your purchase so coverage starts with confidence.",
-      cta: "Continue registration",
+      title: "Activate warranty",
+      lede: "Choose a product from your store or a past order.",
+      cta: "Activate coverage",
     },
     claim: {
       title: "File a claim",

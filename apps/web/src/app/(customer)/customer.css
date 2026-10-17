@@ -3040,6 +3040,251 @@
   color: var(--as-muted);
 }
 
+/* Guest register (default logged-out portal) */
+.as-guest-reg {
+  display: grid;
+  gap: 16px;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 4px 24px;
+}
+
+.as-guest-reg__head h3 {
+  margin: 4px 0 6px;
+  font-family: var(--as-font-display), Fraunces, Georgia, serif;
+  font-size: 1.65rem;
+  letter-spacing: -0.03em;
+}
+
+.as-guest-reg__kicker {
+  margin: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--as-accent);
+}
+
+.as-guest-reg__steps {
+  display: flex;
+  gap: 10px;
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+
+.as-guest-reg__steps li {
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--as-muted);
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--as-ink) 5%, transparent);
+}
+
+.as-guest-reg__steps li[data-active="true"] {
+  color: #fff;
+  background: var(--as-accent);
+}
+
+.as-guest-reg__steps li[data-done="true"] {
+  color: var(--as-accent);
+}
+
+.as-guest-reg__sources {
+  display: grid;
+  gap: 10px;
+}
+
+.as-guest-reg__source {
+  text-align: left;
+  appearance: none;
+  border: 1px solid var(--as-border);
+  border-radius: 16px;
+  padding: 16px 18px;
+  background: var(--as-surface);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.as-guest-reg__source:hover {
+  border-color: color-mix(in srgb, var(--as-accent) 45%, var(--as-border));
+  transform: translateY(-1px);
+}
+
+.as-guest-reg__source strong {
+  font-size: 1rem;
+}
+
+.as-guest-reg__source span {
+  font-size: 0.85rem;
+  color: var(--as-muted);
+}
+
+.as-guest-reg__body {
+  display: grid;
+  gap: 14px;
+}
+
+.as-guest-reg__back,
+.as-portal-login__back,
+.as-linkish {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--as-accent);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.as-guest-reg__picked {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--as-accent) 10%, var(--as-surface));
+  border: 1px solid color-mix(in srgb, var(--as-accent) 22%, transparent);
+}
+
+.as-guest-reg__picked span {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--as-muted);
+}
+
+.as-guest-reg__picked em {
+  font-style: normal;
+  font-size: 0.85rem;
+  color: var(--as-muted);
+}
+
+.as-guest-reg__hint {
+  margin: 6px 0 0;
+  font-size: 0.75rem;
+  color: var(--as-muted);
+}
+
+.as-guest-reg__signin {
+  margin: 0;
+  text-align: center;
+  font-size: 0.88rem;
+  color: var(--as-muted);
+}
+
+/* Phone + country */
+.as-phone {
+  display: grid;
+  gap: 6px;
+}
+
+.as-phone__row {
+  display: grid;
+  grid-template-columns: minmax(118px, 140px) 1fr;
+  gap: 8px;
+}
+
+.as-phone__country {
+  position: relative;
+}
+
+.as-phone__trigger {
+  width: 100%;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid var(--as-border);
+  background: var(--as-surface);
+  font: inherit;
+  cursor: pointer;
+}
+
+.as-phone__flag {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.as-phone__dial {
+  font-weight: 650;
+  font-size: 0.9rem;
+}
+
+.as-phone__chev {
+  margin-left: auto;
+  color: var(--as-muted);
+  font-size: 0.7rem;
+}
+
+.as-phone__menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  width: min(320px, 80vw);
+  max-height: 280px;
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid var(--as-border);
+  background: var(--as-surface);
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--as-ink) 14%, transparent);
+  padding: 8px;
+}
+
+.as-phone__search {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--as-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  margin-bottom: 6px;
+}
+
+.as-phone__menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.as-phone__menu button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  text-align: left;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 8px;
+  border-radius: 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.as-phone__menu button:hover,
+.as-phone__menu button[aria-selected="true"] {
+  background: color-mix(in srgb, var(--as-accent) 12%, transparent);
+}
+
+.as-phone__menu em {
+  font-style: normal;
+  color: var(--as-muted);
+  font-size: 0.85rem;
+}
+
+.as-phone__national {
+  min-width: 0;
+}
+
 /* Portal login */
 .as-portal-login {
   display: grid;
@@ -3050,7 +3295,7 @@
 
 .as-portal-login__card {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   padding: 22px 20px;
   border-radius: 20px;
   border: 1px solid var(--as-border);
@@ -3079,6 +3324,33 @@
   letter-spacing: -0.03em;
 }
 
+.as-portal-login__providers {
+  display: grid;
+  gap: 10px;
+}
+
+.as-portal-login__shopify {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #95bf47 35%, var(--as-border));
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, #95bf47 10%, #fff));
+  color: #212b21;
+  font-weight: 650;
+  font-size: 0.92rem;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.as-portal-login__shopify:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px color-mix(in srgb, #95bf47 18%, transparent);
+}
+
 .as-portal-login__google {
   display: grid;
   gap: 10px;
@@ -3086,11 +3358,40 @@
 }
 
 .as-portal-login__or {
-  margin: 0;
+  margin: 4px 0 0;
   font-size: 0.75rem;
   color: var(--as-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.as-portal-login__modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--as-ink) 5%, var(--as-bg));
+}
+
+.as-portal-login__modes button {
+  appearance: none;
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: transparent;
+  color: var(--as-muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.as-portal-login__modes button[data-active="true"] {
+  background: var(--as-surface);
+  color: var(--as-ink);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--as-ink) 12%, transparent);
 }
 
 .as-portal-login__hint {

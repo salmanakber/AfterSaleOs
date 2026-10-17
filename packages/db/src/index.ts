@@ -34,3 +34,4 @@ export * from "./resolutions";
 export * from "./merchant-ops";
 export * from "./ai";
 export * from "./email";
+export * from "./customer-portal-auth";

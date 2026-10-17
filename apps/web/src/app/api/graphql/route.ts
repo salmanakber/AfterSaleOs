@@ -84,6 +84,7 @@ const typeDefs = /* GraphQL */ `
     needsPlanSelection: Boolean!
     voidWarrantyOnRefund: Boolean!
     warrantyOptInRequired: Boolean!
+    warrantyOptInUiEnabled: Boolean!
     warrantyFeeEnabled: Boolean!
     warrantyFeeVariantId: String
     warrantyFeeLabel: String
@@ -305,6 +306,7 @@ const typeDefs = /* GraphQL */ `
     updateShopSettings(
       voidWarrantyOnRefund: Boolean
       warrantyOptInRequired: Boolean
+      warrantyOptInUiEnabled: Boolean
       warrantyFeeEnabled: Boolean
       warrantyFeeVariantId: String
       warrantyFeeLabel: String
@@ -350,6 +352,7 @@ async function shopSummary(shopId: string) {
     needsPlanSelection: !shop.planId && !shop.billingBypass,
     voidWarrantyOnRefund: shop.voidWarrantyOnRefund,
     warrantyOptInRequired: shop.warrantyOptInRequired,
+    warrantyOptInUiEnabled: shop.warrantyOptInUiEnabled !== false,
     warrantyFeeEnabled: shop.warrantyFeeEnabled,
     warrantyFeeVariantId: shop.warrantyFeeVariantId,
     warrantyFeeLabel: shop.warrantyFeeLabel,
@@ -1113,6 +1116,7 @@ const yoga = createYoga({
           args: {
             voidWarrantyOnRefund?: boolean;
             warrantyOptInRequired?: boolean;
+            warrantyOptInUiEnabled?: boolean;
             warrantyFeeEnabled?: boolean;
             warrantyFeeVariantId?: string | null;
             warrantyFeeLabel?: string | null;
@@ -1148,6 +1152,7 @@ const yoga = createYoga({
             data: {
               voidWarrantyOnRefund: args.voidWarrantyOnRefund,
               warrantyOptInRequired: args.warrantyOptInRequired,
+              warrantyOptInUiEnabled: args.warrantyOptInUiEnabled,
               warrantyFeeEnabled: args.warrantyFeeEnabled,
               warrantyFeeVariantId:
                 args.warrantyFeeVariantId === undefined

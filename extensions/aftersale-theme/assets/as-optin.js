@@ -351,6 +351,27 @@
       });
   }
 
+  function applyUiEnabled(root, cfg) {
+    if (cfg && cfg.warrantyOptInUiEnabled === false) {
+      root.style.display = "none";
+      root.setAttribute("hidden", "hidden");
+      root.setAttribute("data-as-optin-disabled", "1");
+      try {
+        sessionStorage.removeItem(ATTR_KEY);
+      } catch (e) {
+        /* ignore */
+      }
+      setCartAttribute(ATTR_KEY, "");
+      injectFormAttributes(false);
+      injectLineProperties(false);
+      return false;
+    }
+    root.style.display = "";
+    root.removeAttribute("hidden");
+    root.removeAttribute("data-as-optin-disabled");
+    return true;
+  }
+
   function loadFeeConfig(root) {
     var shop = root.getAttribute("data-shop") || "";
     var api = root.getAttribute("data-fee-api") || "";
@@ -359,14 +380,20 @@
     // 1) Same-origin App Proxy  2) Hosted branding API (CORS)
     fetchFeeJson(api, shop)
       .then(function (json) {
-        if (json && (json.warrantyFeeEnabled != null || json.warrantyFeeVariantId)) {
+        if (
+          json &&
+          (json.warrantyFeeEnabled != null ||
+            json.warrantyFeeVariantId ||
+            json.warrantyOptInUiEnabled != null)
+        ) {
           return json;
         }
         return fetchFeeJson(fallback, shop);
       })
       .then(function (json) {
-        if (json) return applyFeeConfig(root, json);
-        return null;
+        if (!json) return null;
+        if (!applyUiEnabled(root, json)) return null;
+        return applyFeeConfig(root, json);
       })
       .catch(function () {});
   }

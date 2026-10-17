@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Autocomplete,
   Banner,
@@ -17,7 +17,7 @@ import { gqlRequest } from "@/lib/graphql";
 import { appHref } from "@/lib/shop-context";
 import { clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
 import { TourTrigger, useOptionalTour } from "./ProductTour";
-import { BrandingStudio } from "./BrandingStudio";
+import { BrandingStudio, LiveCustomerPreview } from "./BrandingStudio";
 
 type ShopSettings = {
   brandingLogoUrl: string | null;
@@ -31,6 +31,7 @@ type ShopSettings = {
   brandingHeroStyle: string | null;
   voidWarrantyOnRefund: boolean;
   warrantyOptInRequired: boolean;
+  warrantyOptInUiEnabled: boolean;
   warrantyFeeEnabled: boolean;
   warrantyFeeVariantId: string | null;
   warrantyFeeLabel: string | null;
@@ -54,6 +55,7 @@ const QUERY = `#graphql
         brandingHeroStyle
         voidWarrantyOnRefund
         warrantyOptInRequired
+        warrantyOptInUiEnabled
         warrantyFeeEnabled
         warrantyFeeVariantId
         warrantyFeeLabel
@@ -91,6 +93,7 @@ export function SettingsPage() {
   const [timezone, setTimezone] = useState("UTC");
   const [voidOnRefund, setVoidOnRefund] = useState(true);
   const [optInRequired, setOptInRequired] = useState(false);
+  const [optInUiEnabled, setOptInUiEnabled] = useState(true);
   const [feeEnabled, setFeeEnabled] = useState(false);
   const [feeVariantId, setFeeVariantId] = useState("");
   const [feeLabel, setFeeLabel] = useState("Product warranty registration");
@@ -111,7 +114,9 @@ export function SettingsPage() {
   >("brand");
   const [studioOpen, setStudioOpen] = useState(false);
   const [previewKind, setPreviewKind] = useState<PreviewKind>("portal");
+  const [canvaPage, setCanvaPage] = useState<"portal" | "register" | "claim">("portal");
   const [embedHeight, setEmbedHeight] = useState(720);
+  const logoFileRef = useRef<HTMLInputElement>(null);
   const tour = useOptionalTour();
 
   useEffect(() => {
@@ -168,6 +173,7 @@ export function SettingsPage() {
         setTimezone(d.home.shop.timezone ?? "UTC");
         setVoidOnRefund(d.home.shop.voidWarrantyOnRefund);
         setOptInRequired(Boolean(d.home.shop.warrantyOptInRequired));
+        setOptInUiEnabled(d.home.shop.warrantyOptInUiEnabled !== false);
         setFeeEnabled(Boolean(d.home.shop.warrantyFeeEnabled));
         setFeeVariantId(d.home.shop.warrantyFeeVariantId ?? "");
         setFeeLabel(d.home.shop.warrantyFeeLabel ?? "Product warranty registration");
@@ -256,6 +262,7 @@ export function SettingsPage() {
           $timezone: String
           $voidWarrantyOnRefund: Boolean
           $warrantyOptInRequired: Boolean
+          $warrantyOptInUiEnabled: Boolean
           $warrantyFeeEnabled: Boolean
           $warrantyFeeVariantId: String
           $warrantyFeeLabel: String
@@ -264,6 +271,7 @@ export function SettingsPage() {
             timezone: $timezone
             voidWarrantyOnRefund: $voidWarrantyOnRefund
             warrantyOptInRequired: $warrantyOptInRequired
+            warrantyOptInUiEnabled: $warrantyOptInUiEnabled
             warrantyFeeEnabled: $warrantyFeeEnabled
             warrantyFeeVariantId: $warrantyFeeVariantId
             warrantyFeeLabel: $warrantyFeeLabel
@@ -272,6 +280,7 @@ export function SettingsPage() {
             timezone
             voidWarrantyOnRefund
             warrantyOptInRequired
+            warrantyOptInUiEnabled
             warrantyFeeEnabled
             warrantyFeeVariantId
             warrantyFeeLabel
@@ -281,6 +290,7 @@ export function SettingsPage() {
           timezone,
           voidWarrantyOnRefund: voidOnRefund,
           warrantyOptInRequired: optInRequired,
+          warrantyOptInUiEnabled: optInUiEnabled,
           warrantyFeeEnabled: feeEnabled,
           warrantyFeeVariantId: feeVariantId.trim() || null,
           warrantyFeeLabel: feeLabel.trim() || "Product warranty registration",
@@ -462,50 +472,171 @@ export function SettingsPage() {
       </div>
 
       {activeTab === "brand" ? (
-        <div className="as-m-panel" style={{ marginTop: 14 }} data-tour="cx-brand">
+        <div className="as-m-panel as-m-canva-panel" style={{ marginTop: 14 }} data-tour="cx-brand">
           <div className="as-m-panel-title">
-            <h3>Portal color kit</h3>
+            <h3>Portal design studio</h3>
+            <InlineStack gap="200">
+              <Button onClick={() => setStudioOpen(true)}>Fullscreen canvas</Button>
+              <Button variant="primary" loading={busy} onClick={() => void onSaveBranding()}>
+                Save brand
+              </Button>
+            </InlineStack>
           </div>
           <p className="as-m-guide-lead">
-            These colors drive the client portal — buttons, page background, surfaces, and text.
+            Edit on the left — the live canvas on the right updates instantly (logo, buttons,
+            background, and text).
           </p>
-          <div className="as-m-color-kit">
-            {(
-              [
-                ["Accent / buttons", accent, setAccent],
-                ["Page background", bgColor, setBgColor],
-                ["Surface / cards", surfaceColor, setSurfaceColor],
-                ["Text", textColor, setTextColor],
-              ] as const
-            ).map(([label, value, setter]) => (
-              <label key={label} className="as-m-color-kit__swatch">
-                <span>{label}</span>
-                <span className="as-m-color-kit__row">
+
+          <div className="as-m-canva">
+            <aside className="as-m-canva__rail">
+              <div className="as-m-canva__section">
+                <h4>Logo</h4>
+                <div className="as-m-logo-picker">
+                  <div className="as-m-logo-preview">
+                    {logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={logoUrl} alt="Logo preview" />
+                    ) : (
+                      <span>No logo</span>
+                    )}
+                  </div>
+                  <div className="as-m-logo-actions">
+                    <input
+                      ref={logoFileRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                      hidden
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void uploadLogo(f);
+                        e.target.value = "";
+                      }}
+                    />
+                    <Button loading={uploading} onClick={() => logoFileRef.current?.click()}>
+                      {logoUrl ? "Replace logo" : "Upload logo"}
+                    </Button>
+                    {logoUrl ? (
+                      <Button tone="critical" variant="plain" onClick={() => setLogoUrl("")}>
+                        Remove
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+                <p className="as-m-canva__hint">PNG, JPG, WEBP, GIF, or SVG · max 5MB</p>
+              </div>
+
+              <div className="as-m-canva__section">
+                <h4>Colors</h4>
+                <div className="as-m-color-kit">
+                  {(
+                    [
+                      ["Accent / buttons", accent, setAccent],
+                      ["Page background", bgColor, setBgColor],
+                      ["Surface / cards", surfaceColor, setSurfaceColor],
+                      ["Text", textColor, setTextColor],
+                    ] as const
+                  ).map(([label, value, setter]) => (
+                    <label key={label} className="as-m-color-kit__swatch">
+                      <span>{label}</span>
+                      <span className="as-m-color-kit__row">
+                        <input
+                          type="color"
+                          value={/^#[0-9A-Fa-f]{6}$/.test(value) ? value : "#000000"}
+                          onChange={(e) => setter(e.target.value.toUpperCase())}
+                        />
+                        <input
+                          className="as-m-input"
+                          value={value}
+                          onChange={(e) => setter(e.target.value)}
+                          placeholder="#000000"
+                        />
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="as-m-canva__section">
+                <h4>Style</h4>
+                <label className="as-m-canva__field">
+                  <span>Font</span>
+                  <select
+                    className="as-m-select"
+                    value={font}
+                    onChange={(e) => setFont(e.target.value)}
+                  >
+                    <option value="sans">Clean sans</option>
+                    <option value="serif">Editorial serif</option>
+                    <option value="display">Display + sans</option>
+                  </select>
+                </label>
+                <label className="as-m-canva__field">
+                  <span>Button style</span>
+                  <select
+                    className="as-m-select"
+                    value={buttonStyle}
+                    onChange={(e) => setButtonStyle(e.target.value)}
+                  >
+                    <option value="solid">Solid</option>
+                    <option value="soft">Soft</option>
+                    <option value="outline">Outline</option>
+                  </select>
+                </label>
+                <label className="as-m-canva__field">
+                  <span>Corner radius · {radius}px</span>
                   <input
-                    type="color"
-                    value={/^#[0-9A-Fa-f]{6}$/.test(value) ? value : "#000000"}
-                    onChange={(e) => setter(e.target.value.toUpperCase())}
+                    type="range"
+                    min={8}
+                    max={36}
+                    value={Number(radius) || 22}
+                    onChange={(e) => setRadius(e.target.value)}
                   />
-                  <input
-                    className="as-m-input"
-                    value={value}
-                    onChange={(e) => setter(e.target.value)}
-                    placeholder="#000000"
-                  />
-                </span>
-              </label>
-            ))}
+                </label>
+              </div>
+            </aside>
+
+            <main className="as-m-canva__stage">
+              <div className="as-m-canva__toolbar">
+                {(
+                  [
+                    ["portal", "Portal"],
+                    ["register", "Activate"],
+                    ["claim", "Claim"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className="as-m-chip"
+                    data-active={canvaPage === id}
+                    onClick={() => setCanvaPage(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <span className="as-m-canva__live">Live</span>
+              </div>
+              <div className="as-m-canva__frame">
+                <LiveCustomerPreview
+                  draft={{
+                    logoUrl,
+                    accent,
+                    bgColor,
+                    surfaceColor,
+                    textColor,
+                    font,
+                    radius,
+                    buttonStyle,
+                    heroStyle,
+                    shopName,
+                  }}
+                  page={canvaPage}
+                  device="desktop"
+                />
+              </div>
+            </main>
           </div>
-          <FormLayout>
-            <TextField label="Logo URL" value={logoUrl} onChange={setLogoUrl} autoComplete="off" />
-            <InlineStack gap="200">
-              <Button variant="primary" loading={busy} onClick={() => void onSaveBranding()}>
-                Save portal brand
-              </Button>
-              <Button onClick={() => setStudioOpen(true)}>Open full studio</Button>
-              <Button onClick={() => setActiveTab("preview")}>Live preview</Button>
-            </InlineStack>
-          </FormLayout>
+
           <BrandingStudio
             open={studioOpen}
             draft={{
@@ -655,6 +786,23 @@ export function SettingsPage() {
             }}
           >
             <FormLayout>
+              <label className="as-m-toggle">
+                <input
+                  type="checkbox"
+                  checked={optInUiEnabled}
+                  onChange={(e) => setOptInUiEnabled(e.target.checked)}
+                />
+                <span>
+                  <strong style={{ display: "block", fontSize: 13 }}>
+                    Show warranty checkbox on product / cart pages
+                  </strong>
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>
+                    Turn off to hide the storefront checkbox (theme embed stays installed but
+                    invisible). When checked at checkout, warranties register from the customer’s
+                    Shopify email automatically.
+                  </span>
+                </span>
+              </label>
               <label className="as-m-toggle">
                 <input
                   type="checkbox"

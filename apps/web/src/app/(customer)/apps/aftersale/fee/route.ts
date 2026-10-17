@@ -30,6 +30,8 @@ async function feePayload(shopParam: string | null) {
   }
 
   return NextResponse.json({
+    warrantyOptInUiEnabled: shop.warrantyOptInUiEnabled !== false,
+    warrantyOptInRequired: Boolean(shop.warrantyOptInRequired),
     warrantyFeeEnabled: Boolean(shop.warrantyFeeEnabled),
     warrantyFeeVariantId: feeVariantId,
     warrantyFeeLabel: shop.warrantyFeeLabel ?? "Product warranty registration",

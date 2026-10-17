@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { publicApiUrl } from "@/lib/public-api";
 import { type CachedOrder, type CachedWarranty } from "@/lib/customer-order-session";
@@ -14,7 +14,12 @@ import {
   persistPortalSession,
   type PortalView,
 } from "../../../components/ClientPortal";
+import { GuestRegisterFlow } from "../../../components/GuestRegisterFlow";
+
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+
+type AuthMode = "signin" | "signup";
+type Gate = "register" | "auth";
 
 function PortalInner() {
   const params = useSearchParams();
@@ -35,15 +40,32 @@ function PortalInner() {
     loggedInCustomerId,
   });
 
+  const [gate, setGate] = useState<Gate>(
+    viewParam === "claim" || viewParam === "requests" || viewParam === "products"
+      ? "auth"
+      : "register",
+  );
+  const [entryView, setEntryView] = useState<PortalView>(
+    viewParam === "activate" ? "activate" : viewParam || "home",
+  );
+  const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState(prefillEmail);
-  const [orderNumber, setOrderNumber] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [warranties, setWarranties] = useState<CachedWarranty[]>([]);
   const [orders, setOrders] = useState<CachedOrder[]>([]);
   const [shopName, setShopName] = useState<string>("");
+
+  const shopifyLoginUrl = useMemo(() => {
+    if (!shop) return "";
+    const returnPath = `/apps/aftersale/portal?shop=${encodeURIComponent(shop)}`;
+    return `https://${shop}/account/login?return_url=${encodeURIComponent(returnPath)}`;
+  }, [shop]);
 
   useEffect(() => {
     if (prefillEmail) setEmail(prefillEmail);
@@ -103,7 +125,7 @@ function PortalInner() {
           });
         }
       } catch (err) {
-        if (!cancelled) setMessage(err instanceof Error ? err.message : "Could not open portal");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not open portal");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -113,7 +135,6 @@ function PortalInner() {
     };
   }, [token, shop]);
 
-  // Optional Google Identity Services
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || sessionEmail) return;
     const existing = document.getElementById("as-google-gsi");
@@ -131,10 +152,18 @@ function PortalInner() {
 
   useEffect(() => {
     if (!googleReady || !GOOGLE_CLIENT_ID || sessionEmail) return;
-    const g = (window as unknown as { google?: { accounts: { id: {
-      initialize: (c: unknown) => void;
-      renderButton: (el: HTMLElement, c: unknown) => void;
-    } } } }).google;
+    const g = (
+      window as unknown as {
+        google?: {
+          accounts: {
+            id: {
+              initialize: (c: unknown) => void;
+              renderButton: (el: HTMLElement, c: unknown) => void;
+            };
+          };
+        };
+      }
+    ).google;
     if (!g?.accounts?.id) return;
     const el = document.getElementById("as-google-btn");
     if (!el) return;
@@ -143,7 +172,7 @@ function PortalInner() {
       callback: async (resp: { credential?: string }) => {
         if (!resp.credential || !shop) return;
         setLoading(true);
-        setMessage(null);
+        setError(null);
         try {
           const res = await fetch(publicApiUrl("/api/public/customer-auth/google"), {
             method: "POST",
@@ -152,18 +181,9 @@ function PortalInner() {
           });
           const json = await res.json();
           if (!res.ok) throw new Error(json.error ?? "Google sign-in failed");
-          setSessionEmail(json.email);
-          setEmail(json.email);
-          setOrders(json.orders ?? []);
-          setWarranties(json.warranties ?? []);
-          persistPortalSession({
-            shop,
-            email: json.email,
-            orders: json.orders ?? [],
-            warranties: json.warranties ?? [],
-          });
+          applySession(json.email, json.orders ?? [], json.warranties ?? []);
         } catch (err) {
-          setMessage(err instanceof Error ? err.message : "Google sign-in failed");
+          setError(err instanceof Error ? err.message : "Google sign-in failed");
         } finally {
           setLoading(false);
         }
@@ -179,43 +199,55 @@ function PortalInner() {
     });
   }, [googleReady, sessionEmail, shop]);
 
-  async function requestLink(e: FormEvent) {
+  function applySession(nextEmail: string, nextOrders: CachedOrder[], nextWarranties: CachedWarranty[]) {
+    setSessionEmail(nextEmail);
+    setEmail(nextEmail);
+    setOrders(nextOrders);
+    setWarranties(nextWarranties);
+    persistPortalSession({
+      shop,
+      email: nextEmail,
+      orders: nextOrders,
+      warranties: nextWarranties,
+    });
+    setMessage(null);
+    setError(null);
+    setPassword("");
+  }
+
+  async function submitAuth(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
+    setError(null);
     try {
       if (!shop) {
-        setMessage("Open this portal from your store’s warranty link.");
+        setError("Open this portal from your store’s warranty link.");
         setLoading(false);
         return;
       }
-      const res = await fetch(
-        publicApiUrl(`/api/public/guest-link?shop=${encodeURIComponent(shop)}`),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, orderNumber, shop }),
-        },
-      );
+      const path =
+        mode === "signup"
+          ? "/api/public/customer-auth/register"
+          : "/api/public/customer-auth/login";
+      const res = await fetch(publicApiUrl(path), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shop,
+          email,
+          password,
+          ...(mode === "signup" && name.trim() ? { name: name.trim() } : {}),
+        }),
+      });
       const json = await res.json();
-      if (json.portal?.orders || json.portal?.warranties) {
-        setSessionEmail(json.portal.email);
-        setWarranties(json.portal.warranties ?? []);
-        setOrders(json.portal.orders ?? []);
-        if (json.portal.email) {
-          persistPortalSession({
-            shop,
-            email: json.portal.email,
-            orders: json.portal.orders ?? [],
-            warranties: json.portal.warranties ?? [],
-          });
-        }
-        setMessage(json.emailHint ?? "You’re in.");
-      } else {
-        setMessage(json.message ?? "If we find a match, we’ll email a sign-in link.");
+      if (!res.ok) throw new Error(json.error ?? "Authentication failed");
+      applySession(json.email, json.orders ?? [], json.warranties ?? []);
+      if (mode === "signup") {
+        setMessage("Account created — you’re in.");
       }
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Could not verify");
+      setError(err instanceof Error ? err.message : "Could not sign in");
     } finally {
       setLoading(false);
     }
@@ -250,6 +282,7 @@ function PortalInner() {
     setOrders([]);
     setWarranties([]);
     setMessage(null);
+    setError(null);
   }
 
   const shellProps = {
@@ -278,9 +311,31 @@ function PortalInner() {
           orders={orders}
           warranties={warranties}
           embed={embed}
-          initialView={viewParam}
+          initialView={entryView}
           onLogout={logout}
           onSessionRefresh={() => void refreshSession()}
+        />
+      </CustomerShell>
+    );
+  }
+
+  if (gate === "register") {
+    return (
+      <CustomerShell
+        title="Register product"
+        lede="Activate warranty and open your portal"
+        {...shellProps}
+        brand={shopName || "AfterSale"}
+        chrome="dashboard"
+      >
+        <GuestRegisterFlow
+          shop={shop}
+          shopName={shopName}
+          onRegistered={(session) => {
+            setEntryView("products");
+            applySession(session.email, session.orders, session.warranties);
+          }}
+          onNeedSignIn={() => setGate("auth")}
         />
       </CustomerShell>
     );
@@ -299,17 +354,78 @@ function PortalInner() {
           <p className="as-portal-login__kicker">Client portal</p>
           <h3>Welcome{shopName ? ` to ${shopName}` : ""}</h3>
           <p className="as-muted">
-            Sign in with Google or verify with the email and order number from your purchase.
+            Sign in with email and password (no Shopify account required), or continue with Shopify.
           </p>
 
-          {GOOGLE_CLIENT_ID ? (
-            <div className="as-portal-login__google">
-              <div id="as-google-btn" />
-              <p className="as-portal-login__or">or continue with email</p>
-            </div>
-          ) : null}
+          <button type="button" className="as-portal-login__back" onClick={() => setGate("register")}>
+            ← Register a product instead
+          </button>
 
-          <form onSubmit={requestLink} className="as-dash-form">
+          <div className="as-portal-login__providers">
+            {shopifyLoginUrl ? (
+              <a className="as-portal-login__shopify" href={shopifyLoginUrl}>
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden fill="none">
+                  <path
+                    d="M7.5 8.5V7a4.5 4.5 0 0 1 9 0v1.5M6 8.5h12l-.7 11.2a2 2 0 0 1-2 1.8H8.7a2 2 0 0 1-2-1.8L6 8.5Z"
+                    stroke="#95BF47"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Continue with Shopify
+              </a>
+            ) : null}
+
+            {GOOGLE_CLIENT_ID ? (
+              <div className="as-portal-login__google">
+                <div id="as-google-btn" />
+              </div>
+            ) : null}
+          </div>
+
+          <p className="as-portal-login__or">or use email</p>
+
+          <div className="as-portal-login__modes" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              data-active={mode === "signin"}
+              onClick={() => {
+                setMode("signin");
+                setError(null);
+                setMessage(null);
+              }}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              role="tab"
+              data-active={mode === "signup"}
+              onClick={() => {
+                setMode("signup");
+                setError(null);
+                setMessage(null);
+              }}
+            >
+              Create account
+            </button>
+          </div>
+
+          <form onSubmit={submitAuth} className="as-dash-form">
+            {mode === "signup" ? (
+              <div>
+                <label className="as-label">Name</label>
+                <input
+                  className="as-input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoComplete="name"
+                  placeholder="Optional"
+                />
+              </div>
+            ) : null}
             <div>
               <label className="as-label">Email</label>
               <input
@@ -322,24 +438,34 @@ function PortalInner() {
               />
             </div>
             <div>
-              <label className="as-label">Order number</label>
+              <label className="as-label">Password</label>
               <input
                 className="as-input"
+                type="password"
                 required
-                value={orderNumber}
-                onChange={(e) => setOrderNumber(e.target.value)}
-                placeholder="#1001"
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                placeholder={mode === "signup" ? "At least 8 characters" : undefined}
               />
             </div>
+            {error ? <div className="as-alert as-alert-error">{error}</div> : null}
             {message ? <div className="as-alert as-alert-ok">{message}</div> : null}
             <button className="as-btn" type="submit" disabled={loading || !shop}>
-              {loading ? "Checking…" : "Sign in to portal"}
+              {loading
+                ? mode === "signup"
+                  ? "Creating…"
+                  : "Signing in…"
+                : mode === "signup"
+                  ? "Create account"
+                  : "Sign in"}
             </button>
           </form>
 
-          {!GOOGLE_CLIENT_ID ? (
+          {shopifyLoginUrl ? (
             <p className="as-portal-login__hint as-muted">
-              Google sign-in appears here when the app has a Google client ID configured.
+              Shopify login is optional. Email + password works without a Shopify customer account.
             </p>
           ) : null}
         </div>
