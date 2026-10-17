@@ -1345,7 +1345,304 @@
   margin-bottom: 6px;
 }
 
-/* —— Slim claim tracking —— */
+/* —— Claim tracking v2 —— */
+.as-track-v2 {
+  display: grid;
+  gap: 12px;
+}
+
+.as-track-v2__hero {
+  display: grid;
+  gap: 12px;
+  padding: 16px 16px 14px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--as-border) 90%, transparent);
+  background:
+    radial-gradient(
+      120% 80% at 0% 0%,
+      color-mix(in srgb, var(--as-accent) 12%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--as-surface) 98%, #fff) 0%,
+      color-mix(in srgb, var(--as-surface) 94%, var(--as-primary-tint)) 100%
+    );
+}
+
+.as-track-v2__hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.as-track-v2__kicker {
+  margin: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--as-accent) 80%, var(--as-ink));
+}
+
+.as-track-v2__number {
+  margin: 2px 0 0;
+  font-family: var(--as-font-display), Fraunces, Georgia, serif;
+  font-size: clamp(1.35rem, 2.8vw, 1.7rem);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  color: var(--as-ink);
+  line-height: 1.1;
+}
+
+.as-track-v2__pill {
+  flex-shrink: 0;
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.as-track-v2__pill--ok {
+  background: var(--as-ok-bg);
+  color: var(--as-ok-text);
+  border: 1px solid var(--as-ok-border);
+}
+
+.as-track-v2__pill--bad {
+  background: var(--as-err-bg);
+  color: var(--as-err-text);
+  border: 1px solid var(--as-err-border);
+}
+
+.as-track-v2__pill--wait {
+  background: color-mix(in srgb, var(--as-accent) 14%, transparent);
+  color: color-mix(in srgb, var(--as-accent) 70%, var(--as-ink));
+  border: 1px solid color-mix(in srgb, var(--as-accent) 35%, transparent);
+}
+
+.as-track-v2__pill--live {
+  background: var(--as-primary-tint);
+  color: var(--as-primary);
+  border: 1px solid color-mix(in srgb, var(--as-primary) 28%, transparent);
+}
+
+.as-track-v2__product {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--as-ink);
+}
+
+.as-track-v2__summary {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: var(--as-ink);
+}
+
+.as-track-v2__rail {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--as-border) 85%, transparent);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.as-track-v2__dot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--as-border);
+  color: var(--as-muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.as-track-v2__rail li[data-state="done"] .as-track-v2__dot,
+.as-track-v2__rail li[data-state="current"] .as-track-v2__dot {
+  background: var(--as-accent);
+  color: #fff;
+}
+
+.as-track-v2__rail-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: var(--as-muted);
+  letter-spacing: 0.02em;
+}
+
+.as-track-v2__rail li[data-state="current"] .as-track-v2__rail-label,
+.as-track-v2__rail li[data-state="done"] .as-track-v2__rail-label {
+  color: var(--as-ink);
+}
+
+.as-track-v2__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.as-track-v2__facts > div {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--as-surface) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--as-border) 80%, transparent);
+}
+
+.as-track-v2__facts span {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--as-muted);
+}
+
+.as-track-v2__facts strong {
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--as-ink);
+}
+
+.as-track-v2__card {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--as-border);
+  background: var(--as-surface);
+}
+
+.as-track-v2__card h3 {
+  margin: 0 0 10px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--as-muted);
+}
+
+.as-track-v2__card > p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--as-ink);
+}
+
+.as-track-v2__empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--as-muted);
+  line-height: 1.45;
+}
+
+.as-track-v2__timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+
+.as-track-v2__timeline li {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 10px;
+  padding: 0 0 14px;
+  position: relative;
+}
+
+.as-track-v2__timeline li:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 14px;
+  bottom: 0;
+  width: 1px;
+  background: var(--as-border);
+}
+
+.as-track-v2__timeline-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--as-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--as-accent) 18%, transparent);
+}
+
+.as-track-v2__timeline p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--as-ink);
+}
+
+.as-track-v2__timeline time {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--as-muted);
+}
+
+.as-track-v2__files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.as-track-v2__files li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--as-ink) 3%, transparent);
+}
+
+.as-track-v2__file-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--as-surface);
+  border: 1px solid var(--as-border);
+  color: var(--as-muted);
+  font-size: 0.85rem;
+}
+
+.as-track-v2__files strong {
+  display: block;
+  font-size: 0.84rem;
+  color: var(--as-ink);
+}
+
+.as-track-v2__files span {
+  font-size: 0.72rem;
+  color: var(--as-muted);
+}
+
+.as-shell-embed .as-track-v2__hero {
+  padding: 14px;
+}
+
+.as-shell-embed .as-track-v2__rail-label {
+  font-size: 0.62rem;
+}
+
+/* —— Slim claim tracking (legacy) —— */
 .as-track {
   display: grid;
   gap: 14px;

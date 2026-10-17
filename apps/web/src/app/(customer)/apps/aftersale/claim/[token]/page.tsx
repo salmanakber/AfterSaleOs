@@ -12,6 +12,7 @@ type ClaimView = {
   status: string;
   issueSummary: string | null;
   issueDetails: string | null;
+  issueCategory: string | null;
   eligibilityResult: string | null;
   productTitle: string | null;
   createdAt: string;
@@ -22,9 +23,9 @@ type ClaimView = {
 };
 
 const RAIL = [
-  { key: "OPEN", label: "Open" },
-  { key: "IN_REVIEW", label: "Review" },
-  { key: "IN_RESOLUTION", label: "Resolve" },
+  { key: "OPEN", label: "Received" },
+  { key: "IN_REVIEW", label: "Reviewing" },
+  { key: "IN_RESOLUTION", label: "Resolving" },
   { key: "COMPLETED", label: "Done" },
 ] as const;
 
@@ -37,7 +38,17 @@ function railActive(status: string): number {
 }
 
 function statusLabel(status: string) {
-  return status.replaceAll("_", " ");
+  const map: Record<string, string> = {
+    OPEN: "Received",
+    IN_REVIEW: "Under review",
+    WAITING_CUSTOMER: "Needs your reply",
+    APPROVED: "Approved",
+    REJECTED: "Not approved",
+    IN_RESOLUTION: "Being resolved",
+    COMPLETED: "Completed",
+    CANCELLED: "Cancelled",
+  };
+  return map[status] ?? status.replaceAll("_", " ");
 }
 
 function TrackInner() {
@@ -102,71 +113,118 @@ function TrackInner() {
   return (
     <CustomerShell
       brand={claim.shopName || "AfterSale"}
-      title="Track claim"
-      lede={claim.productTitle || "Status updates from the care team."}
+      title="Your claim"
+      lede="Live status from the care team."
       {...shellProps}
     >
-      <div className="as-track">
-        <header className="as-track-head">
-          <div>
-            <p className="as-track-kicker">Claim</p>
-            <h2 className="as-track-number">{claim.claimNumber}</h2>
-            {claim.issueSummary ? <p className="as-track-summary">{claim.issueSummary}</p> : null}
+      <article className="as-track-v2">
+        <header className="as-track-v2__hero">
+          <div className="as-track-v2__hero-top">
+            <div>
+              <p className="as-track-v2__kicker">Claim tracking</p>
+              <h2 className="as-track-v2__number">{claim.claimNumber}</h2>
+            </div>
+            <span className={`as-track-v2__pill as-track-v2__pill--${tone}`}>
+              {statusLabel(claim.status)}
+            </span>
           </div>
-          <span className={`as-track-pill as-track-pill--${tone}`}>{statusLabel(claim.status)}</span>
+
+          {claim.productTitle ? (
+            <p className="as-track-v2__product">{claim.productTitle}</p>
+          ) : null}
+
+          {claim.issueSummary ? (
+            <p className="as-track-v2__summary">{claim.issueSummary}</p>
+          ) : null}
+
+          {!closed ? (
+            <ol className="as-track-v2__rail" aria-label="Claim progress">
+              {RAIL.map((step, i) => {
+                const state =
+                  activeIdx > i ? "done" : activeIdx === i ? "current" : "upcoming";
+                return (
+                  <li key={step.key} data-state={state}>
+                    <span className="as-track-v2__dot" aria-hidden>
+                      {state === "done" ? "✓" : i + 1}
+                    </span>
+                    <span className="as-track-v2__rail-label">{step.label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : null}
+
+          <div className="as-track-v2__facts">
+            <div>
+              <span>Opened</span>
+              <strong>{new Date(claim.createdAt).toLocaleDateString()}</strong>
+            </div>
+            <div>
+              <span>Updated</span>
+              <strong>{new Date(claim.updatedAt).toLocaleString()}</strong>
+            </div>
+            {claim.eligibilityResult ? (
+              <div>
+                <span>Eligibility</span>
+                <strong>{statusLabel(claim.eligibilityResult)}</strong>
+              </div>
+            ) : null}
+            {claim.issueCategory ? (
+              <div>
+                <span>Category</span>
+                <strong>{statusLabel(claim.issueCategory)}</strong>
+              </div>
+            ) : null}
+          </div>
         </header>
 
-        {!closed ? (
-          <ol className="as-track-rail" aria-label="Claim progress">
-            {RAIL.map((step, i) => (
-              <li key={step.key} data-state={activeIdx > i ? "done" : activeIdx === i ? "current" : "upcoming"}>
-                <span className="as-track-rail__tick" aria-hidden />
-                <span className="as-track-rail__label">{step.label}</span>
-              </li>
-            ))}
-          </ol>
+        {claim.issueDetails ? (
+          <section className="as-track-v2__card">
+            <h3>What you reported</h3>
+            <p>{claim.issueDetails}</p>
+          </section>
         ) : null}
 
-        <div className="as-track-meta-row">
-          {claim.eligibilityResult ? (
-            <span>Eligibility · {statusLabel(claim.eligibilityResult)}</span>
-          ) : null}
-          <span>Opened {new Date(claim.createdAt).toLocaleDateString()}</span>
-          <span>Updated {new Date(claim.updatedAt).toLocaleString()}</span>
-        </div>
-
-        {claim.issueDetails ? <p className="as-track-details">{claim.issueDetails}</p> : null}
-
-        <section className="as-track-section">
-          <h3>Updates</h3>
+        <section className="as-track-v2__card">
+          <h3>Updates from the team</h3>
           {claim.notes.length > 0 ? (
-            <ul className="as-track-updates">
-              {claim.notes.map((n, i) => (
-                <li key={i}>
-                  <p>{n.body}</p>
-                  <time>{new Date(n.createdAt).toLocaleString()}</time>
+            <ol className="as-track-v2__timeline">
+              {[...claim.notes].reverse().map((n, i) => (
+                <li key={`${n.createdAt}-${i}`}>
+                  <span className="as-track-v2__timeline-dot" aria-hidden />
+                  <div>
+                    <p>{n.body}</p>
+                    <time dateTime={n.createdAt}>{new Date(n.createdAt).toLocaleString()}</time>
+                  </div>
                 </li>
               ))}
-            </ul>
+            </ol>
           ) : (
-            <p className="as-muted as-track-empty">No updates yet — check back soon.</p>
+            <p className="as-track-v2__empty">
+              No messages yet. You’ll get an email when the store posts an update.
+            </p>
           )}
         </section>
 
         {claim.attachments.length > 0 ? (
-          <section className="as-track-section">
-            <h3>Files</h3>
-            <ul className="as-track-files">
+          <section className="as-track-v2__card">
+            <h3>Your files</h3>
+            <ul className="as-track-v2__files">
               {claim.attachments.map((a, i) => (
-                <li key={i}>
-                  <strong>{a.fileName}</strong>
-                  <span>{a.contentType || "File"}</span>
+                <li key={`${a.fileName}-${i}`}>
+                  <span className="as-track-v2__file-icon" aria-hidden>
+                    ▦
+                  </span>
+                  <div>
+                    <strong>{a.fileName}</strong>
+                    <span>{a.contentType || "Attachment"}</span>
+                  </div>
                 </li>
               ))}
             </ul>
           </section>
         ) : null}
-      </div>
+      </article>
     </CustomerShell>
   );
 }

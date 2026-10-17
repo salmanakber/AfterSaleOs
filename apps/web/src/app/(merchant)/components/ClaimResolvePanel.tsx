@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Banner,
   BlockStack,
@@ -70,6 +70,8 @@ export function ClaimResolvePanel({
   repairs,
   suppliers,
   busy,
+  allowRepairs = false,
+  allowSuppliers = false,
   onCreateRepair,
   onCreateReplacement,
   onCompleteReplacement,
@@ -82,6 +84,10 @@ export function ClaimResolvePanel({
   repairs: ResolveRepair[];
   suppliers: { id: string; name: string }[];
   busy: boolean;
+  /** Plan feature: repairs desk */
+  allowRepairs?: boolean;
+  /** Plan feature: supplier portal — never show supplier UI when false */
+  allowSuppliers?: boolean;
   onCreateRepair: () => void;
   onCreateReplacement: (warrantyMode: string) => void;
   onCompleteReplacement: (id: string) => void;
@@ -107,6 +113,11 @@ export function ClaimResolvePanel({
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
   const [supplierAmount, setSupplierAmount] = useState("");
   const [supplierStatus, setSupplierStatus] = useState("NOT_FILED");
+
+  useEffect(() => {
+    if (path === "supplier" && !allowSuppliers) setPath("choose");
+    if (path === "repair" && !allowRepairs) setPath("choose");
+  }, [path, allowSuppliers, allowRepairs]);
 
   const openDrafts = replacements.filter((r) => r.status === "draft_created");
 
@@ -190,53 +201,61 @@ export function ClaimResolvePanel({
                 ) : null}
               </li>
             ))}
-            {repairs.map((r) => (
-              <li key={r.id}>
-                <div>
-                  <strong>Repair {r.repairNumber}</strong>
-                  <span>{r.status.replaceAll("_", " ")}</span>
-                </div>
-                <Button url={appHref(`/repairs/${r.id}`)} size="slim">
-                  Open repair
-                </Button>
-              </li>
-            ))}
+            {allowRepairs
+              ? repairs.map((r) => (
+                  <li key={r.id}>
+                    <div>
+                      <strong>Repair {r.repairNumber}</strong>
+                      <span>{r.status.replaceAll("_", " ")}</span>
+                    </div>
+                    <Button url={appHref(`/repairs/${r.id}`)} size="slim">
+                      Open repair
+                    </Button>
+                  </li>
+                ))
+              : null}
           </ul>
         </div>
       )}
 
       {path === "choose" ? (
         <div className="as-resolve-paths">
-          <p className="as-resolve-paths__lede">Choose how to resolve this claim</p>
-          <div className="as-resolve-path-grid">
+          <p className="as-resolve-paths__lede">How do you want to resolve this?</p>
+          <div
+            className={`as-resolve-path-grid${allowRepairs || allowSuppliers ? "" : " as-resolve-path-grid--two"}`}
+          >
             <button type="button" className="as-resolve-path" onClick={() => setPath("refund")}>
-              <span className="as-resolve-path__icon" aria-hidden>
+              <span className="as-resolve-path__icon" data-tone="money" aria-hidden>
                 $
               </span>
               <strong>Refund money</strong>
-              <span>Log a refund and jump to the Shopify order to issue it.</span>
+              <span>Log the amount, then issue it on the Shopify order.</span>
             </button>
             <button type="button" className="as-resolve-path" onClick={() => setPath("replace")}>
-              <span className="as-resolve-path__icon" aria-hidden>
+              <span className="as-resolve-path__icon" data-tone="ship" aria-hidden>
                 ↻
               </span>
               <strong>Send replacement</strong>
-              <span>Create a free draft order for the same product, then fulfill in Shopify.</span>
+              <span>Create a free draft order, fulfill in Shopify, mark dispatched.</span>
             </button>
-            <button type="button" className="as-resolve-path" onClick={() => setPath("repair")}>
-              <span className="as-resolve-path__icon" aria-hidden>
-                ✎
-              </span>
-              <strong>Start repair</strong>
-              <span>Open a repair ticket for intake, diagnosis, and shipping.</span>
-            </button>
-            <button type="button" className="as-resolve-path" onClick={() => setPath("supplier")}>
-              <span className="as-resolve-path__icon" aria-hidden>
-                ⇆
-              </span>
-              <strong>Supplier recovery</strong>
-              <span>Track money you can recover from a supplier (internal).</span>
-            </button>
+            {allowRepairs ? (
+              <button type="button" className="as-resolve-path" onClick={() => setPath("repair")}>
+                <span className="as-resolve-path__icon" data-tone="fix" aria-hidden>
+                  ✎
+                </span>
+                <strong>Start repair</strong>
+                <span>Open a repair ticket for intake, diagnosis, and shipping.</span>
+              </button>
+            ) : null}
+            {allowSuppliers ? (
+              <button type="button" className="as-resolve-path" onClick={() => setPath("supplier")}>
+                <span className="as-resolve-path__icon" data-tone="vendor" aria-hidden>
+                  ⇆
+                </span>
+                <strong>Supplier recovery</strong>
+                <span>Track money you can recover from a supplier (internal).</span>
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -369,7 +388,7 @@ export function ClaimResolvePanel({
         </div>
       ) : null}
 
-      {path === "repair" ? (
+      {path === "repair" && allowRepairs ? (
         <div className="as-resolve-panel">
           <InlineStack align="space-between" blockAlign="center">
             <Text as="h3" variant="headingMd">
@@ -389,7 +408,7 @@ export function ClaimResolvePanel({
         </div>
       ) : null}
 
-      {path === "supplier" ? (
+      {path === "supplier" && allowSuppliers ? (
         <div className="as-resolve-panel">
           <InlineStack align="space-between" blockAlign="center">
             <Text as="h3" variant="headingMd">

@@ -16,6 +16,7 @@ import type { RepairStatus, ReplacementWarrantyMode, SupplierClaimStatus } from 
 import { resolveMerchantContext } from "@/lib/auth/merchant";
 import { shopifyGraphqlRequest } from "@/lib/shopify/client";
 import { enqueueEmail } from "@/lib/queue";
+import { notifyClaimStatus } from "@/lib/claim-notify";
 import { mapClaim } from "./claims";
 
 export const resolutionsTypeDefs = /* GraphQL */ `
@@ -498,6 +499,14 @@ export const resolutionsResolvers = {
         include: repairInclude,
       });
       await notifyRepairStatus(merchant.shopId, repair.id);
+      await notifyClaimStatus({
+        shopId: merchant.shopId,
+        claimId: args.input.claimId,
+        status: "IN_RESOLUTION",
+        note: `Repair ${repair.repairNumber} was opened for your claim.`,
+        event: "resolution",
+        resolutionKind: "repair",
+      });
       return mapRepair(full);
     },
     updateRepair: async (
@@ -634,6 +643,15 @@ export const resolutionsResolvers = {
         adminOrderUrl,
       });
 
+      await notifyClaimStatus({
+        shopId: merchant.shopId,
+        claimId: claim.id,
+        status: "IN_RESOLUTION",
+        note: `A replacement is being prepared${draftOrderName ? ` (${draftOrderName})` : ""}.`,
+        event: "resolution",
+        resolutionKind: "replacement",
+      });
+
       return {
         id: replacement.id,
         claimId: replacement.claimId,
@@ -663,6 +681,16 @@ export const resolutionsResolvers = {
       const claim = await prisma.claim.findFirst({
         where: { id: updated.claimId, shopId: merchant.shopId },
       });
+      if (claim) {
+        await notifyClaimStatus({
+          shopId: merchant.shopId,
+          claimId: claim.id,
+          status: claim.status,
+          note: "Your replacement has been marked as dispatched.",
+          event: "resolution",
+          resolutionKind: "replacement",
+        });
+      }
       return {
         id: updated.id,
         claimId: updated.claimId,
@@ -716,6 +744,14 @@ export const resolutionsResolvers = {
       const claim = await prisma.claim.findFirst({
         where: { id: resolution.claimId, shopId: merchant.shopId },
       });
+      await notifyClaimStatus({
+        shopId: merchant.shopId,
+        claimId: args.input.claimId,
+        status: "IN_RESOLUTION",
+        note: args.input.reason || "A refund is being processed for your claim.",
+        event: "resolution",
+        resolutionKind: "refund",
+      });
       return {
         id: resolution.id,
         claimId: resolution.claimId,
@@ -737,6 +773,7 @@ export const resolutionsResolvers = {
       ctx: { request: Request },
     ) => {
       const merchant = await resolveMerchantContext(ctx.request);
+      await assertPlanFeature(merchant.shopId, "supplierPortal", "Supplier portal");
       const s = await createSupplier({
         shopId: merchant.shopId,
         name: args.input.name,
@@ -762,6 +799,7 @@ export const resolutionsResolvers = {
       ctx: { request: Request },
     ) => {
       const merchant = await resolveMerchantContext(ctx.request);
+      await assertPlanFeature(merchant.shopId, "supplierPortal", "Supplier portal");
       const link = await linkProductSupplier({
         shopId: merchant.shopId,
         supplierId: args.supplierId,
@@ -798,6 +836,7 @@ export const resolutionsResolvers = {
       ctx: { request: Request },
     ) => {
       const merchant = await resolveMerchantContext(ctx.request);
+      await assertPlanFeature(merchant.shopId, "supplierPortal", "Supplier portal");
       const row = await upsertSupplierClaim({
         shopId: merchant.shopId,
         claimId: args.input.claimId,
@@ -837,7 +876,15 @@ export const resolutionsResolvers = {
         statusKey: args.statusKey,
         note: args.note,
       });
-      return mapClaim(args.claimId, merchant.shopId, merchant.shopDomain);
+      const mapped = await mapClaim(args.claimId, merchant.shopId, merchant.shopDomain);
+      await notifyClaimStatus({
+        shopId: merchant.shopId,
+        claimId: args.claimId,
+        status: mapped.status,
+        note: args.note,
+        event: "status",
+      });
+      return mapped;
     },
   },
 };

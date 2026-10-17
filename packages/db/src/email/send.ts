@@ -88,23 +88,60 @@ function builtinTemplate(template: string, data: Record<string, unknown>, brand:
   }
   if (template === "claim_created") {
     return {
-      subject: `${brand.shopName}: claim ${esc(data.claimNumber)} received`,
+      subject: `${brand.shopName}: we received claim ${esc(data.claimNumber)}`,
       html: wrapEmail(
         brand,
         `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">We received your claim</h1>
-        <p>Thanks for contacting ${shopName}. Claim <strong>${esc(data.claimNumber)}</strong> is in our queue.</p>
+        <p>Thanks for contacting ${shopName}. Claim <strong>${esc(data.claimNumber)}</strong> is in our queue${data.productTitle ? ` for <strong>${esc(data.productTitle)}</strong>` : ""}.</p>
+        ${data.summary ? `<p style="margin:12px 0;padding:12px 14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">${esc(data.summary)}</p>` : ""}
+        ${cta(brand, String(data.trackingUrl ?? "#"), "Track your claim")}`,
+      ),
+    };
+  }
+  if (template === "claim_customer_note") {
+    return {
+      subject: `${brand.shopName}: update on claim ${esc(data.claimNumber)}`,
+      html: wrapEmail(
+        brand,
+        `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">Message from ${shopName}</h1>
+        <p>There’s a new update on claim <strong>${esc(data.claimNumber)}</strong>.</p>
+        ${data.note ? `<p style="margin:14px 0;padding:14px 16px;background:#f8fafc;border-radius:10px;border-left:3px solid ${escAttr(brand.accent)};">${esc(data.note)}</p>` : ""}
+        ${cta(brand, String(data.trackingUrl ?? "#"), "View claim status")}`,
+      ),
+    };
+  }
+  if (template.startsWith("claim_resolution_")) {
+    const kind = String(data.resolutionKind || template.replace("claim_resolution_", ""));
+    const title =
+      kind === "refund"
+        ? "Refund in progress"
+        : kind === "replacement"
+          ? "Replacement in progress"
+          : kind === "repair"
+            ? "Repair started"
+            : "We’re resolving your claim";
+    return {
+      subject: `${brand.shopName}: ${title.toLowerCase()} · ${esc(data.claimNumber)}`,
+      html: wrapEmail(
+        brand,
+        `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">${esc(title)}</h1>
+        <p>Claim <strong>${esc(data.claimNumber)}</strong> is now <strong>${esc(data.statusLabel ?? data.status)}</strong>.</p>
+        ${data.note ? `<p style="margin:12px 0;padding:12px 14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">${esc(data.note)}</p>` : ""}
         ${cta(brand, String(data.trackingUrl ?? "#"), "Track your claim")}`,
       ),
     };
   }
   if (template.startsWith("claim_status_")) {
+    const label = esc(data.statusLabel ?? data.status);
     return {
-      subject: `${brand.shopName}: claim ${esc(data.claimNumber)} → ${esc(data.status)}`,
+      subject: `${brand.shopName}: claim ${esc(data.claimNumber)} is ${label}`,
       html: wrapEmail(
         brand,
         `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">Claim update</h1>
-        <p>Claim <strong>${esc(data.claimNumber)}</strong> is now <strong>${esc(data.status)}</strong>.</p>
-        ${data.summary ? `<p>${esc(data.summary)}</p>` : ""}
+        <p>Claim <strong>${esc(data.claimNumber)}</strong> is now <strong>${label}</strong>.</p>
+        ${data.productTitle ? `<p style="color:#64748b;margin:0 0 8px;">Product: ${esc(data.productTitle)}</p>` : ""}
+        ${data.note ? `<p style="margin:12px 0;padding:12px 14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">${esc(data.note)}</p>` : ""}
+        ${!data.note && data.summary ? `<p>${esc(data.summary)}</p>` : ""}
         ${cta(brand, String(data.trackingUrl ?? "#"), "View claim status")}`,
       ),
     };

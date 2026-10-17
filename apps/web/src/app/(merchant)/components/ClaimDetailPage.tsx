@@ -20,6 +20,7 @@ import { friendlyError } from "@/lib/merchant-errors";
 import { appHref } from "@/lib/shop-context";
 import { BrandLoader } from "./BrandLoader";
 import { ClaimResolvePanel } from "./ClaimResolvePanel";
+import { useFeatureAccess } from "./FeatureLock";
 import { useMerchantAuth } from "../providers";
 
 type ClaimDetail = {
@@ -107,6 +108,8 @@ const DETAIL = `#graphql
 export function ClaimDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { navigate } = useMerchantAuth();
+  const repairsAccess = useFeatureAccess("repairsEnabled");
+  const suppliersAccess = useFeatureAccess("supplierPortal");
   const [claim, setClaim] = useState<ClaimDetail | null>(null);
   const [staff, setStaff] = useState<{ id: string; name: string | null; email: string; active?: boolean }[]>([]);
   const [workflowStatuses, setWorkflowStatuses] = useState<WorkflowStatus[]>([]);
@@ -877,9 +880,11 @@ export function ClaimDetailPage() {
                     Update status
                   </Button>
                   <Button onClick={() => setDeskTab("resolve")}>Start resolution</Button>
-                  <Button onClick={createRepair} loading={busy}>
-                    Create repair
-                  </Button>
+                  {repairsAccess.allowed ? (
+                    <Button onClick={createRepair} loading={busy}>
+                      Create repair
+                    </Button>
+                  ) : null}
                 </BlockStack>
               </div>
               <div className="as-claim-tile">
@@ -1030,8 +1035,10 @@ export function ClaimDetailPage() {
             replacements={claimReplacements}
             refunds={claimRefunds}
             repairs={claimRepairs}
-            suppliers={suppliers}
+            suppliers={suppliersAccess.allowed ? suppliers : []}
             busy={busy}
+            allowRepairs={repairsAccess.allowed}
+            allowSuppliers={suppliersAccess.allowed}
             onCreateRepair={() => void createRepair()}
             onCreateReplacement={(mode) => void createReplacement(mode)}
             onCompleteReplacement={(rid) => void completeReplacementAction(rid)}

@@ -560,23 +560,28 @@ body {
 .as-resolve-path-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
+}
+
+.as-resolve-path-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 @media (max-width: 720px) {
-  .as-resolve-path-grid {
+  .as-resolve-path-grid,
+  .as-resolve-path-grid--two {
     grid-template-columns: 1fr;
   }
 }
 
 .as-resolve-path {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   text-align: left;
-  padding: 14px 14px 16px;
-  border-radius: 14px;
+  padding: 16px 16px 18px;
+  border-radius: 16px;
   border: 1px solid #e2e8f0;
-  background: #fff;
+  background: linear-gradient(180deg, #fff 0%, #fafbfc 100%);
   cursor: pointer;
   font: inherit;
   color: inherit;
@@ -584,21 +589,41 @@ body {
 }
 
 .as-resolve-path:hover {
-  border-color: #93c5fd;
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.08);
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
   transform: translateY(-1px);
 }
 
 .as-resolve-path__icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.as-resolve-path__icon[data-tone="money"] {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.as-resolve-path__icon[data-tone="ship"] {
   background: #eff6ff;
   color: #1d4ed8;
-  font-weight: 700;
-  font-size: 0.9rem;
+}
+
+.as-resolve-path__icon[data-tone="fix"] {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.as-resolve-path__icon[data-tone="vendor"] {
+  background: #f5f3ff;
+  color: #6d28d9;
 }
 
 .as-resolve-path strong {

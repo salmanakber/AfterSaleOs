@@ -14,6 +14,7 @@ import {
 } from "@aftersale/db";
 import type { ClaimStatus } from "@prisma/client";
 import { enqueueEmail } from "@/lib/queue";
+import { notifyClaimStatus } from "@/lib/claim-notify";
 import { resolveMerchantContext } from "@/lib/auth/merchant";
 
 export const claimsTypeDefs = /* GraphQL */ `
@@ -273,30 +274,6 @@ export async function mapClaim(claimId: string, shopId: string, shopDomain: stri
   };
 }
 
-async function notifyClaimStatus(shopId: string, claimId: string, status: string) {
-  const claim = await prisma.claim.findFirst({
-    where: { id: claimId, shopId },
-    include: { shop: true },
-  });
-  if (!claim?.customerEmail) return;
-  const appBase = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://aftersale.tidyflowapp.com").replace(
-    /\/$/,
-    "",
-  );
-  await enqueueEmail({
-    shopId,
-    to: claim.customerEmail,
-    template: `claim_status_${status.toLowerCase()}`,
-    data: {
-      claimNumber: claim.claimNumber,
-      status,
-      trackingUrl: `${appBase}/apps/aftersale/claim/${claim.publicToken}?shop=${encodeURIComponent(claim.shop.shopDomain)}`,
-      summary: claim.issueSummary,
-      shopName: claim.shop.shopName ?? claim.shop.shopDomain,
-    },
-  });
-}
-
 export const claimsResolvers = {
   Query: {
     claims: async (
@@ -497,7 +474,13 @@ export const claimsResolvers = {
         status: args.status as ClaimStatus,
         note: args.note,
       });
-      await notifyClaimStatus(merchant.shopId, args.id, args.status);
+      await notifyClaimStatus({
+        shopId: merchant.shopId,
+        claimId: args.id,
+        status: args.status,
+        note: args.note,
+        event: "status",
+      });
       return mapClaim(args.id, merchant.shopId, merchant.shopDomain);
     },
     addClaimNote: async (
@@ -513,6 +496,20 @@ export const claimsResolvers = {
         isInternal: args.isInternal ?? false,
         authorType: "staff",
       });
+      if (!(args.isInternal ?? false)) {
+        const claim = await prisma.claim.findFirst({
+          where: { id: args.id, shopId: merchant.shopId },
+        });
+        if (claim) {
+          await notifyClaimStatus({
+            shopId: merchant.shopId,
+            claimId: args.id,
+            status: claim.status,
+            note: args.body,
+            event: "note",
+          });
+        }
+      }
       return {
         id: note.id,
         authorType: note.authorType,
