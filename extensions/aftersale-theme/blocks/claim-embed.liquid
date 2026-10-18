@@ -25,9 +25,18 @@
 {% if product %}
   {% assign product_q = product.title | url_encode %}
 {% endif %}
-{% assign embed_src = as_app_url | append: '/apps/aftersale/claim?shop=' | append: shop.permanent_domain | append: '&embed=1&theme=local&accent=' | append: accent_q | append: as_layout_qs %}
+{% comment %} Always load unified portal inside the theme block — never redirect to self-hosted claim. {% endcomment %}
+{% assign embed_src = as_app_url | append: '/apps/aftersale/portal?shop=' | append: shop.permanent_domain | append: '&embed=1&theme=local&view=claim&accent=' | append: accent_q | append: as_layout_qs %}
 {% if product %}
   {% assign embed_src = embed_src | append: '&product=' | append: product_q | append: '&product_id=' | append: product.id %}
+{% endif %}
+{% if routes.account_login_url != blank %}
+  {% assign as_login_q = routes.account_login_url | url_encode %}
+  {% assign embed_src = embed_src | append: '&shopify_login=' | append: as_login_q %}
+{% endif %}
+{% if request.path != blank %}
+  {% assign as_return_q = request.path | url_encode %}
+  {% assign embed_src = embed_src | append: '&return_to=' | append: as_return_q %}
 {% endif %}
 {% if customer and customer.email != blank %}
   {% assign as_email_q = customer.email | url_encode %}
@@ -61,7 +70,8 @@
       class="as-embed-block__frame"
       title="{{ block.settings.title | default: 'File a claim' }}"
       src="{{ embed_src }}"
-      style="width:100%;max-width:{{ as_max_w }};min-height:{{ block.settings.min_height }}px;border:0;border-radius:{{ radius }}px;background:{{ surface }};margin-inline:auto;display:block;"
+      data-as-min-height="{{ block.settings.min_height }}"
+      style="width:100%;max-width:{{ as_max_w }};min-height:{{ block.settings.min_height }}px;height:{{ block.settings.min_height }}px;border:0;border-radius:{{ radius }}px;background:{{ surface }};margin-inline:auto;display:block;"
       loading="lazy"
       allow="clipboard-write"
       referrerpolicy="no-referrer-when-downgrade"
@@ -74,6 +84,7 @@
   "name": "Claim form embed",
   "target": "section",
   "stylesheet": "aftersale.css",
+  "javascript": "as-embed.js",
   "settings": [
     {
       "type": "paragraph",
@@ -122,7 +133,7 @@
       "min": 280,
       "max": 1200,
       "step": 20,
-      "default": 480
+      "default": 720
     },
     {
       "type": "header",

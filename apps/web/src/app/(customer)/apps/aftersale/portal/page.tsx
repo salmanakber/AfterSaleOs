@@ -25,6 +25,7 @@ import {
   GoogleContinueButton,
   isGoogleSignInConfigured,
 } from "../../../components/GoogleContinueButton";
+import { EmbedHeightReporter } from "../../../components/EmbedHeightReporter";
 import type { FeePaymentInfo } from "@/lib/warranty-fee";
 
 type AuthMode = "signin" | "signup";
@@ -347,66 +348,74 @@ function PortalInner() {
 
   if (sessionEmail) {
     return (
-      <CustomerShell
-        title="Client portal"
-        lede="Your warranties and claims"
-        {...shellProps}
-        brand={shopName || "AfterSale"}
-        chrome="dashboard"
-      >
-        <ClientPortal
-          shop={shop}
-          shopName={shopName}
-          email={sessionEmail}
-          orders={orders}
-          warranties={warranties}
-          embed={embed}
-          initialView={entryView}
-          pendingFeePayment={pendingFeePayment}
-          onDismissFeePayment={() => setPendingFeePayment(null)}
-          onLogout={logout}
-          onSessionRefresh={() => void refreshSession()}
-        />
-      </CustomerShell>
+      <>
+        <EmbedHeightReporter enabled={embed} />
+        <CustomerShell
+          title="Client portal"
+          lede="Your warranties and claims"
+          {...shellProps}
+          brand={shopName || "AfterSale"}
+          chrome="dashboard"
+        >
+          <ClientPortal
+            shop={shop}
+            shopName={shopName}
+            email={sessionEmail}
+            orders={orders}
+            warranties={warranties}
+            embed={embed}
+            initialView={entryView}
+            pendingFeePayment={pendingFeePayment}
+            onDismissFeePayment={() => setPendingFeePayment(null)}
+            onLogout={logout}
+            onSessionRefresh={() => void refreshSession()}
+          />
+        </CustomerShell>
+      </>
     );
   }
 
   if (gate === "register") {
     return (
-      <CustomerShell
-        title="Register product"
-        lede="Activate warranty and open your portal"
-        {...shellProps}
-        brand={shopName || "AfterSale"}
-        chrome="dashboard"
-      >
-        <GuestRegisterFlow
-          shop={shop}
-          shopName={shopName}
-          shopifyLoginUrl={shopifyLoginUrl || undefined}
-          onRegistered={(session, fee) => {
-            setEntryView("products");
-            if (fee) setPendingFeePayment(fee);
-            applySession(session.email, session.orders, session.warranties);
-          }}
-          onGoogleSession={(session) => {
-            setEntryView("home");
-            applySession(session.email, session.orders, session.warranties);
-          }}
-          onNeedSignIn={() => setGate("auth")}
-        />
-      </CustomerShell>
+      <>
+        <EmbedHeightReporter enabled={embed} />
+        <CustomerShell
+          title="Register product"
+          lede="Activate warranty and open your portal"
+          {...shellProps}
+          brand={shopName || "AfterSale"}
+          chrome="dashboard"
+        >
+          <GuestRegisterFlow
+            shop={shop}
+            shopName={shopName}
+            shopifyLoginUrl={shopifyLoginUrl || undefined}
+            onRegistered={(session, fee) => {
+              setEntryView("products");
+              if (fee) setPendingFeePayment(fee);
+              applySession(session.email, session.orders, session.warranties);
+            }}
+            onGoogleSession={(session) => {
+              setEntryView("home");
+              applySession(session.email, session.orders, session.warranties);
+            }}
+            onNeedSignIn={() => setGate("auth")}
+          />
+        </CustomerShell>
+      </>
     );
   }
 
   return (
-    <CustomerShell
-      title="Sign in"
-      lede="Access warranties, registration, and claims in one place."
-      {...shellProps}
-      brand={shopName || "AfterSale"}
-      chrome="dashboard"
-    >
+    <>
+      <EmbedHeightReporter enabled={embed} />
+      <CustomerShell
+        title="Sign in"
+        lede="Access warranties, registration, and claims in one place."
+        {...shellProps}
+        brand={shopName || "AfterSale"}
+        chrome="dashboard"
+      >
       <div className="as-portal-login">
         <div className="as-portal-login__card">
           <p className="as-portal-login__kicker">Client portal</p>
@@ -542,6 +551,7 @@ function PortalInner() {
         </div>
       </div>
     </CustomerShell>
+    </>
   );
 }
 

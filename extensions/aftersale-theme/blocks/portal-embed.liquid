@@ -63,7 +63,8 @@
       class="as-embed-block__frame"
       title="{{ block.settings.title | default: 'Warranty portal' }}"
       src="{{ embed_src }}"
-      style="width:100%;max-width:{{ as_max_w }};min-height:{{ block.settings.min_height }}px;border:0;border-radius:{{ radius }}px;background:{{ surface }};margin-inline:auto;display:block;"
+      data-as-min-height="{{ block.settings.min_height }}"
+      style="width:100%;max-width:{{ as_max_w }};min-height:{{ block.settings.min_height }}px;height:{{ block.settings.min_height }}px;border:0;border-radius:{{ radius }}px;background:{{ surface }};margin-inline:auto;display:block;"
       loading="lazy"
       allow="clipboard-write"
       referrerpolicy="no-referrer-when-downgrade"
@@ -76,6 +77,7 @@
   "name": "Client portal",
   "target": "section",
   "stylesheet": "aftersale.css",
+  "javascript": "as-embed.js",
   "settings": [
     {
       "type": "paragraph",
@@ -122,9 +124,9 @@
       "id": "min_height",
       "label": "Minimum height",
       "min": 280,
-      "max": 1200,
+      "max": 1400,
       "step": 20,
-      "default": 480
+      "default": 720
     },
     {
       "type": "header",

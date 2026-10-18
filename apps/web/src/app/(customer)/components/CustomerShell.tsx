@@ -133,8 +133,11 @@ export function CustomerShell({
         ? " as-btn-style-outline"
         : "";
 
-  if (embed) {
-    // Full-width form; merchant picks 1/2 columns + width in theme customizer.
+  const isDashboard = chrome === "dashboard";
+
+  // Theme-block portal: same dashboard UI as self-hosted — never the stripped form embed chrome.
+  // Legacy form embeds (claim/register without dashboard) keep as-shell-embed.
+  if (embed && !isDashboard) {
     return (
       <div
         className={`as-shell as-shell-embed as-shell-embed--${embedWidth} as-shell-embed--${embedStyle}${skipHostedBrand ? " as-shell-theme-local" : ""}${fontClass}${buttonClass}`}
@@ -150,13 +153,14 @@ export function CustomerShell({
     );
   }
 
-  const isDashboard = chrome === "dashboard";
-
   return (
     <div
-      className={`as-shell${isDashboard ? " as-shell-dash" : ""}${skipHostedBrand ? " as-shell-theme-local" : ""}${fontClass}${buttonClass}`}
+      className={`as-shell${isDashboard ? " as-shell-dash" : ""}${embed ? " as-shell-in-theme" : ""}${skipHostedBrand ? " as-shell-theme-local" : ""}${fontClass}${buttonClass}`}
       style={brandStyle}
       data-hero={design.heroStyle || "bold"}
+      data-embed={embed ? "1" : undefined}
+      data-cols={embed ? embedCols : undefined}
+      data-width={embed ? embedWidth : undefined}
     >
       <div className="as-topbar as-no-print">
         <div className="as-mark-lockup">
@@ -170,7 +174,7 @@ export function CustomerShell({
             <span className="as-mark-text">{displayBrand}</span>
           ) : null}
         </div>
-        <ThemeToggle />
+        {!embed ? <ThemeToggle /> : null}
       </div>
 
       {!isDashboard ? (

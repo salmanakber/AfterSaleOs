@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 /**
  * Legacy register URL → unified client portal (Activate warranty).
- * Keeps QR / product deep-links working by forwarding query params.
+ * Preserves embed/theme params so theme blocks stay in-iframe.
  */
 function RegisterRedirect() {
   const router = useRouter();
@@ -14,6 +14,7 @@ function RegisterRedirect() {
   useEffect(() => {
     const next = new URLSearchParams(params.toString());
     next.set("view", "activate");
+    // Prefer soft navigation; keep all query params (embed=1, theme=local, etc.).
     router.replace(`/apps/aftersale/portal?${next.toString()}`);
   }, [params, router]);
 

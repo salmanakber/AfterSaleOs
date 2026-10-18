@@ -54,22 +54,74 @@ async function loadBrand(shopId: string): Promise<Brand> {
 
 function wrapEmail(brand: Brand, innerHtml: string) {
   const logo = brand.logoUrl
-    ? `<img src="${escAttr(brand.logoUrl)}" alt="${escAttr(brand.shopName)}" width="140" style="display:block;max-width:140px;height:auto;margin:0 0 16px;" />`
-    : `<div style="font-size:20px;font-weight:700;color:#0f172a;margin:0 0 16px;">${esc(brand.shopName)}</div>`;
+    ? `<img src="${escAttr(brand.logoUrl)}" alt="${escAttr(brand.shopName)}" width="132" style="display:block;max-width:132px;height:auto;border-radius:10px;" />`
+    : `<div style="font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;letter-spacing:-0.02em;color:#0c1210;line-height:1.2;">${esc(brand.shopName)}</div>`;
 
-  return `<!DOCTYPE html><html><body style="margin:0;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:28px 12px;background:#f4f6f8;"><tr><td align="center">
-  <table role="presentation" width="100%" style="max-width:560px;background:#fff;border-radius:14px;border:1px solid #e5e7eb;overflow:hidden;">
-  <tr><td style="height:4px;background:${escAttr(brand.accent)};font-size:0;">&nbsp;</td></tr>
-  <tr><td style="padding:28px 28px 8px;">${logo}</td></tr>
-  <tr><td style="padding:0 28px 28px;font-size:15px;line-height:1.55;color:#334155;">${innerHtml}</td></tr>
-  <tr><td style="padding:16px 28px 24px;border-top:1px solid #f1f5f9;font-size:12px;color:#94a3b8;">Sent by ${esc(brand.shopName)} via AfterSale</td></tr>
-  </table></td></tr></table></body></html>`;
+  // Matches client portal look: soft paper canvas, brand accent bar, rounded card, serif headlines.
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>${esc(brand.shopName)}</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f5f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#0c1210;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 14px;background:#f3f5f4;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:18px;border:1px solid #e4e9e6;overflow:hidden;box-shadow:0 18px 40px rgba(12,18,16,0.06);">
+          <tr>
+            <td style="height:5px;background:${escAttr(brand.accent)};font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:28px 28px 12px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align:middle;">${logo}</td>
+                  <td align="right" style="vertical-align:middle;">
+                    <span style="display:inline-block;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${escAttr(brand.accent)};background:#f7f9f8;padding:6px 10px;border-radius:999px;border:1px solid #e4e9e6;">Warranty &amp; care</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:4px 28px 28px;font-size:15px;line-height:1.6;color:#3d4a44;">
+              ${innerHtml}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 28px 22px;border-top:1px solid #eef2f0;font-size:12px;line-height:1.5;color:#8a9690;">
+              Sent by <strong style="color:#0c1210;">${esc(brand.shopName)}</strong>
+              <span style="color:#c5cec9;"> · </span>
+              Powered by AfterSale
+            </td>
+          </tr>
+        </table>
+        <p style="margin:16px 0 0;font-size:11px;color:#9aa5a0;max-width:560px;">
+          You’re receiving this because of a warranty or claim related to your purchase.
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 }
 
 function cta(brand: Brand, href: string, label: string) {
-  return `<p style="margin:22px 0 8px;"><a href="${escAttr(href)}" style="display:inline-block;background:${escAttr(brand.accent)};color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 18px;border-radius:10px;">${esc(label)}</a></p>
-  <p style="margin:0;font-size:12px;color:#94a3b8;word-break:break-all;">Or open: <a href="${escAttr(href)}" style="color:${escAttr(brand.accent)};">${esc(href)}</a></p>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 10px;"><tr><td style="border-radius:12px;background:${escAttr(brand.accent)};">
+  <a href="${escAttr(href)}" style="display:inline-block;padding:13px 20px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;letter-spacing:-0.01em;">${esc(label)}</a>
+</td></tr></table>
+<p style="margin:0;font-size:12px;line-height:1.5;color:#8a9690;word-break:break-all;">Or open: <a href="${escAttr(href)}" style="color:${escAttr(brand.accent)};font-weight:600;text-decoration:underline;">${esc(href)}</a></p>`;
+}
+
+function heading(text: string) {
+  return `<h1 style="margin:0 0 12px;font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.25;letter-spacing:-0.02em;font-weight:700;color:#0c1210;">${esc(text)}</h1>`;
+}
+
+function noteBox(brand: Brand, text: string) {
+  return `<p style="margin:14px 0;padding:14px 16px;background:#f7f9f8;border-radius:12px;border:1px solid #e4e9e6;border-left:3px solid ${escAttr(brand.accent)};color:#3d4a44;">${esc(text)}</p>`;
 }
 
 function builtinTemplate(template: string, data: Record<string, unknown>, brand: Brand) {
@@ -79,9 +131,9 @@ function builtinTemplate(template: string, data: Record<string, unknown>, brand:
       subject: `${brand.shopName}: your warranty portal link`,
       html: wrapEmail(
         brand,
-        `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">Your warranty portal link</h1>
-        <p>Use this one-time link to view your warranties. It expires in 15 minutes.</p>
-        ${data.orderNumber ? `<p>Order <strong>${esc(data.orderNumber)}</strong></p>` : ""}
+        `${heading("Your warranty portal link")}
+        <p style="margin:0 0 10px;">Use this one-time link to open your client portal. It expires in 15 minutes.</p>
+        ${data.orderNumber ? `<p style="margin:0 0 10px;">Order <strong>${esc(data.orderNumber)}</strong></p>` : ""}
         ${cta(brand, String(data.link ?? "#"), "Open warranty portal")}`,
       ),
     };
@@ -91,9 +143,9 @@ function builtinTemplate(template: string, data: Record<string, unknown>, brand:
       subject: `${brand.shopName}: we received claim ${esc(data.claimNumber)}`,
       html: wrapEmail(
         brand,
-        `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">We received your claim</h1>
-        <p>Thanks for contacting ${shopName}. Claim <strong>${esc(data.claimNumber)}</strong> is in our queue${data.productTitle ? ` for <strong>${esc(data.productTitle)}</strong>` : ""}.</p>
-        ${data.summary ? `<p style="margin:12px 0;padding:12px 14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">${esc(data.summary)}</p>` : ""}
+        `${heading("We received your claim")}
+        <p style="margin:0 0 10px;">Thanks for contacting ${shopName}. Claim <strong>${esc(data.claimNumber)}</strong> is in our queue${data.productTitle ? ` for <strong>${esc(data.productTitle)}</strong>` : ""}.</p>
+        ${data.summary ? noteBox(brand, String(data.summary)) : ""}
         ${cta(brand, String(data.trackingUrl ?? "#"), "Track your claim")}`,
       ),
     };
@@ -103,9 +155,9 @@ function builtinTemplate(template: string, data: Record<string, unknown>, brand:
       subject: `${brand.shopName}: update on claim ${esc(data.claimNumber)}`,
       html: wrapEmail(
         brand,
-        `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">Message from ${shopName}</h1>
-        <p>There’s a new update on claim <strong>${esc(data.claimNumber)}</strong>.</p>
-        ${data.note ? `<p style="margin:14px 0;padding:14px 16px;background:#f8fafc;border-radius:10px;border-left:3px solid ${escAttr(brand.accent)};">${esc(data.note)}</p>` : ""}
+        `${heading(`Message from ${brand.shopName}`)}
+        <p style="margin:0 0 10px;">There’s a new update on claim <strong>${esc(data.claimNumber)}</strong>.</p>
+        ${data.note ? noteBox(brand, String(data.note)) : ""}
         ${cta(brand, String(data.trackingUrl ?? "#"), "View claim status")}`,
       ),
     };
@@ -124,9 +176,9 @@ function builtinTemplate(template: string, data: Record<string, unknown>, brand:
       subject: `${brand.shopName}: ${title.toLowerCase()} · ${esc(data.claimNumber)}`,
       html: wrapEmail(
         brand,
-        `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">${esc(title)}</h1>
-        <p>Claim <strong>${esc(data.claimNumber)}</strong> is now <strong>${esc(data.statusLabel ?? data.status)}</strong>.</p>
-        ${data.note ? `<p style="margin:12px 0;padding:12px 14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">${esc(data.note)}</p>` : ""}
+        `${heading(title)}
+        <p style="margin:0 0 10px;">Claim <strong>${esc(data.claimNumber)}</strong> is now <strong>${esc(data.statusLabel ?? data.status)}</strong>.</p>
+        ${data.note ? noteBox(brand, String(data.note)) : ""}
         ${cta(brand, String(data.trackingUrl ?? "#"), "Track your claim")}`,
       ),
     };
@@ -137,11 +189,11 @@ function builtinTemplate(template: string, data: Record<string, unknown>, brand:
       subject: `${brand.shopName}: claim ${esc(data.claimNumber)} is ${label}`,
       html: wrapEmail(
         brand,
-        `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">Claim update</h1>
-        <p>Claim <strong>${esc(data.claimNumber)}</strong> is now <strong>${label}</strong>.</p>
-        ${data.productTitle ? `<p style="color:#64748b;margin:0 0 8px;">Product: ${esc(data.productTitle)}</p>` : ""}
-        ${data.note ? `<p style="margin:12px 0;padding:12px 14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">${esc(data.note)}</p>` : ""}
-        ${!data.note && data.summary ? `<p>${esc(data.summary)}</p>` : ""}
+        `${heading("Claim update")}
+        <p style="margin:0 0 10px;">Claim <strong>${esc(data.claimNumber)}</strong> is now <strong>${label}</strong>.</p>
+        ${data.productTitle ? `<p style="margin:0 0 10px;color:#6b7a73;">Product: ${esc(data.productTitle)}</p>` : ""}
+        ${data.note ? noteBox(brand, String(data.note)) : ""}
+        ${!data.note && data.summary ? `<p style="margin:0 0 10px;">${esc(data.summary)}</p>` : ""}
         ${cta(brand, String(data.trackingUrl ?? "#"), "View claim status")}`,
       ),
     };
@@ -151,8 +203,8 @@ function builtinTemplate(template: string, data: Record<string, unknown>, brand:
       subject: `${brand.shopName}: repair ${esc(data.repairNumber)} → ${esc(data.status)}`,
       html: wrapEmail(
         brand,
-        `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">Repair update</h1>
-        <p>Repair <strong>${esc(data.repairNumber)}</strong> is now <strong>${esc(data.status)}</strong>.</p>
+        `${heading("Repair update")}
+        <p style="margin:0 0 10px;">Repair <strong>${esc(data.repairNumber)}</strong> is now <strong>${esc(data.status)}</strong>.</p>
         ${cta(brand, String(data.trackingUrl ?? "#"), "View details")}`,
       ),
     };
@@ -162,11 +214,11 @@ function builtinTemplate(template: string, data: Record<string, unknown>, brand:
       subject: `${brand.shopName}: your warranty expires soon`,
       html: wrapEmail(
         brand,
-        `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">Coverage ending soon</h1>
-        <p>Your warranty for <strong>${esc(data.productTitle)}</strong> (order <strong>${esc(data.orderNumber)}</strong>) ends on <strong>${esc(data.endAt)}</strong>.</p>
-        <p>Open your portal to view the certificate or start a claim while you’re still covered.</p>
+        `${heading("Coverage ending soon")}
+        <p style="margin:0 0 10px;">Your warranty for <strong>${esc(data.productTitle)}</strong> (order <strong>${esc(data.orderNumber)}</strong>) ends on <strong>${esc(data.endAt)}</strong>.</p>
+        <p style="margin:0 0 10px;">Open your portal to view the certificate or start a claim while you’re still covered.</p>
         ${cta(brand, String(data.link ?? "#"), "Open warranty portal")}
-        ${data.claimLink ? `<p style="margin-top:12px;"><a href="${escAttr(data.claimLink)}" style="color:${escAttr(brand.accent)};font-weight:600;">Start a claim</a></p>` : ""}`,
+        ${data.claimLink ? `<p style="margin:14px 0 0;"><a href="${escAttr(data.claimLink)}" style="color:${escAttr(brand.accent)};font-weight:700;text-decoration:underline;">Start a claim</a></p>` : ""}`,
       ),
     };
   }
@@ -175,8 +227,8 @@ function builtinTemplate(template: string, data: Record<string, unknown>, brand:
       subject: `${brand.shopName}: warranty registered`,
       html: wrapEmail(
         brand,
-        `<h1 style="margin:0 0 12px;font-size:22px;color:#0f172a;">You’re covered</h1>
-        <p>Thanks for registering <strong>${esc(data.productTitle)}</strong> with ${shopName}.</p>
+        `${heading("You’re covered")}
+        <p style="margin:0 0 10px;">Thanks for registering <strong>${esc(data.productTitle)}</strong> with ${shopName}.</p>
         ${cta(brand, String(data.link ?? "#"), "View your warranty")}`,
       ),
     };
@@ -187,14 +239,14 @@ function builtinTemplate(template: string, data: Record<string, unknown>, brand:
       subject: String(data.subject ?? `${brand.shopName}: an update from us`),
       html: wrapEmail(
         brand,
-        `${customBody || "<p>We have an update about your warranty coverage.</p>"}
+        `${customBody || "<p style=\"margin:0 0 10px;\">We have an update about your warranty coverage.</p>"}
         ${cta(brand, String(data.link ?? "#"), "Open warranty portal")}`,
       ),
     };
   }
   return {
     subject: `${brand.shopName}: ${template}`,
-    html: wrapEmail(brand, `<pre>${esc(JSON.stringify(data, null, 2))}</pre>`),
+    html: wrapEmail(brand, `<pre style="white-space:pre-wrap;font-size:12px;">${esc(JSON.stringify(data, null, 2))}</pre>`),
   };
 }
 

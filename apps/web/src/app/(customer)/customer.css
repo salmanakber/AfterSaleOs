@@ -1091,13 +1091,33 @@
 }
 
 /* —— Full-width embeds: form fields in 2 columns, no intro sidebar —— */
-.as-customer-root:has(.as-shell-embed) {
+.as-customer-root:has(.as-shell-embed),
+.as-customer-root:has(.as-shell-in-theme) {
   min-height: 0;
   background: transparent;
+  padding-bottom: 8px;
 }
 
-.as-customer-root:has(.as-shell-embed) .as-atmosphere {
+.as-customer-root:has(.as-shell-embed) .as-atmosphere,
+.as-customer-root:has(.as-shell-in-theme) .as-atmosphere {
   display: none;
+}
+
+/* Theme-block portal: same dashboard as self-hosted, constrained to the iframe */
+.as-shell-in-theme.as-shell-dash {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 8px 10px 16px;
+  min-height: auto;
+}
+
+.as-shell-in-theme .as-topbar {
+  margin-bottom: 8px;
+  padding-inline: 4px;
+}
+
+.as-shell-in-theme .as-dash-nav {
+  position: static;
 }
 
 .as-shell-embed {
