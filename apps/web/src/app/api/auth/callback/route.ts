@@ -89,15 +89,21 @@ export async function GET(request: NextRequest) {
   const host =
     url.searchParams.get("host") ?? request.cookies.get("shopify_oauth_host")?.value ?? null;
   const needsPlan = !fresh.planId && !fresh.billingBypass;
-  // Embedded apps must return into Shopify Admin — not standalone APP_URL —
-  // or the merchant lands outside the embed and App Bridge / idToken never boot.
   const path = needsPlan ? "/plans?welcome=1" : "/";
-  const redirectTo = embeddedAdminAppUrl({
-    path,
-    shop: shopDomain,
-    host,
-    apiKey,
-  });
+
+  // Prefer returning to APP_URL with shop/host. Client then embeds via App Bridge
+  // without bouncing Admin between /apps/aftersale-os and /apps/{apiKey}.
+  const appUrl = (process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
+  let redirectTo: string;
+  if (appUrl) {
+    const dest = new URL(path, `${appUrl}/`);
+    dest.searchParams.set("shop", shopDomain);
+    if (host) dest.searchParams.set("host", host);
+    dest.searchParams.set("embedded", "1");
+    redirectTo = dest.toString();
+  } else {
+    redirectTo = embeddedAdminAppUrl({ path, shop: shopDomain, host, apiKey });
+  }
 
   const response = NextResponse.redirect(redirectTo);
   response.cookies.delete("shopify_oauth_state");

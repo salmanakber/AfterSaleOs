@@ -5,6 +5,18 @@ export function shopHandleFromDomain(shop: string): string {
 }
 
 /**
+ * Prefer the App Store handle (e.g. aftersale-os) over the raw API key in Admin URLs.
+ * Mixing handle ↔ client_id URLs causes install redirect loops in Admin.
+ */
+export function shopifyAppAdminSlug(apiKey?: string): string {
+  const handle = (process.env.SHOPIFY_APP_HANDLE || process.env.NEXT_PUBLIC_SHOPIFY_APP_HANDLE || "")
+    .trim()
+    .replace(/^\/+|\/+$/g, "");
+  if (handle) return handle;
+  return (apiKey || process.env.SHOPIFY_API_KEY || process.env.NEXT_PUBLIC_SHOPIFY_API_KEY || "").trim();
+}
+
+/**
  * Decode Shopify's `host` query param (base64) → e.g. `admin.shopify.com/store/acme`.
  * Returns null if missing/invalid.
  */
@@ -44,6 +56,7 @@ export function embeddedAdminAppUrl(opts: {
   apiKey?: string;
 }): string {
   const apiKey = opts.apiKey || process.env.SHOPIFY_API_KEY || process.env.NEXT_PUBLIC_SHOPIFY_API_KEY || "";
+  const appSlug = shopifyAppAdminSlug(apiKey);
   const rawPath = opts.path || "/";
   const splitAt = rawPath.indexOf("?");
   const pathnamePart = splitAt >= 0 ? rawPath.slice(0, splitAt) : rawPath;
@@ -58,13 +71,13 @@ export function embeddedAdminAppUrl(opts: {
   const suffix = q ? `${pathname}?${q}` : pathname === "/" ? "" : pathname;
 
   const decodedHost = decodeShopifyHost(opts.host);
-  if (decodedHost && apiKey) {
-    return `https://${decodedHost}/apps/${apiKey}${suffix || ""}`;
+  if (decodedHost && appSlug) {
+    return `https://${decodedHost}/apps/${appSlug}${suffix || ""}`;
   }
 
-  const handle = shopHandleFromDomain(opts.shop);
-  if (apiKey && handle) {
-    return `https://admin.shopify.com/store/${handle}/apps/${apiKey}${suffix || ""}`;
+  const storeHandle = shopHandleFromDomain(opts.shop);
+  if (appSlug && storeHandle) {
+    return `https://admin.shopify.com/store/${storeHandle}/apps/${appSlug}${suffix || ""}`;
   }
 
   // Last resort: standalone app URL (should be rare).

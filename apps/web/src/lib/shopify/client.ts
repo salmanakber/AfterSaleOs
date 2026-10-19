@@ -116,26 +116,39 @@ export async function exchangeSessionToken(
       ? "urn:shopify:params:oauth:token-type:offline-access-token"
       : "urn:shopify:params:oauth:token-type:online-access-token";
 
-  const body = new URLSearchParams({
-    client_id: apiKey,
-    client_secret: apiSecret,
-    grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-    subject_token: sessionToken,
-    subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
-    requested_token_type: requestedTokenType,
-    expiring: "1",
-  });
+  async function requestExchange(expiring: boolean) {
+    const body = new URLSearchParams({
+      client_id: apiKey,
+      client_secret: apiSecret,
+      grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+      subject_token: sessionToken,
+      subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
+      requested_token_type: requestedTokenType,
+    });
+    // Prefer non-expiring first — many Partner apps still use classic offline tokens.
+    if (expiring) body.set("expiring", "1");
 
-  const res = await fetch(`https://${shopDomain}/admin/oauth/access_token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
+    return fetch(`https://${shopDomain}/admin/oauth/access_token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+  }
 
+  let res = await requestExchange(false);
   if (!res.ok) {
-    const text = await res.text();
-    if (res.status === 400) throw new SessionTokenStaleError(`Token exchange failed: ${text}`);
-    throw new Error(`Token exchange failed (${res.status}): ${text}`);
+    const firstText = await res.text();
+    // Retry with expiring offline tokens (required for some newer public apps).
+    const retry = await requestExchange(true);
+    if (retry.ok) {
+      res = retry;
+    } else {
+      const text = `${firstText} | expiring: ${await retry.text()}`;
+      if (res.status === 400 || retry.status === 400) {
+        throw new SessionTokenStaleError(`Token exchange failed: ${text}`);
+      }
+      throw new Error(`Token exchange failed (${res.status}): ${text}`);
+    }
   }
 
   const json = (await res.json()) as {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma, shopRepository } from "@aftersale/db";
+import { shopRepository } from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
 import { getOfflineSession, shopify } from "@/lib/shopify/client";
 
@@ -11,6 +11,8 @@ export async function GET(request: NextRequest) {
   const shopRow = await shopRepository.findByDomain(shopDomain);
   const session = await getOfflineSession(shopDomain);
 
+  // Only force re-auth when we have no offline token. A temporary Admin API blip
+  // must NOT trigger top-level OAuth (that causes same_site_cookies + URL loops).
   if (!shopRow || !session) {
     return NextResponse.json({
       connected: false,
@@ -34,6 +36,7 @@ export async function GET(request: NextRequest) {
     shopId: shopRow.id,
     plan: shopRow.planId,
     status: shopRow.status,
-    needsAuth: !reachable,
+    needsAuth: false,
+    needsTokenRefresh: !reachable,
   });
 }

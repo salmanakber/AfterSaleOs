@@ -43,10 +43,14 @@ function mapBillingPlan(raw: Record<string, unknown> | null | undefined): PlanEn
   };
 }
 
+const APP_ADMIN_SLUG =
+  process.env.NEXT_PUBLIC_SHOPIFY_APP_HANDLE?.trim() ||
+  "aftersale-os";
+
 /** If we landed on standalone APP_URL (outside Admin iframe), bounce into embed. */
 function redirectStandaloneIntoAdmin(shop: string | null, host: string | null): boolean {
   if (typeof window === "undefined") return false;
-  if (!SHOPIFY_API_KEY || !shop) return false;
+  if (!shop) return false;
   try {
     if (window.top !== window.self) return false; // already embedded
   } catch {
@@ -56,21 +60,27 @@ function redirectStandaloneIntoAdmin(shop: string | null, host: string | null): 
   if (window.location.hostname.includes("admin.shopify.com")) return false;
 
   const params = new URLSearchParams(window.location.search);
+  // After OAuth callback we may intentionally be on APP_URL with embedded=1 —
+  // bounce once into Admin using the stable app handle (not the API key).
   const keep = new URLSearchParams();
   for (const [k, v] of params.entries()) {
-    if (!["shop", "host", "hmac", "timestamp", "session", "embedded", "locale", "id_token"].includes(k)) {
+    if (
+      !["shop", "host", "hmac", "timestamp", "session", "embedded", "locale", "id_token"].includes(k)
+    ) {
       keep.set(k, v);
     }
   }
   const q = keep.toString();
   const path = `${window.location.pathname}${q ? `?${q}` : ""}`;
+  const appSlug = APP_ADMIN_SLUG || SHOPIFY_API_KEY;
+  if (!appSlug) return false;
 
   let adminBase: string | null = null;
   if (host) {
     try {
       const decoded = atob(host.replace(/-/g, "+").replace(/_/g, "/"));
       if (/admin\.shopify\.com|myshopify\.com/i.test(decoded)) {
-        adminBase = `https://${decoded.replace(/^https?:\/\//, "")}/apps/${SHOPIFY_API_KEY}`;
+        adminBase = `https://${decoded.replace(/^https?:\/\//, "")}/apps/${appSlug}`;
       }
     } catch {
       /* ignore */
@@ -78,12 +88,22 @@ function redirectStandaloneIntoAdmin(shop: string | null, host: string | null): 
   }
   if (!adminBase) {
     const handle = shop.replace(/\.myshopify\.com$/i, "");
-    adminBase = `https://admin.shopify.com/store/${handle}/apps/${SHOPIFY_API_KEY}`;
+    adminBase = `https://admin.shopify.com/store/${handle}/apps/${appSlug}`;
   }
 
   const target = `${adminBase}${path === "/" ? "" : path}`;
   window.location.replace(target);
   return true;
+}
+
+function isLikelyEmbedded(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (window.top !== window.self) return true;
+  } catch {
+    return true;
+  }
+  return window.location.search.includes("host=") || window.location.search.includes("id_token=");
 }
 
 declare global {
@@ -215,39 +235,55 @@ export function AppProviders({ children }: { children: ReactNode }) {
       try {
         const sessionRes = await fetch(`/api/auth/session?shop=${encodeURIComponent(shopParam)}`);
         const sessionJson = await sessionRes.json();
-        if (sessionJson.needsAuth) {
-          // Prefer token exchange inside Admin (no OAuth cookies → no same_site_cookies).
+
+        async function exchangeOfflineToken(): Promise<boolean> {
+          clearSessionTokenCache();
           const idToken = await getSessionToken();
-          if (idToken) {
-            const exchangeRes = await fetch("/api/auth/token-exchange", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${idToken}`,
-              },
-              body: JSON.stringify({ shop: shopParam }),
-            });
-            if (exchangeRes.ok) {
-              const exchanged = (await exchangeRes.json()) as {
-                needsPlanSelection?: boolean;
-              };
-              if (exchanged.needsPlanSelection) {
-                setNeedsPlanSelection(true);
-                router.replace(appHref("/plans?welcome=1"));
-              }
-              setReady(true);
-              return;
-            }
+          if (!idToken) return false;
+          const exchangeRes = await fetch("/api/auth/token-exchange", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ shop: shopParam }),
+          });
+          if (!exchangeRes.ok) {
             console.warn(
               "[bootstrap] token exchange failed",
               exchangeRes.status,
               await exchangeRes.text().catch(() => ""),
             );
+            return false;
           }
-          // Fallback: top-level OAuth (uses SameSite=None cookies).
+          const exchanged = (await exchangeRes.json()) as { needsPlanSelection?: boolean };
+          if (exchanged.needsPlanSelection) {
+            setNeedsPlanSelection(true);
+            if (!window.location.pathname.startsWith("/plans")) {
+              router.replace(appHref("/plans?welcome=1"));
+            }
+          }
+          return true;
+        }
+
+        if (sessionJson.needsAuth || sessionJson.needsTokenRefresh) {
+          const ok = await exchangeOfflineToken();
+          if (ok) {
+            setReady(true);
+            return;
+          }
+          // Never auto top-level OAuth while embedded — that loops handle ↔ apiKey
+          // and surfaces Shopify's same_site_cookies error.
+          if (isLikelyEmbedded()) {
+            setError(
+              "Could not connect to Shopify from this Admin session. Click Reconnect below, or reinstall the app.",
+            );
+            setReady(true);
+            return;
+          }
           const authQs = new URLSearchParams({ shop: shopParam });
           if (hostParam) authQs.set("host", hostParam);
-          window.open(`/api/auth?${authQs.toString()}`, "_top");
+          window.location.assign(`/api/auth?${authQs.toString()}`);
           return;
         }
 
@@ -377,8 +413,23 @@ export function AppProviders({ children }: { children: ReactNode }) {
                 ) : null}
                 {error ? (
                   <div style={{ padding: "12px 16px" }}>
-                    <Banner tone="critical" title="Connection error">
+                    <Banner tone="critical" title="Connection error" onDismiss={() => setError(null)}>
                       <p>{error}</p>
+                      {shop ? (
+                        <p style={{ marginTop: 8 }}>
+                          <a
+                            href={`/api/auth?shop=${encodeURIComponent(shop)}${
+                              getRememberedHost()
+                                ? `&host=${encodeURIComponent(getRememberedHost()!)}`
+                                : ""
+                            }`}
+                            target="_top"
+                            rel="noreferrer"
+                          >
+                            Reconnect AfterSale OS
+                          </a>
+                        </p>
+                      ) : null}
                     </Banner>
                   </div>
                 ) : null}
