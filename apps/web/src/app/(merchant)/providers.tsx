@@ -216,6 +216,35 @@ export function AppProviders({ children }: { children: ReactNode }) {
         const sessionRes = await fetch(`/api/auth/session?shop=${encodeURIComponent(shopParam)}`);
         const sessionJson = await sessionRes.json();
         if (sessionJson.needsAuth) {
+          // Prefer token exchange inside Admin (no OAuth cookies → no same_site_cookies).
+          const idToken = await getSessionToken();
+          if (idToken) {
+            const exchangeRes = await fetch("/api/auth/token-exchange", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${idToken}`,
+              },
+              body: JSON.stringify({ shop: shopParam }),
+            });
+            if (exchangeRes.ok) {
+              const exchanged = (await exchangeRes.json()) as {
+                needsPlanSelection?: boolean;
+              };
+              if (exchanged.needsPlanSelection) {
+                setNeedsPlanSelection(true);
+                router.replace(appHref("/plans?welcome=1"));
+              }
+              setReady(true);
+              return;
+            }
+            console.warn(
+              "[bootstrap] token exchange failed",
+              exchangeRes.status,
+              await exchangeRes.text().catch(() => ""),
+            );
+          }
+          // Fallback: top-level OAuth (uses SameSite=None cookies).
           const authQs = new URLSearchParams({ shop: shopParam });
           if (hostParam) authQs.set("host", hostParam);
           window.open(`/api/auth?${authQs.toString()}`, "_top");
