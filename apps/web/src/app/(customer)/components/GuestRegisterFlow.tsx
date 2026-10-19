@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { publicApiUrl } from "@/lib/public-api";
 import type { CachedOrder, CachedWarranty } from "@/lib/customer-order-session";
 import { ProductSearchSelect, type PickedProduct } from "./ProductSearchSelect";
@@ -21,10 +21,20 @@ export type GuestRegisterSession = {
   warranties: CachedWarranty[];
 };
 
+export type QrScanContext = {
+  code: string;
+  label?: string | null;
+  productId?: string | null;
+  productTitle?: string | null;
+  productImageUrl?: string | null;
+  shopifyProductId?: string | null;
+};
+
 export function GuestRegisterFlow({
   shop,
   shopName,
   shopifyLoginUrl,
+  qrContext,
   onRegistered,
   onNeedSignIn,
   onGoogleSession,
@@ -32,6 +42,7 @@ export function GuestRegisterFlow({
   shop: string;
   shopName?: string;
   shopifyLoginUrl?: string;
+  qrContext?: QrScanContext | null;
   onRegistered: (session: GuestRegisterSession, fee?: FeePaymentInfo | null) => void;
   onNeedSignIn: () => void;
   onGoogleSession?: (session: GuestRegisterSession) => void;
@@ -39,6 +50,7 @@ export function GuestRegisterFlow({
   const [step, setStep] = useState<1 | 2>(1);
   const [source, setSource] = useState<SourceMode>(null);
   const [picked, setPicked] = useState<PickedProduct | null>(null);
+  const [qrReady, setQrReady] = useState(false);
   const [orders, setOrders] = useState<CachedOrder[]>([]);
   const [lookupEmail, setLookupEmail] = useState("");
   const [lookupOrder, setLookupOrder] = useState("");
@@ -54,6 +66,57 @@ export function GuestRegisterFlow({
   const [phoneNational, setPhoneNational] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Prefill from QR scan — no login required; jump into catalog with product selected.
+  useEffect(() => {
+    if (!shop || !qrContext?.code || qrReady) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (qrContext.productTitle && (qrContext.shopifyProductId || qrContext.productId)) {
+          if (cancelled) return;
+          setPicked({
+            source: "catalog",
+            title: qrContext.productTitle,
+            shopifyProductId: qrContext.shopifyProductId || qrContext.productId || undefined,
+            imageUrl: qrContext.productImageUrl,
+          });
+          setSource("catalog");
+          setQrReady(true);
+          return;
+        }
+        if (qrContext.productId) {
+          const res = await fetch(
+            publicApiUrl(
+              `/api/public/products?shop=${encodeURIComponent(shop)}&product_id=${encodeURIComponent(qrContext.productId)}&limit=1`,
+            ),
+          );
+          const json = await res.json();
+          const p = json.products?.[0];
+          if (p && !cancelled) {
+            setPicked({
+              source: "catalog",
+              title: p.title,
+              shopifyProductId: p.shopifyProductId,
+              imageUrl: p.imageUrl,
+            });
+            setSource("catalog");
+          } else if (!cancelled) {
+            setSource("catalog");
+          }
+        } else if (!cancelled) {
+          setSource("catalog");
+        }
+      } catch {
+        if (!cancelled) setSource("catalog");
+      } finally {
+        if (!cancelled) setQrReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [shop, qrContext, qrReady]);
 
   async function lookupOrders(e: FormEvent) {
     e.preventDefault();
@@ -141,7 +204,8 @@ export function GuestRegisterFlow({
           shopifyVariantId: picked.shopifyVariantId,
           outsideShopify: picked.source === "catalog" && !picked.orderNumber,
           createPortalAccount: true,
-          source: "portal_guest",
+          source: qrContext?.code ? "qr" : "portal_guest",
+          qrCode: qrContext?.code || undefined,
         }),
       });
       const json = await res.json();
@@ -173,24 +237,78 @@ export function GuestRegisterFlow({
 
   const showSocial = Boolean(shopifyLoginUrl) || isGoogleSignInConfigured();
 
-  return (
-    <div className="as-guest-reg">
-      <header className="as-guest-reg__head">
-        <p className="as-guest-reg__kicker">Client portal</p>
-        <h3>Activate your warranty{shopName ? ` with ${shopName}` : ""}</h3>
-        <p className="as-muted">
-          Register a product, or sign in with Google / Shopify — no store account required for email
-          signup.
-        </p>
-        <ol className="as-guest-reg__steps" aria-label="Progress">
-          <li data-active={step === 1} data-done={step > 1}>
-            1 · Product
-          </li>
-          <li data-active={step === 2}>2 · Your details</li>
-        </ol>
-      </header>
+  const fromQr = Boolean(qrContext?.code);
 
-      {step === 1 && !source && showSocial ? (
+  return (
+    <div className={`as-guest-reg${fromQr ? " as-guest-reg--qr" : ""}`}>
+      {fromQr ? (
+        <div className="as-qr-landing">
+          <div className="as-qr-landing__glow" aria-hidden />
+          <p className="as-qr-landing__kicker">Scanned QR</p>
+          <h2>{qrContext?.label || qrContext?.productTitle || "Activate your warranty"}</h2>
+          <p>
+            {shopName
+              ? `You’re registering coverage with ${shopName}. No account needed to start — create one as you finish.`
+              : "No account needed to start — create one as you finish registration."}
+          </p>
+          {picked || qrContext?.productTitle ? (
+            <div className="as-qr-landing__product">
+              {picked?.imageUrl || qrContext?.productImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={picked?.imageUrl || qrContext?.productImageUrl || ""}
+                  alt=""
+                  width={56}
+                  height={56}
+                />
+              ) : (
+                <span className="as-qr-landing__mark" aria-hidden>
+                  QR
+                </span>
+              )}
+              <div>
+                <strong>{picked?.title || qrContext?.productTitle || "Product"}</strong>
+                <em>Ready to activate</em>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <header className="as-guest-reg__head">
+          <p className="as-guest-reg__kicker">Client portal</p>
+          <h3>Activate your warranty{shopName ? ` with ${shopName}` : ""}</h3>
+          <p className="as-muted">
+            Register a product, or sign in with Google / Shopify — no store account required for email
+            signup.
+          </p>
+          <ol className="as-guest-reg__steps" aria-label="Progress">
+            <li data-active={step === 1} data-done={step > 1}>
+              1 · Product
+            </li>
+            <li data-active={step === 2}>2 · Your details</li>
+          </ol>
+        </header>
+      )}
+
+      {fromQr && picked && step === 1 ? (
+        <div className="as-guest-reg__body as-guest-reg__qr-cta">
+          <button type="button" className="as-btn" onClick={continueToDetails}>
+            Continue with this product
+          </button>
+          <button
+            type="button"
+            className="as-guest-reg__back"
+            onClick={() => {
+              setPicked(null);
+              setSource("catalog");
+            }}
+          >
+            Choose a different product
+          </button>
+        </div>
+      ) : null}
+
+      {step === 1 && !source && !fromQr && showSocial ? (
         <div className="as-guest-reg__social">
           {shopifyLoginUrl ? (
             <a
@@ -233,7 +351,7 @@ export function GuestRegisterFlow({
         <div className="as-alert as-alert-error">{error}</div>
       ) : null}
 
-      {step === 1 ? (
+      {step === 1 && !(fromQr && picked) ? (
         <div className="as-guest-reg__body">
           {!source ? (
             <div className="as-guest-reg__sources">
@@ -360,7 +478,7 @@ export function GuestRegisterFlow({
             </div>
           ) : null}
         </div>
-      ) : (
+      ) : step === 2 ? (
         <form className="as-guest-reg__body as-dash-form" onSubmit={submit}>
           <button type="button" className="as-guest-reg__back" onClick={() => setStep(1)}>
             ← Back to product
@@ -442,7 +560,7 @@ export function GuestRegisterFlow({
             coverage activates automatically.
           </p>
         </form>
-      )}
+      ) : null}
 
       <p className="as-guest-reg__signin">
         Already have a portal account?{" "}

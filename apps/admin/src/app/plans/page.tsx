@@ -51,24 +51,24 @@ const QUOTA_FIELDS: { key: keyof PlanRow; label: string }[] = [
   { key: "priceMonthlyCents", label: "Price (cents)" },
 ];
 
-const FEATURE_FIELDS: { key: keyof PlanRow; label: string }[] = [
-  { key: "customBranding", label: "Custom branding" },
-  { key: "pdfCertificate", label: "PDF certificates" },
-  { key: "qrCodes", label: "QR codes" },
-  { key: "csvExport", label: "CSV export" },
-  { key: "backfillBeyond12Months", label: "Backfill > 12 months" },
-  { key: "repairsEnabled", label: "Repairs" },
-  { key: "customWorkflows", label: "Custom workflows" },
-  { key: "advancedAnalytics", label: "Advanced analytics" },
-  { key: "bulkOperations", label: "Bulk operations" },
-  { key: "supplierPortal", label: "Supplier portal" },
-  { key: "technicianPortal", label: "Technician portal" },
-  { key: "publicApiEnabled", label: "Public API" },
-  { key: "flowEnabled", label: "Shopify Flow" },
-  { key: "expiryCampaigns", label: "Expiry campaigns" },
-  { key: "partsInventory", label: "Parts inventory" },
-  { key: "multiLocation", label: "Multi-location" },
-  { key: "erpConnectors", label: "ERP connectors" },
+const FEATURE_FIELDS: { key: keyof PlanRow; label: string; blurb: string }[] = [
+  { key: "customBranding", label: "Custom branding", blurb: "Logo, colors, fonts on customer pages" },
+  { key: "pdfCertificate", label: "PDF certificates", blurb: "Downloadable warranty PDFs" },
+  { key: "qrCodes", label: "QR codes", blurb: "Printable QR studio & scan landings" },
+  { key: "csvExport", label: "CSV export", blurb: "Export warranties and claims" },
+  { key: "backfillBeyond12Months", label: "Deep history backfill", blurb: "Import beyond 12 months" },
+  { key: "repairsEnabled", label: "Repairs", blurb: "Repair jobs and shipping" },
+  { key: "customWorkflows", label: "Custom workflows", blurb: "Rename statuses & pipelines" },
+  { key: "advancedAnalytics", label: "Advanced analytics", blurb: "Deeper claim insights" },
+  { key: "bulkOperations", label: "Bulk operations", blurb: "Act on many records at once" },
+  { key: "supplierPortal", label: "Supplier portal", blurb: "Route claims to suppliers" },
+  { key: "technicianPortal", label: "Technician portal", blurb: "Focused repair queue" },
+  { key: "publicApiEnabled", label: "Public API", blurb: "Programmatic integrations" },
+  { key: "flowEnabled", label: "Shopify Flow", blurb: "Trigger Flow from events" },
+  { key: "expiryCampaigns", label: "Expiry campaigns", blurb: "Remind before coverage ends" },
+  { key: "partsInventory", label: "Parts inventory", blurb: "Spare parts for repairs" },
+  { key: "multiLocation", label: "Multi-location", blurb: "Multiple store locations" },
+  { key: "erpConnectors", label: "ERP connectors", blurb: "Sync resolutions to ERP" },
 ];
 
 export default function AdminPlansPage() {
@@ -112,6 +112,14 @@ export default function AdminPlansPage() {
     });
   }
 
+  function setAllFeatures(id: string, enabled: boolean) {
+    const patch: Partial<PlanRow> = {};
+    for (const f of FEATURE_FIELDS) {
+      (patch as Record<string, boolean>)[f.key as string] = enabled;
+    }
+    updateDraft(id, patch);
+  }
+
   async function save(id: string) {
     const t = token();
     const draft = drafts[id];
@@ -141,8 +149,8 @@ export default function AdminPlansPage() {
 
   return (
     <AdminShell
-      title="Plans & limits"
-      lede="Raise or lower quotas and feature flags. Merchant apps enforce these values immediately."
+      title="Plans & feature scope"
+      lede="Set quotas and include/exclude every feature per plan. Merchant apps and the Plans page reflect these flags immediately after save."
     >
       {message ? <p className="sa-flash sa-flash-ok">{message}</p> : null}
       {error ? <p className="sa-flash sa-flash-bad">{error}</p> : null}
@@ -150,15 +158,31 @@ export default function AdminPlansPage() {
       <div className="sa-stack" style={{ display: "grid", gap: 16 }}>
         {plans.map((plan) => {
           const draft = drafts[plan.id] ?? plan;
+          const included = FEATURE_FIELDS.filter((f) => Boolean(draft[f.key]));
+          const excluded = FEATURE_FIELDS.filter((f) => !draft[f.key]);
           return (
             <Panel
               key={plan.id}
               title={`${draft.name} (${draft.slug})`}
               toolbar={
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <StatusPill tone={draft.isFree ? "info" : "ok"}>
                     {draft.isFree ? "Free" : `$${(draft.priceMonthlyCents / 100).toFixed(0)}/mo`}
                   </StatusPill>
+                  <button
+                    type="button"
+                    className="sa-btn sa-btn-ghost"
+                    onClick={() => setAllFeatures(plan.id, true)}
+                  >
+                    Include all
+                  </button>
+                  <button
+                    type="button"
+                    className="sa-btn sa-btn-ghost"
+                    onClick={() => setAllFeatures(plan.id, false)}
+                  >
+                    Exclude all
+                  </button>
                   <button
                     type="button"
                     className="sa-btn"
@@ -170,6 +194,10 @@ export default function AdminPlansPage() {
                 </div>
               }
             >
+              <p style={{ margin: "0 0 12px", fontSize: 13, opacity: 0.75 }}>
+                Included: {included.length} · Not included: {excluded.length}
+              </p>
+
               <div
                 style={{
                   display: "grid",
@@ -199,27 +227,52 @@ export default function AdminPlansPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-                  gap: 8,
+                  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                  gap: 10,
                 }}
               >
-                {FEATURE_FIELDS.map((f) => (
-                  <label
-                    key={f.key}
-                    style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={Boolean(draft[f.key])}
-                      onChange={(e) =>
-                        updateDraft(plan.id, {
-                          [f.key]: e.target.checked,
-                        } as Partial<PlanRow>)
-                      }
-                    />
-                    {f.label}
-                  </label>
-                ))}
+                {FEATURE_FIELDS.map((f) => {
+                  const on = Boolean(draft[f.key]);
+                  return (
+                    <label
+                      key={f.key}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "auto 1fr",
+                        gap: "6px 10px",
+                        alignItems: "start",
+                        fontSize: 13,
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: `1px solid ${on ? "rgba(16,185,129,0.35)" : "rgba(148,163,184,0.25)"}`,
+                        background: on ? "rgba(16,185,129,0.08)" : "rgba(148,163,184,0.06)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={(e) =>
+                          updateDraft(plan.id, {
+                            [f.key]: e.target.checked,
+                          } as Partial<PlanRow>)
+                        }
+                        style={{ marginTop: 3 }}
+                      />
+                      <span>
+                        <strong style={{ display: "block" }}>
+                          {f.label}{" "}
+                          <span style={{ fontWeight: 500, opacity: 0.7 }}>
+                            {on ? "· included" : "· not included"}
+                          </span>
+                        </strong>
+                        <span style={{ display: "block", marginTop: 2, opacity: 0.7, fontSize: 12 }}>
+                          {f.blurb}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
             </Panel>
           );

@@ -74,7 +74,12 @@ export const shopRepository = {
 
 export const sessionRepository = {
   async getOfflineSession(shop: string) {
-    const id = `offline_${shop}`;
+    const domain = shop
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .replace(/\/$/, "");
+    const id = `offline_${domain}`;
     return prisma.session.findUnique({ where: { id } });
   },
 

@@ -1,15 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Banner,
   BlockStack,
   Button,
-  Card,
-  DataTable,
   FormLayout,
-  Layout,
+  InlineStack,
   Modal,
   Page,
   Select,
@@ -18,6 +16,7 @@ import {
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
 import { friendlyError } from "@/lib/merchant-errors";
+import { PageEmpty, PageLoading } from "./PageLoading";
 
 type Staff = {
   id: string;
@@ -25,13 +24,14 @@ type Staff = {
   name: string | null;
   role: string;
   active: boolean;
+  inviteUrl: string;
 };
 
 type Quota = { seatsUsed: number; seatsLimit: number };
 
 const QUERY = `#graphql
   query Team {
-    staffMembers { id email name role active }
+    staffMembers { id email name role active inviteUrl }
     staffQuota { seatsUsed seatsLimit }
   }
 `;
@@ -39,10 +39,31 @@ const QUERY = `#graphql
 const UPSERT = `#graphql
   mutation UpsertStaff($id: ID, $email: String!, $name: String, $role: String, $active: Boolean) {
     upsertStaffMember(id: $id, email: $email, name: $name, role: $role, active: $active) {
-      id email name role active
+      id email name role active inviteUrl
     }
   }
 `;
+
+const ROTATE = `#graphql
+  mutation RotateInvite($id: ID!) {
+    rotateStaffInvite(id: $id) { id inviteUrl }
+  }
+`;
+
+function roleLabel(role: string) {
+  switch (role) {
+    case "OWNER_ADMIN":
+      return "Owner";
+    case "SUPPORT_AGENT":
+      return "Support";
+    case "ANALYST":
+      return "Analyst";
+    case "TECHNICIAN":
+      return "Technician";
+    default:
+      return role.replaceAll("_", " ");
+  }
+}
 
 export function TeamPage() {
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -50,7 +71,10 @@ export function TeamPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [linkModal, setLinkModal] = useState<Staff | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [editId, setEditId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -58,12 +82,14 @@ export function TeamPage() {
   const [active, setActive] = useState(true);
 
   const load = useCallback(() => {
+    setLoading(true);
     gqlRequest<{ staffMembers: Staff[]; staffQuota: Quota }>(QUERY)
       .then((d) => {
         setStaff(d.staffMembers);
         setQuota(d.staffQuota);
       })
-      .catch((e) => setError(friendlyError(e)));
+      .catch((e) => setError(friendlyError(e)))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -71,6 +97,9 @@ export function TeamPage() {
   }, [load]);
 
   const atLimit = quota.seatsUsed >= quota.seatsLimit;
+  const seatPct = quota.seatsLimit > 0 ? Math.min(100, Math.round((quota.seatsUsed / quota.seatsLimit) * 100)) : 0;
+
+  const owners = useMemo(() => staff.filter((s) => s.role === "OWNER_ADMIN" && s.active).length, [staff]);
 
   function openNew() {
     setEditId(null);
@@ -94,7 +123,7 @@ export function TeamPage() {
     setBusy(true);
     setError(null);
     try {
-      await gqlRequest(UPSERT, {
+      const res = await gqlRequest<{ upsertStaffMember: Staff }>(UPSERT, {
         id: editId,
         email,
         name: name || null,
@@ -104,6 +133,9 @@ export function TeamPage() {
       setOpen(false);
       setSuccess(editId ? "Team member updated." : "Team member added.");
       load();
+      if (!editId && res.upsertStaffMember?.inviteUrl) {
+        setLinkModal(res.upsertStaffMember);
+      }
     } catch (e) {
       setError(friendlyError(e, "Save failed"));
     } finally {
@@ -111,74 +143,189 @@ export function TeamPage() {
     }
   }
 
-  const rows = staff.map((s) => [
-    s.name ?? "—",
-    s.email,
-    s.role.replaceAll("_", " "),
-    <Badge key={s.id} tone={s.active ? "success" : undefined}>
-      {s.active ? "Active" : "Inactive"}
-    </Badge>,
-    <Button key={`e-${s.id}`} variant="plain" onClick={() => openEdit(s)}>
-      Edit
-    </Button>,
-  ]);
+  async function copyLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setSuccess("Invite link copied");
+    } catch {
+      setError("Could not copy link");
+    }
+  }
+
+  async function rotateLink(s: Staff) {
+    setBusy(true);
+    try {
+      const res = await gqlRequest<{ rotateStaffInvite: { id: string; inviteUrl: string } }>(ROTATE, {
+        id: s.id,
+      });
+      const next = { ...s, inviteUrl: res.rotateStaffInvite.inviteUrl };
+      setStaff((prev) => prev.map((m) => (m.id === s.id ? next : m)));
+      setLinkModal(next);
+      setSuccess("New unique invite link generated");
+    } catch (e) {
+      setError(friendlyError(e, "Could not rotate link"));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <Page
       title="Team"
-      subtitle={`${quota.seatsUsed} of ${quota.seatsLimit} active seats used`}
       primaryAction={{
         content: "Add member",
         onAction: openNew,
         disabled: atLimit,
       }}
+      secondaryActions={[{ content: "Help", onAction: () => setHelpOpen(true) }]}
     >
-      <Layout>
+      <div className="as-m-studio">
+        <header className="as-m-studio__hero as-m-studio__hero--team">
+          <div>
+            <p className="as-m-studio__kicker">Access · seats · invites</p>
+            <h2>Your aftercare team</h2>
+          </div>
+          <div className="as-m-studio__stats">
+            <div>
+              <strong>
+                {quota.seatsUsed}/{quota.seatsLimit}
+              </strong>
+              <span>Seats</span>
+            </div>
+            <div>
+              <strong>{owners}</strong>
+              <span>Owners</span>
+            </div>
+            <div>
+              <strong>{staff.filter((s) => s.active).length}</strong>
+              <span>Active</span>
+            </div>
+          </div>
+        </header>
+
+        <div className="as-m-team-meter">
+          <div className="as-m-team-meter__head">
+            <span>Seat usage</span>
+            <span>
+              {quota.seatsUsed} of {quota.seatsLimit}
+            </span>
+          </div>
+          <div className="as-m-team-meter__track">
+            <div className="as-m-team-meter__fill" style={{ width: `${seatPct}%` }} />
+          </div>
+        </div>
+
         {error ? (
-          <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setError(null)}>
-              {error}
-            </Banner>
-          </Layout.Section>
+          <Banner tone="critical" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
         ) : null}
         {success ? (
-          <Layout.Section>
-            <Banner tone="success" onDismiss={() => setSuccess(null)}>
-              {success}
-            </Banner>
-          </Layout.Section>
+          <Banner tone="success" onDismiss={() => setSuccess(null)}>
+            {success}
+          </Banner>
         ) : null}
         {atLimit ? (
-          <Layout.Section>
-            <Banner tone="warning">
-              You&apos;ve used all {quota.seatsLimit} staff seats on your plan. Deactivate a member or
-              upgrade to add more.
-            </Banner>
-          </Layout.Section>
+          <Banner tone="warning">
+            All {quota.seatsLimit} seats are in use. Deactivate a member or upgrade to add more.
+          </Banner>
         ) : null}
-        <Layout.Section>
-          <Card>
+
+        {loading && staff.length === 0 ? (
+          <PageLoading label="Loading team" />
+        ) : staff.length === 0 ? (
+          <PageEmpty
+            title="No team members yet"
+            body="Add teammates who handle claims, repairs, or analytics — each gets a unique login link."
+            action={<Button onClick={openNew}>Add member</Button>}
+          />
+        ) : (
+          <div className="as-m-team-grid">
+            {staff.map((s) => (
+              <article key={s.id} className="as-m-team-card" data-active={s.active ? "true" : "false"}>
+                <div className="as-m-team-card__avatar" aria-hidden>
+                  {(s.name || s.email).slice(0, 1).toUpperCase()}
+                </div>
+                <div className="as-m-team-card__body">
+                  <div className="as-m-team-card__top">
+                    <div>
+                      <h3>{s.name || "Unnamed"}</h3>
+                      <p>{s.email}</p>
+                    </div>
+                    <Badge tone={s.active ? "success" : undefined}>
+                      {s.active ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                  <span className="as-m-team-card__role">{roleLabel(s.role)}</span>
+                  <div className="as-m-team-card__actions">
+                    <Button size="slim" onClick={() => setLinkModal(s)}>
+                      Invite link
+                    </Button>
+                    <Button size="slim" variant="plain" onClick={() => openEdit(s)}>
+                      Edit
+                    </Button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Modal
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        title="Team help"
+        primaryAction={{ content: "Got it", onAction: () => setHelpOpen(false) }}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            <Text as="p">
+              Each member gets a unique invite link. Share it so they can open this store’s AfterSale
+              workspace in Shopify Admin with their account.
+            </Text>
+            <Text as="p" tone="subdued">
+              Use the same email they use for Shopify when possible. Keep at least one active Owner.
+              Seat limits come from your plan.
+            </Text>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={Boolean(linkModal)}
+        onClose={() => setLinkModal(null)}
+        title={linkModal ? `Invite · ${linkModal.name || linkModal.email}` : "Invite link"}
+        primaryAction={{
+          content: "Copy link",
+          onAction: () => linkModal && void copyLink(linkModal.inviteUrl),
+        }}
+        secondaryActions={[
+          {
+            content: "Generate new",
+            onAction: () => linkModal && void rotateLink(linkModal),
+            loading: busy,
+          },
+          { content: "Close", onAction: () => setLinkModal(null) },
+        ]}
+      >
+        <Modal.Section>
+          {linkModal ? (
             <BlockStack gap="300">
-              {staff.length === 0 ? (
-                <BlockStack gap="200">
-                  <Text as="p" tone="subdued">
-                    No staff yet. Add teammates who handle claims, repairs, or analytics.
-                  </Text>
-                  <Text as="p" tone="subdued">
-                    Use the same emails they sign in with on Shopify admin when possible.
-                  </Text>
-                </BlockStack>
-              ) : (
-                <DataTable
-                  columnContentTypes={["text", "text", "text", "text", "text"]}
-                  headings={["Name", "Email", "Role", "Status", ""]}
-                  rows={rows}
-                />
-              )}
+              <Text as="p" tone="subdued">
+                Unique login link for this teammate. They open it, then continue into Shopify Admin for
+                this store.
+              </Text>
+              <div className="as-m-team-linkbox">{linkModal.inviteUrl}</div>
+              <InlineStack gap="200">
+                <Button url={linkModal.inviteUrl} external>
+                  Open invite page
+                </Button>
+              </InlineStack>
             </BlockStack>
-          </Card>
-        </Layout.Section>
-      </Layout>
+          ) : null}
+        </Modal.Section>
+      </Modal>
 
       <Modal
         open={open}
@@ -201,11 +348,10 @@ export function TeamPage() {
               ]}
               value={role}
               onChange={setRole}
-              helpText="Owner / admin can manage the team. Keep at least one active owner."
             />
             <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-              Active (counts toward plan seat limit: {quota.seatsUsed}/{quota.seatsLimit})
+              Active (counts toward seats: {quota.seatsUsed}/{quota.seatsLimit})
             </label>
           </FormLayout>
         </Modal.Section>

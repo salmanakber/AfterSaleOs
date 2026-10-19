@@ -1,11 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma, shopRepository } from "@aftersale/db";
 import { normalizeShopDomain } from "@aftersale/shared";
-import {
-  exchangeSessionToken,
-  SessionTokenStaleError,
-  shopify,
-} from "@/lib/shopify/client";
+import { exchangeSessionToken, SessionTokenStaleError } from "@/lib/shopify/client";
+
+async function bootstrapShopProfile(shopDomain: string, accessToken: string, shopId: string) {
+  try {
+    const res = await fetch(`https://${shopDomain}/admin/api/2025-01/shop.json`, {
+      headers: {
+        "X-Shopify-Access-Token": accessToken,
+        Accept: "application/json",
+      },
+    });
+    if (!res.ok) {
+      console.warn("[token-exchange] REST shop bootstrap", res.status, await res.text());
+      return;
+    }
+    const json = (await res.json()) as {
+      shop?: {
+        name?: string;
+        email?: string;
+        iana_timezone?: string;
+        currency?: string;
+        id?: number;
+      };
+    };
+    const s = json.shop;
+    if (!s) return;
+    await prisma.shop.update({
+      where: { id: shopId },
+      data: {
+        shopName: s.name ?? undefined,
+        email: s.email ?? undefined,
+        timezone: s.iana_timezone ?? undefined,
+        currency: s.currency ?? undefined,
+        shopifyShopId: s.id != null ? `gid://shopify/Shop/${s.id}` : undefined,
+        status: "ACTIVE",
+      },
+    });
+  } catch (err) {
+    console.warn("[token-exchange] shop bootstrap failed", err);
+  }
+}
 
 /**
  * Embedded install / reconnect without cookie-based OAuth.
@@ -25,44 +60,8 @@ export async function POST(request: NextRequest) {
     const session = await exchangeSessionToken(shopHint || "unknown.myshopify.com", bearer, "offline");
     const shopDomain = normalizeShopDomain(session.shop);
     const shopRow = await shopRepository.ensureShop(shopDomain);
-
-    try {
-      const client = new shopify.clients.Graphql({ session });
-      const data = await client.request(`#graphql
-        query ShopBootstrap {
-          shop {
-            name
-            email
-            ianaTimezone
-            currencyCode
-            id
-          }
-        }
-      `);
-      const s = (
-        data.data as {
-          shop: {
-            name: string;
-            email: string;
-            ianaTimezone: string;
-            currencyCode: string;
-            id: string;
-          };
-        }
-      ).shop;
-      await prisma.shop.update({
-        where: { id: shopRow.id },
-        data: {
-          shopName: s.name,
-          email: s.email,
-          timezone: s.ianaTimezone,
-          currency: s.currencyCode,
-          shopifyShopId: s.id,
-          status: "ACTIVE",
-        },
-      });
-    } catch (err) {
-      console.warn("[token-exchange] shop bootstrap failed", err);
+    if (session.accessToken) {
+      await bootstrapShopProfile(shopDomain, session.accessToken, shopRow.id);
     }
 
     const fresh = await prisma.shop.findUniqueOrThrow({ where: { id: shopRow.id } });

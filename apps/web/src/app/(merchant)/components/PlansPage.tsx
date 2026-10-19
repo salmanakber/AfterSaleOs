@@ -6,6 +6,11 @@ import { Badge, Banner, Button, Layout, Page, Text } from "@shopify/polaris";
 import { clearSessionTokenCache, merchantAuthHeaders } from "@/lib/session-token";
 import { appHref } from "@/lib/shop-context";
 import { gqlRequest } from "@/lib/graphql";
+import {
+  PLAN_FEATURE_META,
+  featuresFromPlan,
+  type PlanFeatureKey,
+} from "@/lib/plan-features";
 import { useMerchantAuth } from "../providers";
 
 type Plan = {
@@ -16,8 +21,12 @@ type Plan = {
   warrantiesPerMonth: number;
   claimsPerMonth: number;
   aiCreditsPerMonth: number;
+  staffSeats?: number;
+  warrantyRulesLimit?: number;
   isFree: boolean;
-};
+} & Partial<Record<PlanFeatureKey, boolean>>;
+
+const FEATURE_ORDER = Object.keys(PLAN_FEATURE_META) as PlanFeatureKey[];
 
 type BillingPayload = {
   current: Plan | null;
@@ -221,18 +230,6 @@ export function PlansPage() {
             </Layout.Section>
           ) : null}
 
-          {data?.billingTestMode ? (
-            <Layout.Section>
-              <Banner tone="warning" title="Shopify billing test mode is on">
-                <p>
-                  Paid plans create test charges (no real payment). Your app must still use{" "}
-                  <strong>public distribution</strong> in Partner Dashboard — custom apps cannot
-                  call the Billing API even with test mode on.
-                </p>
-              </Banner>
-            </Layout.Section>
-          ) : null}
-
           {current && !forcePick ? (
             <Layout.Section>
               <div className="as-m-panel">
@@ -291,8 +288,18 @@ export function PlansPage() {
                       <li>{plan.warrantiesPerMonth.toLocaleString()} warranties / mo</li>
                       <li>{plan.claimsPerMonth.toLocaleString()} claims / mo</li>
                       <li>{plan.aiCreditsPerMonth.toLocaleString()} AI credits / mo</li>
-                      <li>{plan.isFree ? "Core aftercare toolkit" : "Repairs & replacements"}</li>
+                      {plan.staffSeats != null ? (
+                        <li>{plan.staffSeats.toLocaleString()} staff seat{plan.staffSeats === 1 ? "" : "s"}</li>
+                      ) : null}
+                      {plan.warrantyRulesLimit != null ? (
+                        <li>
+                          {plan.warrantyRulesLimit >= 9999
+                            ? "Unlimited warranty rules"
+                            : `${plan.warrantyRulesLimit.toLocaleString()} warranty rules`}
+                        </li>
+                      ) : null}
                     </ul>
+                    <PlanScopeList plan={plan} />
                     <Button
                       fullWidth
                       variant={isCurrent ? "secondary" : "primary"}
@@ -337,6 +344,52 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
           data-critical={pct >= 90 ? "true" : "false"}
           style={{ width: `${pct}%` }}
         />
+      </div>
+    </div>
+  );
+}
+
+function PlanScopeList({ plan }: { plan: Plan }) {
+  const features = featuresFromPlan(plan);
+  const included = FEATURE_ORDER.filter((k) => features[k]);
+  const excluded = FEATURE_ORDER.filter((k) => !features[k]);
+
+  return (
+    <div className="as-m-plan-scope">
+      <div className="as-m-plan-scope__col" data-tone="in">
+        <p className="as-m-plan-scope__label">Included</p>
+        {included.length === 0 ? (
+          <p className="as-m-plan-scope__empty">Core registration &amp; claims only</p>
+        ) : (
+          <ul>
+            {included.map((key) => (
+              <li key={key} data-included="true">
+                <span aria-hidden>✓</span>
+                {PLAN_FEATURE_META[key].label}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="as-m-plan-scope__col" data-tone="out">
+        <p className="as-m-plan-scope__label">Not included</p>
+        {excluded.length === 0 ? (
+          <p className="as-m-plan-scope__empty">Everything unlocked</p>
+        ) : (
+          <ul>
+            {excluded.slice(0, included.length === 0 ? 8 : 6).map((key) => (
+              <li key={key} data-included="false">
+                <span aria-hidden>—</span>
+                {PLAN_FEATURE_META[key].label}
+              </li>
+            ))}
+            {excluded.length > (included.length === 0 ? 8 : 6) ? (
+              <li data-included="false" className="as-m-plan-scope__more">
+                +{excluded.length - (included.length === 0 ? 8 : 6)} more on higher plans
+              </li>
+            ) : null}
+          </ul>
+        )}
       </div>
     </div>
   );

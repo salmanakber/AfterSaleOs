@@ -70,6 +70,7 @@ export const merchantOpsTypeDefs = /* GraphQL */ `
       role: String
       active: Boolean
     ): ClaimStaff!
+    rotateStaffInvite(id: ID!): ClaimStaff!
     createSerialList(name: String!, ruleId: ID): SerialListItem!
     addSerialNumbers(serialListId: ID!, serials: [String!]!): AddSerialsResult!
     linkSerialListToRule(serialListId: ID!, ruleId: ID): SerialListItem!
@@ -186,6 +187,13 @@ export const merchantOpsResolvers = {
         active: args.active,
         staffSeatsLimit: limit,
       });
+      const { mintStaffInviteToken, staffInvitePublicUrl } = await import("@/lib/staff-invite");
+      const token = mintStaffInviteToken({
+        staffId: row.id,
+        shopId: row.shopId,
+        email: row.email,
+        nonce: row.id,
+      });
       return {
         id: row.id,
         email: row.email,
@@ -193,6 +201,40 @@ export const merchantOpsResolvers = {
         role: row.role,
         active: row.active,
         createdAt: row.createdAt.toISOString(),
+        inviteUrl: staffInvitePublicUrl(token),
+      };
+    },
+    rotateStaffInvite: async (
+      _: unknown,
+      args: { id: string },
+      ctx: { request: Request },
+    ) => {
+      const m = await merchant(ctx);
+      const { prisma } = await import("@aftersale/db");
+      const row = await prisma.staffMember.findFirst({
+        where: { id: args.id, shopId: m.shopId },
+      });
+      if (!row) throw new Error("Team member not found");
+      // Touch row so owners can issue a fresh unique link
+      const updated = await prisma.staffMember.update({
+        where: { id: row.id },
+        data: { name: row.name },
+      });
+      const { mintStaffInviteToken, staffInvitePublicUrl } = await import("@/lib/staff-invite");
+      const token = mintStaffInviteToken({
+        staffId: updated.id,
+        shopId: updated.shopId,
+        email: updated.email,
+        nonce: `${updated.id}:${updated.updatedAt.getTime()}`,
+      });
+      return {
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        role: updated.role,
+        active: updated.active,
+        createdAt: updated.createdAt.toISOString(),
+        inviteUrl: staffInvitePublicUrl(token),
       };
     },
     createSerialList: async (

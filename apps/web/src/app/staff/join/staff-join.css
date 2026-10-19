@@ -1,0 +1,100 @@
+.as-staff-join {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 18px;
+  font-family: "Figtree", "Segoe UI", system-ui, sans-serif;
+  background:
+    radial-gradient(900px 420px at 10% -10%, rgba(59, 130, 246, 0.22), transparent 55%),
+    radial-gradient(700px 360px at 100% 0%, rgba(16, 185, 129, 0.14), transparent 50%),
+    #0b1220;
+  color: #f8fafc;
+  position: relative;
+  overflow: hidden;
+}
+
+.as-staff-join__glow {
+  position: absolute;
+  inset: auto -10% -30% 30%;
+  height: 280px;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.35), transparent 70%);
+  pointer-events: none;
+}
+
+.as-staff-join__card {
+  position: relative;
+  width: min(100%, 440px);
+  padding: 28px 26px 24px;
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  display: grid;
+  gap: 12px;
+}
+
+.as-staff-join__kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.as-staff-join__card h1 {
+  margin: 0;
+  font-size: 1.7rem;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.as-staff-join__muted {
+  margin: 0;
+  color: rgba(248, 250, 252, 0.72);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.as-staff-join__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.as-staff-join__meta span {
+  font-size: 0.75rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(248, 250, 252, 0.85);
+}
+
+.as-staff-join__cta {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 650;
+  text-decoration: none;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.as-staff-join__cta:hover {
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.as-staff-join__hint {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: rgba(248, 250, 252, 0.55);
+  line-height: 1.4;
+}

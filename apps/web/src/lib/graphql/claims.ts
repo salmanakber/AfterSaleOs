@@ -43,6 +43,7 @@ export const claimsTypeDefs = /* GraphQL */ `
     role: String!
     active: Boolean!
     createdAt: String!
+    inviteUrl: String
   }
 
   type ClaimItem {
@@ -232,6 +233,7 @@ export async function mapClaim(claimId: string, shopId: string, shopDomain: stri
           role: c.assignee.role,
           active: c.assignee.active,
           createdAt: c.assignee.createdAt.toISOString(),
+          inviteUrl: null,
         }
       : null,
     workflowStatusKey: c.workflowStatusKey,
@@ -320,18 +322,29 @@ export const claimsResolvers = {
     },
     staffMembers: async (_: unknown, __: unknown, ctx: { request: Request }) => {
       const merchant = await resolveMerchantContext(ctx.request);
+      const { mintStaffInviteToken, staffInvitePublicUrl } = await import("@/lib/staff-invite");
       const staff = await prisma.staffMember.findMany({
         where: { shopId: merchant.shopId },
         orderBy: [{ active: "desc" }, { email: "asc" }],
       });
-      return staff.map((s) => ({
-        id: s.id,
-        name: s.name,
-        email: s.email,
-        role: s.role,
-        active: s.active,
-        createdAt: s.createdAt.toISOString(),
-      }));
+      return staff.map((s) => {
+        // Stable unique link per member (same nonce = same URL until rotated).
+        const token = mintStaffInviteToken({
+          staffId: s.id,
+          shopId: s.shopId,
+          email: s.email,
+          nonce: s.id,
+        });
+        return {
+          id: s.id,
+          name: s.name,
+          email: s.email,
+          role: s.role,
+          active: s.active,
+          createdAt: s.createdAt.toISOString(),
+          inviteUrl: staffInvitePublicUrl(token),
+        };
+      });
     },
     aiCreditBalance: async (_: unknown, __: unknown, ctx: { request: Request }) => {
       const merchant = await resolveMerchantContext(ctx.request);

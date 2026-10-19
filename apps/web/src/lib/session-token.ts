@@ -6,8 +6,8 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** Wait briefly for App Bridge CDN to expose window.shopify.idToken. */
-async function waitForShopifyIdToken(timeoutMs = 4000): Promise<boolean> {
+/** Wait for App Bridge CDN to expose window.shopify.idToken (first paint can lag). */
+async function waitForShopifyIdToken(timeoutMs = 8000): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     if (typeof window !== "undefined" && typeof window.shopify?.idToken === "function") {
@@ -18,22 +18,29 @@ async function waitForShopifyIdToken(timeoutMs = 4000): Promise<boolean> {
   return typeof window !== "undefined" && typeof window.shopify?.idToken === "function";
 }
 
-export async function getSessionToken(): Promise<string | null> {
-  if (cached && cached.exp > Date.now() + 30_000) return cached.token;
+export async function getSessionToken(opts?: { force?: boolean }): Promise<string | null> {
+  if (!opts?.force && cached && cached.exp > Date.now() + 30_000) return cached.token;
   if (typeof window === "undefined") return null;
 
   const ready = await waitForShopifyIdToken();
   if (!ready || !window.shopify?.idToken) return null;
 
-  try {
-    const token = await window.shopify.idToken();
-    cached = { token, exp: Date.now() + 45_000 };
-    return token;
-  } catch (err) {
-    console.warn("[session-token] idToken failed", err);
-    cached = null;
-    return null;
+  // App Bridge can reject the first idToken() call right after iframe mount.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (attempt > 0) {
+        cached = null;
+        await sleep(250 * attempt);
+      }
+      const token = await window.shopify.idToken();
+      cached = { token, exp: Date.now() + 45_000 };
+      return token;
+    } catch (err) {
+      console.warn("[session-token] idToken failed", attempt + 1, err);
+      cached = null;
+    }
   }
+  return null;
 }
 
 export function clearSessionTokenCache() {

@@ -5,7 +5,10 @@ import { randomBytes } from "crypto";
 
 export const runtime = "nodejs";
 
-/** Create or resolve a QR short code, then redirect to registration/support. */
+/**
+ * Resolve a short QR code: log the scan, then send the customer to a
+ * beautiful no-login portal activate flow (product / support / campaign).
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> },
@@ -31,20 +34,32 @@ export async function GET(
 
   const shop = await prisma.shop.findUnique({ where: { id: link.shopId } });
   const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const base = appUrl.replace(/\/$/, "") || (shop?.shopDomain ? `https://${shop.shopDomain}` : "");
+
   const q = new URLSearchParams({
     shop: shop?.shopDomain ?? "",
     qr: link.code,
+    source: "qr",
   });
-  if (link.targetType === "product" && link.targetId) q.set("product_id", link.targetId);
-  if (link.targetType === "variant" && link.targetId) q.set("variant_id", link.targetId);
+  if (link.label) q.set("qr_label", link.label);
 
-  // Hosted app URL — reliable (app-proxy pages need assetPrefix + absolute APIs).
-  const base = appUrl.replace(/\/$/, "") || (shop?.shopDomain ? `https://${shop.shopDomain}` : "");
-  return NextResponse.redirect(`${base}/apps/aftersale/register?${q.toString()}`);
+  if (link.targetType === "product" && link.targetId) {
+    q.set("product_id", link.targetId);
+    q.set("view", "activate");
+  } else if (link.targetType === "variant" && link.targetId) {
+    q.set("variant_id", link.targetId);
+    q.set("view", "activate");
+  } else if (link.targetType === "support" || link.targetType === "claim") {
+    q.set("view", "claim");
+  } else {
+    q.set("view", "activate");
+  }
+
+  // Dedicated scan landing → portal register gate (no forced login).
+  return NextResponse.redirect(`${base}/apps/aftersale/portal?${q.toString()}`);
 }
 
 export async function POST(request: NextRequest) {
-  // Merchant-authenticated QR create is via GraphQL in a follow-up; this is a helper for seeding.
   const body = (await request.json()) as {
     shop?: string;
     targetType?: string;
@@ -70,6 +85,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     code: link.code,
     url: `${appUrl}/q/${link.code}`,
-    storefrontHint: `https://${shop.shopDomain}/apps/aftersale/register?shop=${shop.shopDomain}&qr=${link.code}`,
+    storefrontHint: `https://${shop.shopDomain}/apps/aftersale/portal?shop=${shop.shopDomain}&qr=${link.code}&view=activate&source=qr`,
   });
 }

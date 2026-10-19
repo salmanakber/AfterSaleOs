@@ -3113,6 +3113,13 @@ section.as-dash-home {
   color: var(--as-muted);
 }
 
+.as-dash-list__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .as-dash-empty,
 .as-dash-success {
   display: grid;
@@ -3680,6 +3687,209 @@ section.as-dash-home {
 
 .as-portal-login__hint code {
   font-size: 0.7rem;
+}
+
+/* QR scan landing (guest) */
+.as-guest-reg--qr {
+  max-width: 640px;
+}
+
+.as-qr-landing {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  padding: 22px 20px 18px;
+  background:
+    radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--as-accent) 28%, transparent), transparent 55%),
+    linear-gradient(165deg, color-mix(in srgb, var(--as-ink) 92%, #0f172a), #0b1220);
+  color: #f8fafc;
+  margin-bottom: 4px;
+}
+
+.as-qr-landing__glow {
+  position: absolute;
+  inset: auto -20% -40% 40%;
+  height: 160px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--as-accent) 45%, transparent), transparent 70%);
+  pointer-events: none;
+}
+
+.as-qr-landing__kicker {
+  position: relative;
+  margin: 0 0 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--as-accent) 80%, #fff);
+}
+
+.as-qr-landing h2 {
+  position: relative;
+  margin: 0 0 8px;
+  font-family: var(--as-font-display), Fraunces, Georgia, serif;
+  font-size: clamp(1.45rem, 4vw, 1.9rem);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.as-qr-landing > p {
+  position: relative;
+  margin: 0;
+  max-width: 36ch;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: rgba(248, 250, 252, 0.78);
+}
+
+.as-qr-landing__product {
+  position: relative;
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.as-qr-landing__product img,
+.as-qr-landing__mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.as-qr-landing__mark {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.as-qr-landing__product strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.as-qr-landing__product em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 0.75rem;
+  color: rgba(248, 250, 252, 0.65);
+}
+
+.as-guest-reg__qr-cta {
+  display: grid;
+  gap: 10px;
+}
+
+.as-qr-portal-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 14px;
+  margin-bottom: 14px;
+  background: color-mix(in srgb, var(--as-accent) 12%, var(--as-surface));
+  border: 1px solid color-mix(in srgb, var(--as-accent) 28%, var(--as-border));
+}
+
+.as-qr-portal-banner__badge {
+  flex: 0 0 auto;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--as-accent);
+  color: #111;
+}
+
+.as-qr-portal-banner strong {
+  display: block;
+  font-size: 0.92rem;
+}
+
+.as-qr-portal-banner em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 0.75rem;
+  color: var(--as-muted);
+}
+
+.as-qr-share {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.as-qr-share__card {
+  position: relative;
+  width: min(100%, 380px);
+  padding: 22px 20px 18px;
+  border-radius: 20px;
+  background: var(--as-surface);
+  border: 1px solid var(--as-border);
+  text-align: center;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+}
+
+.as-qr-share__close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: 0;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--as-muted);
+  cursor: pointer;
+}
+
+.as-qr-share__kicker {
+  margin: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--as-accent);
+}
+
+.as-qr-share__card h3 {
+  margin: 0;
+  font-family: var(--as-font-display), Fraunces, Georgia, serif;
+  font-size: 1.25rem;
+}
+
+.as-qr-share__card img {
+  border-radius: 14px;
+  border: 1px solid var(--as-border);
+  padding: 10px;
+  background: #fff;
+}
+
+.as-qr-share__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
 }
 
 @media print {

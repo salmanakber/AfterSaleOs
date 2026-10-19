@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
   const shopParam = sp.get("shop");
   const q = (sp.get("q") ?? "").trim();
+  const productId = (sp.get("product_id") ?? sp.get("id") ?? "").trim();
   const limit = Math.min(Number(sp.get("limit") ?? 24) || 24, 40);
 
   if (!shopParam) {
@@ -29,16 +30,20 @@ export async function GET(request: NextRequest) {
   const products = await prisma.product.findMany({
     where: {
       shopId: shop.id,
-      ...(q
+      ...(productId
         ? {
-            OR: [
-              { title: { contains: q, mode: "insensitive" } },
-              { vendor: { contains: q, mode: "insensitive" } },
-              { productType: { contains: q, mode: "insensitive" } },
-              { handle: { contains: q, mode: "insensitive" } },
-            ],
+            OR: [{ id: productId }, { shopifyProductId: productId }],
           }
-        : {}),
+        : q
+          ? {
+              OR: [
+                { title: { contains: q, mode: "insensitive" } },
+                { vendor: { contains: q, mode: "insensitive" } },
+                { productType: { contains: q, mode: "insensitive" } },
+                { handle: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
       status: { not: "archived" },
     },
     include: {

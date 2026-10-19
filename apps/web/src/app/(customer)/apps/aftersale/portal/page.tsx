@@ -20,7 +20,10 @@ import {
   persistPortalSession,
   type PortalView,
 } from "../../../components/ClientPortal";
-import { GuestRegisterFlow } from "../../../components/GuestRegisterFlow";
+import {
+  GuestRegisterFlow,
+  type QrScanContext,
+} from "../../../components/GuestRegisterFlow";
 import {
   GoogleContinueButton,
   isGoogleSignInConfigured,
@@ -88,6 +91,10 @@ function PortalInner() {
   const embedLayout = parseEmbedLayout(params);
   const prefillEmail = params.get("email") ?? "";
   const viewParam = (params.get("view") as PortalView | null) || "home";
+  const qrCode = params.get("qr");
+  const qrLabelParam = params.get("qr_label");
+  const productIdParam = params.get("product_id");
+  const fromQr = Boolean(qrCode) || params.get("source") === "qr";
   const loggedInCustomerId =
     params.get("logged_in_customer_id") ?? params.get("customer_id") ?? "";
   const shopifyLoginBase = params.get("shopify_login");
@@ -124,12 +131,25 @@ function PortalInner() {
   });
 
   const [gate, setGate] = useState<Gate>(() => {
+    // QR scans always open registration — no login wall.
+    if (fromQr) return "register";
     if (loggedInCustomerId || fromShopify || prefillEmail) return "auth";
     if (viewParam === "claim" || viewParam === "requests" || viewParam === "products") return "auth";
     return "register";
   });
-  const [entryView, setEntryView] = useState<PortalView>(
-    viewParam === "activate" ? "activate" : viewParam || "home",
+  const [entryView, setEntryView] = useState<PortalView>(() => {
+    if (fromQr && viewParam === "claim") return "claim";
+    if (fromQr || viewParam === "activate") return "activate";
+    return viewParam || "home";
+  });
+  const [qrContext, setQrContext] = useState<QrScanContext | null>(() =>
+    qrCode
+      ? {
+          code: qrCode,
+          label: qrLabelParam,
+          productId: productIdParam,
+        }
+      : null,
   );
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState(prefillEmail);
@@ -168,6 +188,29 @@ function PortalInner() {
       })
       .catch(() => undefined);
   }, [shop]);
+
+  useEffect(() => {
+    if (!qrCode) return;
+    let cancelled = false;
+    fetch(publicApiUrl(`/api/public/qr/${encodeURIComponent(qrCode)}`))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (cancelled || !j) return;
+        if (j.shopName) setShopName(j.shopName);
+        setQrContext({
+          code: j.code || qrCode,
+          label: j.label || qrLabelParam,
+          productId: j.product?.id || j.targetId || productIdParam,
+          productTitle: j.product?.title ?? null,
+          productImageUrl: j.product?.imageUrl ?? null,
+          shopifyProductId: j.product?.shopifyProductId ?? null,
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [qrCode, qrLabelParam, productIdParam]);
 
   useEffect(() => {
     if (token || blockAutoLogin) return;
@@ -365,6 +408,7 @@ function PortalInner() {
             warranties={warranties}
             embed={embed}
             initialView={entryView}
+            qrContext={qrContext}
             pendingFeePayment={pendingFeePayment}
             onDismissFeePayment={() => setPendingFeePayment(null)}
             onLogout={logout}
@@ -380,8 +424,12 @@ function PortalInner() {
       <>
         <EmbedHeightReporter enabled={embed} />
         <CustomerShell
-          title="Register product"
-          lede="Activate warranty and open your portal"
+          title={fromQr ? "QR registration" : "Register product"}
+          lede={
+            fromQr
+              ? "Scan received — activate coverage without signing in first"
+              : "Activate warranty and open your portal"
+          }
           {...shellProps}
           brand={shopName || "AfterSale"}
           chrome="dashboard"
@@ -390,13 +438,14 @@ function PortalInner() {
             shop={shop}
             shopName={shopName}
             shopifyLoginUrl={shopifyLoginUrl || undefined}
+            qrContext={qrContext}
             onRegistered={(session, fee) => {
               setEntryView("products");
               if (fee) setPendingFeePayment(fee);
               applySession(session.email, session.orders, session.warranties);
             }}
             onGoogleSession={(session) => {
-              setEntryView("home");
+              setEntryView(fromQr ? "activate" : "home");
               applySession(session.email, session.orders, session.warranties);
             }}
             onNeedSignIn={() => setGate("auth")}

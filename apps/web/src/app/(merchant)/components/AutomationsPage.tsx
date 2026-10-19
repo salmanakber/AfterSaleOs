@@ -6,11 +6,8 @@ import {
   Banner,
   BlockStack,
   Button,
-  Card,
-  DataTable,
   FormLayout,
   InlineStack,
-  Layout,
   Modal,
   Page,
   Select,
@@ -18,9 +15,9 @@ import {
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
-import { TourTrigger } from "./ProductTour";
 import { FeatureLock } from "./FeatureLock";
 import { friendlyError } from "@/lib/merchant-errors";
+import { PageLoading } from "./PageLoading";
 
 type Workflow = {
   id: string;
@@ -78,12 +75,14 @@ export function AutomationsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [tplOpen, setTplOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameLabel, setRenameLabel] = useState("");
   const [tplKey, setTplKey] = useState("");
   const [tplSubject, setTplSubject] = useState("");
   const [tplBody, setTplBody] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [expiryDays, setExpiryDays] = useState("30");
   const [mktSubject, setMktSubject] = useState("A note about your warranty coverage");
   const [mktBody, setMktBody] = useState(
@@ -91,12 +90,14 @@ export function AutomationsPage() {
   );
 
   const load = useCallback(() => {
+    setLoading(true);
     gqlRequest<{ claimWorkflow: Workflow; notificationTemplates: Template[] }>(QUERY)
       .then((d) => {
         setWorkflow(d.claimWorkflow);
         setTemplates(d.notificationTemplates);
       })
-      .catch((e) => setError(friendlyError(e)));
+      .catch((e) => setError(friendlyError(e)))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -145,7 +146,7 @@ export function AutomationsPage() {
     try {
       await gqlRequest(UPSERT_TPL, { key: tplKey, subject: tplSubject, bodyHtml: tplBody });
       setTplOpen(false);
-      setSuccess("Email template saved. New claim emails will use this copy.");
+      setSuccess("Email template saved.");
       load();
     } catch (e) {
       setError(friendlyError(e, "Save failed"));
@@ -153,24 +154,6 @@ export function AutomationsPage() {
       setBusy(false);
     }
   }
-
-  const statusRows =
-    workflow?.statuses.map((s) => [
-      s.label,
-      s.key,
-      s.systemState,
-      s.emailTemplateKey ?? "—",
-      <InlineStack key={s.id} gap="200">
-        <Button size="slim" variant="plain" onClick={() => openRename(s.id, s.label)}>
-          Rename
-        </Button>
-        {s.emailTemplateKey ? (
-          <Button size="slim" onClick={() => openTemplate(s.emailTemplateKey!)}>
-            Email
-          </Button>
-        ) : null}
-      </InlineStack>,
-    ]) ?? [];
 
   async function runExpiry(dryRun: boolean) {
     setBusy(true);
@@ -213,157 +196,168 @@ export function AutomationsPage() {
   }
 
   return (
-    <Page title="Automations" subtitle="Claim workflow, email templates, and marketing campaigns">
-      <div style={{ marginBottom: 12 }}>
-        <TourTrigger tourId="automations" />
-      </div>
-      <Layout>
+    <Page
+      title="Automations"
+      primaryAction={undefined}
+      secondaryActions={[{ content: "Help", onAction: () => setHelpOpen(true) }]}
+    >
+      <div className="as-m-studio">
+        <header className="as-m-studio__hero as-m-studio__hero--auto">
+          <div>
+            <p className="as-m-studio__kicker">Workflow · email · campaigns</p>
+            <h2>Claim automation desk</h2>
+          </div>
+          <div className="as-m-studio__stats">
+            <div>
+              <strong>{loading ? "—" : workflow?.statuses.length ?? 0}</strong>
+              <span>Statuses</span>
+            </div>
+            <div>
+              <strong>{loading ? "—" : workflow?.transitions.length ?? 0}</strong>
+              <span>Transitions</span>
+            </div>
+            <div>
+              <strong>{loading ? "—" : templates.filter((t) => !t.isPlatformDefault).length}</strong>
+              <span>Custom emails</span>
+            </div>
+          </div>
+        </header>
+
         {error ? (
-          <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setError(null)}>
-              {error}
-            </Banner>
-          </Layout.Section>
+          <Banner tone="critical" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
         ) : null}
         {success ? (
-          <Layout.Section>
-            <Banner tone="success" onDismiss={() => setSuccess(null)}>
-              {success}
-            </Banner>
-          </Layout.Section>
+          <Banner tone="success" onDismiss={() => setSuccess(null)}>
+            {success}
+          </Banner>
         ) : null}
 
-        <Layout.Section>
-          <FeatureLock feature="expiryCampaigns">
-            <Card>
-              <BlockStack gap="400">
-                <Text as="h2" variant="headingMd">
-                  Marketing &amp; expiry emails
-                </Text>
-                <Text as="p" tone="subdued">
-                  Remind customers before coverage ends, or send a broadcast to everyone with an
-                  active warranty. Ask your AfterSale admin if email delivery is not connected yet.
-                </Text>
-                <Select
-                  label="Expiry window"
-                  options={[
-                    { label: "Next 7 days", value: "7" },
-                    { label: "Next 14 days", value: "14" },
-                    { label: "Next 30 days", value: "30" },
-                    { label: "Next 60 days", value: "60" },
-                  ]}
-                  value={expiryDays}
-                  onChange={setExpiryDays}
-                />
-                <InlineStack gap="200">
-                  <Button onClick={() => void runExpiry(true)} loading={busy}>
-                    Preview expiry count
-                  </Button>
-                  <Button variant="primary" onClick={() => void runExpiry(false)} loading={busy}>
-                    Send expiry reminders
-                  </Button>
-                </InlineStack>
-                <FormLayout>
-                  <TextField
-                    label="Broadcast subject"
-                    value={mktSubject}
-                    onChange={setMktSubject}
-                    autoComplete="off"
-                  />
-                  <TextField
-                    label="Broadcast message"
-                    value={mktBody}
-                    onChange={setMktBody}
-                    multiline={4}
-                    autoComplete="off"
-                    helpText="Sent once to each customer who has at least one active warranty."
-                  />
-                </FormLayout>
-                <InlineStack gap="200">
-                  <Button onClick={() => void runMarketing(true)} loading={busy}>
-                    Preview audience
-                  </Button>
-                  <Button variant="primary" onClick={() => void runMarketing(false)} loading={busy}>
-                    Send marketing email
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-            </Card>
-          </FeatureLock>
-        </Layout.Section>
-
-        {!workflow ? (
-          <Layout.Section>
-            <Text as="p" tone="subdued">
-              Loading workflow…
-            </Text>
-          </Layout.Section>
+        {loading && !workflow ? (
+          <PageLoading label="Loading automations" />
         ) : (
-          <>
-            <Layout.Section>
-              <Card>
-                <BlockStack gap="200">
-                  <InlineStack gap="200" blockAlign="center">
-                    <Text as="h2" variant="headingMd">
-                      {workflow.name}
-                    </Text>
-                    {workflow.isDefault ? <Badge tone="info">Default</Badge> : null}
-                  </InlineStack>
-                  <Text as="p" tone="subdued">
-                    Transitions are enforced when updating claims. Customize labels and emails per
-                    status. Placeholders: {"{{claimNumber}}"}, {"{{status}}"}, {"{{trackingUrl}}"},{" "}
-                    {"{{summary}}"}, {"{{shopName}}"}.
-                  </Text>
-                </BlockStack>
-              </Card>
-            </Layout.Section>
-
-            <Layout.Section>
-              <Card>
-                <div data-tour="automations-statuses">
-                <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">
-                    Statuses
-                  </Text>
-                  {statusRows.length === 0 ? (
-                    <Text as="p" tone="subdued">
-                      No statuses configured for this workflow yet.
-                    </Text>
-                  ) : (
-                    <DataTable
-                      columnContentTypes={["text", "text", "text", "text", "text"]}
-                      headings={["Label", "Key", "System state", "Email template", "Actions"]}
-                      rows={statusRows}
-                    />
-                  )}
-                </BlockStack>
+          <div className="as-m-auto-layout">
+            <FeatureLock feature="expiryCampaigns">
+              <section className="as-m-auto-campaign">
+                <div className="as-m-auto-campaign__head">
+                  <p className="as-m-studio__kicker">Outreach</p>
+                  <h3>Expiry &amp; marketing</h3>
                 </div>
-              </Card>
-            </Layout.Section>
+                <div className="as-m-auto-campaign__grid">
+                  <div className="as-m-auto-tile">
+                    <h4>Expiry reminders</h4>
+                    <Select
+                      label="Window"
+                      labelHidden
+                      options={[
+                        { label: "Next 7 days", value: "7" },
+                        { label: "Next 14 days", value: "14" },
+                        { label: "Next 30 days", value: "30" },
+                        { label: "Next 60 days", value: "60" },
+                      ]}
+                      value={expiryDays}
+                      onChange={setExpiryDays}
+                    />
+                    <InlineStack gap="200">
+                      <Button onClick={() => void runExpiry(true)} loading={busy}>
+                        Preview
+                      </Button>
+                      <Button variant="primary" onClick={() => void runExpiry(false)} loading={busy}>
+                        Send
+                      </Button>
+                    </InlineStack>
+                  </div>
+                  <div className="as-m-auto-tile as-m-auto-tile--wide">
+                    <h4>Broadcast</h4>
+                    <TextField label="Subject" labelHidden value={mktSubject} onChange={setMktSubject} autoComplete="off" placeholder="Subject" />
+                    <TextField label="Body" labelHidden value={mktBody} onChange={setMktBody} multiline={3} autoComplete="off" />
+                    <InlineStack gap="200">
+                      <Button onClick={() => void runMarketing(true)} loading={busy}>
+                        Preview audience
+                      </Button>
+                      <Button variant="primary" onClick={() => void runMarketing(false)} loading={busy}>
+                        Send broadcast
+                      </Button>
+                    </InlineStack>
+                  </div>
+                </div>
+              </section>
+            </FeatureLock>
 
-            <Layout.Section>
-              <Card>
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    Allowed transitions
-                  </Text>
+            {workflow ? (
+              <>
+                <section className="as-m-auto-workflow">
+                  <div className="as-m-auto-workflow__head">
+                    <div>
+                      <p className="as-m-studio__kicker">Pipeline</p>
+                      <h3>
+                        {workflow.name}{" "}
+                        {workflow.isDefault ? <Badge tone="info">Default</Badge> : null}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="as-m-auto-status-rail" data-tour="automations-statuses">
+                    {workflow.statuses.map((s, i) => (
+                      <article key={s.id} className="as-m-auto-status" style={{ animationDelay: `${i * 0.04}s` }}>
+                        <div className="as-m-auto-status__index">{String(i + 1).padStart(2, "0")}</div>
+                        <div className="as-m-auto-status__body">
+                          <strong>{s.label}</strong>
+                          <span>
+                            {s.key} · {s.systemState}
+                          </span>
+                        </div>
+                        <div className="as-m-auto-status__actions">
+                          <Button size="slim" variant="plain" onClick={() => openRename(s.id, s.label)}>
+                            Rename
+                          </Button>
+                          {s.emailTemplateKey ? (
+                            <Button size="slim" onClick={() => openTemplate(s.emailTemplateKey!)}>
+                              Email
+                            </Button>
+                          ) : null}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="as-m-auto-transitions">
+                  <p className="as-m-studio__kicker">Allowed moves</p>
+                  <h3>Transitions</h3>
                   {workflow.transitions.length === 0 ? (
                     <Text as="p" tone="subdued">
                       No transitions defined.
                     </Text>
                   ) : (
-                    workflow.transitions.map((t) => (
-                      <Text as="p" key={t.id} tone="subdued">
-                        {t.fromKey} → {t.toKey}
-                      </Text>
-                    ))
+                    <div className="as-m-auto-flow">
+                      {workflow.transitions.map((t) => (
+                        <div key={t.id} className="as-m-auto-flow__edge">
+                          <span>{t.fromKey}</span>
+                          <em aria-hidden>→</em>
+                          <span>{t.toKey}</span>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </BlockStack>
-              </Card>
-            </Layout.Section>
-          </>
+                </section>
+              </>
+            ) : null}
+          </div>
         )}
-      </Layout>
+      </div>
+
+      <Modal open={helpOpen} onClose={() => setHelpOpen(false)} title="Automations help" primaryAction={{ content: "Got it", onAction: () => setHelpOpen(false) }}>
+        <Modal.Section>
+          <BlockStack gap="300">
+            <Text as="p">Statuses and transitions control how claims move. Rename labels for your team language, then customize the email for each status.</Text>
+            <Text as="p" tone="subdued">
+              Placeholders: {"{{claimNumber}}"}, {"{{status}}"}, {"{{trackingUrl}}"}, {"{{summary}}"}, {"{{shopName}}"}.
+            </Text>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
 
       <Modal
         open={renameOpen}
@@ -373,33 +367,21 @@ export function AutomationsPage() {
         secondaryActions={[{ content: "Cancel", onAction: () => setRenameOpen(false) }]}
       >
         <Modal.Section>
-          <TextField
-            label="Label"
-            value={renameLabel}
-            onChange={setRenameLabel}
-            autoComplete="off"
-            helpText="Shown to merchants and customers. The internal key stays the same."
-          />
+          <TextField label="Label" value={renameLabel} onChange={setRenameLabel} autoComplete="off" />
         </Modal.Section>
       </Modal>
 
       <Modal
         open={tplOpen}
         onClose={() => setTplOpen(false)}
-        title={`Email template: ${tplKey}`}
+        title={`Email: ${tplKey}`}
         primaryAction={{ content: "Save template", onAction: saveTemplate, loading: busy }}
         secondaryActions={[{ content: "Cancel", onAction: () => setTplOpen(false) }]}
       >
         <Modal.Section>
           <FormLayout>
             <TextField label="Subject" value={tplSubject} onChange={setTplSubject} autoComplete="off" />
-            <TextField
-              label="Body HTML"
-              value={tplBody}
-              onChange={setTplBody}
-              multiline={10}
-              autoComplete="off"
-            />
+            <TextField label="Body HTML" value={tplBody} onChange={setTplBody} multiline={10} autoComplete="off" />
           </FormLayout>
         </Modal.Section>
       </Modal>

@@ -10,6 +10,8 @@ import {
 } from "@/lib/customer-order-session";
 import { ProductSearchSelect, type PickedProduct } from "./ProductSearchSelect";
 import { formatWarrantyFee, type FeePaymentInfo } from "@/lib/warranty-fee";
+import { downloadQrPng, printQrSheet, qrImageUrl } from "@/lib/qr-display";
+import type { QrScanContext } from "./GuestRegisterFlow";
 
 export type PortalView = "home" | "activate" | "products" | "claim" | "requests";
 
@@ -43,6 +45,7 @@ export function ClientPortal({
   warranties,
   embed,
   initialView = "home",
+  qrContext = null,
   pendingFeePayment = null,
   onDismissFeePayment,
   onLogout,
@@ -55,6 +58,7 @@ export function ClientPortal({
   warranties: CachedWarranty[];
   embed?: boolean;
   initialView?: PortalView;
+  qrContext?: QrScanContext | null;
   pendingFeePayment?: FeePaymentInfo | null;
   onDismissFeePayment?: () => void;
   onLogout: () => void;
@@ -62,6 +66,8 @@ export function ClientPortal({
 }) {
   const [view, setView] = useState<PortalView>(initialView);
   const [picked, setPicked] = useState<PickedProduct | null>(null);
+  const [shareQr, setShareQr] = useState<{ title: string; url: string } | null>(null);
+  const [qrPrefillDone, setQrPrefillDone] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [serial, setSerial] = useState("");
@@ -114,6 +120,59 @@ export function ClientPortal({
     if (picked?.orderNumber) setOrderNumber(picked.orderNumber);
   }, [picked?.orderNumber]);
 
+  // Prefill activate form from an incoming QR scan.
+  useEffect(() => {
+    if (!shop || !qrContext || qrPrefillDone) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (qrContext.productTitle && (qrContext.shopifyProductId || qrContext.productId)) {
+          if (!cancelled) {
+            setPicked({
+              source: "catalog",
+              title: qrContext.productTitle,
+              shopifyProductId: qrContext.shopifyProductId || qrContext.productId || undefined,
+              imageUrl: qrContext.productImageUrl,
+            });
+            setView("activate");
+          }
+          return;
+        }
+        if (qrContext.productId) {
+          const res = await fetch(
+            publicApiUrl(
+              `/api/public/products?shop=${encodeURIComponent(shop)}&product_id=${encodeURIComponent(qrContext.productId)}&limit=1`,
+            ),
+          );
+          const json = await res.json();
+          const p = json.products?.[0];
+          if (p && !cancelled) {
+            setPicked({
+              source: "catalog",
+              title: p.title,
+              shopifyProductId: p.shopifyProductId,
+              imageUrl: p.imageUrl,
+            });
+            setView("activate");
+          }
+        } else if (!cancelled) {
+          setView("activate");
+        }
+      } finally {
+        if (!cancelled) setQrPrefillDone(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [shop, qrContext, qrPrefillDone]);
+
+  function productShareUrl(w: CachedWarranty) {
+    const p = new URLSearchParams({ shop, view: "activate", source: "share" });
+    if (w.productTitle) p.set("qr_label", w.productTitle);
+    return `${typeof window !== "undefined" ? window.location.origin : ""}/apps/aftersale/portal?${p.toString()}`;
+  }
+
   const qs = useMemo(() => {
     const p = new URLSearchParams({ shop });
     if (email) p.set("email", email);
@@ -140,7 +199,8 @@ export function ClientPortal({
           shopifyProductId: picked.shopifyProductId,
           shopifyVariantId: picked.shopifyVariantId,
           outsideShopify: picked.source === "catalog" && !picked.orderNumber,
-          source: "portal",
+          source: qrContext?.code ? "qr" : "portal",
+          qrCode: qrContext?.code || undefined,
         }),
       });
       const json = await res.json();
@@ -316,10 +376,27 @@ export function ClientPortal({
         {view === "activate" ? (
           <section className="as-dash-panel">
             <header className="as-dash-head">
-              <p className="as-dash-head__kicker">Activate</p>
-              <h2>Register a product</h2>
-              <p>Search the store catalog or pick something from your recent orders.</p>
+              <p className="as-dash-head__kicker">{qrContext?.code ? "QR scan" : "Activate"}</p>
+              <h2>
+                {qrContext?.label || qrContext?.productTitle
+                  ? `Register ${qrContext.label || qrContext.productTitle}`
+                  : "Register a product"}
+              </h2>
+              <p>
+                {qrContext?.code
+                  ? "This product came from your QR scan — confirm details to activate coverage."
+                  : "Search the store catalog or pick something from your recent orders."}
+              </p>
             </header>
+            {qrContext?.code ? (
+              <div className="as-qr-portal-banner">
+                <span className="as-qr-portal-banner__badge">Scanned</span>
+                <div>
+                  <strong>{qrContext.label || qrContext.productTitle || `Code ${qrContext.code}`}</strong>
+                  <em>Source QR · {qrContext.code}</em>
+                </div>
+              </div>
+            ) : null}
             <form className="as-dash-form" onSubmit={submitRegister}>
               <ProductSearchSelect
                 shop={shop}
@@ -386,14 +463,30 @@ export function ClientPortal({
                         {w.endAt ? ` · Ends ${new Date(w.endAt).toLocaleDateString()}` : ""}
                       </span>
                     </div>
-                    {w.certificateToken ? (
-                      <a
+                    <div className="as-dash-list__actions">
+                      <button
+                        type="button"
                         className="as-btn as-btn-secondary"
-                        href={customerPageUrl(`/c/${w.certificateToken}?shop=${encodeURIComponent(shop)}`)}
+                        onClick={() =>
+                          setShareQr({
+                            title: w.productTitle || "Product",
+                            url: productShareUrl(w),
+                          })
+                        }
                       >
-                        Certificate
-                      </a>
-                    ) : null}
+                        My QR
+                      </button>
+                      {w.certificateToken ? (
+                        <a
+                          className="as-btn as-btn-secondary"
+                          href={customerPageUrl(
+                            `/c/${w.certificateToken}?shop=${encodeURIComponent(shop)}`,
+                          )}
+                        >
+                          Certificate
+                        </a>
+                      ) : null}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -513,6 +606,60 @@ export function ClientPortal({
           </section>
         ) : null}
 
+        {shareQr ? (
+          <div
+            className="as-qr-share"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Share product QR"
+          >
+            <div className="as-qr-share__card">
+              <button
+                type="button"
+                className="as-qr-share__close"
+                onClick={() => setShareQr(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+              <p className="as-qr-share__kicker">Your product QR</p>
+              <h3>{shareQr.title}</h3>
+              <p className="as-muted">Share or print this code so others can open registration for this product.</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrImageUrl(shareQr.url, 280)} alt="" width={200} height={200} />
+              <div className="as-qr-share__actions">
+                <button
+                  type="button"
+                  className="as-btn"
+                  onClick={() => void downloadQrPng(shareQr.url, `warranty-${shareQr.title}`, 720)}
+                >
+                  Download
+                </button>
+                <button
+                  type="button"
+                  className="as-btn as-btn-secondary"
+                  onClick={() =>
+                    printQrSheet({
+                      title: shareQr.title,
+                      subtitle: shopName || shop,
+                      url: shareQr.url,
+                      imageUrl: qrImageUrl(shareQr.url, 560),
+                    })
+                  }
+                >
+                  Print
+                </button>
+                <button
+                  type="button"
+                  className="as-btn as-btn-ghost"
+                  onClick={() => void navigator.clipboard.writeText(shareQr.url)}
+                >
+                  Copy link
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
     </div>
   );

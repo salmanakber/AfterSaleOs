@@ -7,6 +7,8 @@ function isCustomerSurface(pathname: string) {
     pathname.startsWith("/c/") ||
     pathname.startsWith("/portal/") ||
     pathname.startsWith("/api/public/") ||
+    pathname.startsWith("/api/staff/") ||
+    pathname.startsWith("/staff/") ||
     pathname.startsWith("/q/")
   );
 }

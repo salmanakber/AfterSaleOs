@@ -1,15 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Banner,
   BlockStack,
   Button,
-  Card,
   FormLayout,
   InlineStack,
-  Layout,
   Modal,
   Page,
   Select,
@@ -17,7 +15,6 @@ import {
   TextField,
 } from "@shopify/polaris";
 import { gqlRequest } from "@/lib/graphql";
-import { TourTrigger, useOptionalTour } from "./ProductTour";
 import { PageEmpty, PageLoading } from "./PageLoading";
 
 type Rule = {
@@ -99,8 +96,14 @@ const LINK_SERIAL_LIST = `#graphql
   }
 `;
 
+function durationLabel(months: number | null | undefined) {
+  if (months == null) return "Lifetime";
+  if (months === 12) return "12 months";
+  if (months === 24) return "24 months";
+  return `${months} mo`;
+}
+
 export function ProductsRulesPage() {
-  const tour = useOptionalTour();
   const [rules, setRules] = useState<Rule[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [serialLists, setSerialLists] = useState<SerialList[]>([]);
@@ -109,8 +112,10 @@ export function ProductsRulesPage() {
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [serialOpen, setSerialOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"rules" | "products" | "serials">("rules");
 
   const [name, setName] = useState("Store warranty");
   const [warrantyType, setWarrantyType] = useState("store");
@@ -147,6 +152,11 @@ export function ProductsRulesPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const covered = useMemo(
+    () => products.filter((p) => p.coverageLabel !== "No coverage").length,
+    [products],
+  );
 
   function versionPayload() {
     const durationMonths = duration.trim() === "" || duration === "lifetime" ? null : Number(duration);
@@ -319,13 +329,7 @@ export function ProductsRulesPage() {
         />
       ) : null}
       {targetType !== "default" ? (
-        <TextField
-          label="Product or collection ID"
-          value={targetId}
-          onChange={setTargetId}
-          autoComplete="off"
-          helpText="Pick a product above, or paste the Shopify ID if you already have it."
-        />
+        <TextField label="Product or collection ID" value={targetId} onChange={setTargetId} autoComplete="off" />
       ) : null}
       <TextField
         label="Warranty terms"
@@ -333,7 +337,6 @@ export function ProductsRulesPage() {
         onChange={setTermsHtml}
         multiline={6}
         autoComplete="off"
-        helpText="Shown to customers on certificates and claim pages. Simple formatting is fine."
       />
     </FormLayout>
   );
@@ -341,147 +344,197 @@ export function ProductsRulesPage() {
   return (
     <Page
       title="Products & Rules"
-      subtitle={hasLoaded ? `${rules.length} rules · ${products.length} products` : "Loading…"}
       primaryAction={{ content: "Create rule", onAction: () => setOpen(true) }}
-      secondaryActions={
-        tour ? [{ content: "Take a tour", onAction: () => tour.startTour("rules", { force: true }) }] : undefined
-      }
+      secondaryActions={[
+        { content: "Help", onAction: () => setHelpOpen(true) },
+        { content: "Refresh", onAction: load },
+      ]}
     >
-      <div className="as-m-ops-surface">
+      <div className="as-m-studio">
+        <header className="as-m-studio__hero as-m-studio__hero--rules">
+          <div>
+            <p className="as-m-studio__kicker">Coverage engine</p>
+            <h2>Warranty rules &amp; catalog</h2>
+          </div>
+          <div className="as-m-studio__stats">
+            <div>
+              <strong>{hasLoaded ? rules.length : "—"}</strong>
+              <span>Rules</span>
+            </div>
+            <div>
+              <strong>{hasLoaded ? `${covered}/${products.length || 0}` : "—"}</strong>
+              <span>Covered</span>
+            </div>
+            <div>
+              <strong>{hasLoaded ? serialLists.length : "—"}</strong>
+              <span>Serial lists</span>
+            </div>
+          </div>
+        </header>
+
         {error ? (
-          <Banner tone="critical" title="Error" onDismiss={() => setError(null)}>
-            <p>{error}</p>
+          <Banner tone="critical" onDismiss={() => setError(null)}>
+            {error}
           </Banner>
         ) : null}
         {success ? (
           <Banner tone="success" onDismiss={() => setSuccess(null)}>
-            <p>{success}</p>
+            {success}
           </Banner>
         ) : null}
 
-        <div className="as-m-ops-banner">
-          <div>
-            <p className="as-m-ops-kicker">Coverage</p>
-            <h2>Products & warranty rules</h2>
-            <p>Define coverage terms, assign them to products, and manage serial lists.</p>
-          </div>
-          <InlineStack gap="200">
-            <TourTrigger tourId="rules" label="Tour" />
-            <Button onClick={load} loading={loading && hasLoaded} disabled={loading && !hasLoaded}>
-              Refresh
-            </Button>
-          </InlineStack>
+        <div className="as-m-studio__tabs" role="tablist">
+          {(
+            [
+              ["rules", "Rules"],
+              ["products", "Products"],
+              ["serials", "Serials"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              className="as-m-studio__tab"
+              data-active={tab === id}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {loading && !hasLoaded ? (
-          <PageLoading label="Loading rules" />
+          <PageLoading label="Loading coverage" />
         ) : (
-      <Layout>
-        <Layout.Section>
-          <Card>
-            <div data-tour="rules-panel">
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
-                Warranty rules
-              </Text>
-              {rules.length === 0 ? (
-                <PageEmpty
-                  title="No rules yet"
-                  body="Create a default rule so new orders receive warranties."
-                  action={<Button onClick={() => setOpen(true)}>Create rule</Button>}
-                />
-              ) : (
-                rules.map((r) => (
-                  <div key={r.id} className="as-m-rule-card">
-                  <InlineStack align="space-between" blockAlign="center">
-                    <BlockStack gap="100">
-                      <InlineStack gap="200">
-                        <Text as="span" fontWeight="semibold">
-                          {r.name}
-                        </Text>
-                        <Badge tone={r.active ? "success" : "info"}>{r.active ? "Active" : "Inactive"}</Badge>
-                      </InlineStack>
-                      <Text as="p" tone="subdued" variant="bodySm">
-                        {r.currentVersion?.durationMonths == null
-                          ? "Lifetime"
-                          : `${r.currentVersion.durationMonths} months`}{" "}
-                        · {r.assignments.map((a) => a.targetType).join(", ")} · priority {r.priority}
-                      </Text>
-                    </BlockStack>
-                    <Button onClick={() => openEdit(r)}>Edit</Button>
-                  </InlineStack>
+          <>
+            {tab === "rules" ? (
+              <section className="as-m-studio__panel" data-tour="rules-panel">
+                {rules.length === 0 ? (
+                  <PageEmpty
+                    title="No rules yet"
+                    body="Create a default rule so new orders receive warranties."
+                    action={<Button onClick={() => setOpen(true)}>Create rule</Button>}
+                  />
+                ) : (
+                  <div className="as-m-rule-grid">
+                    {rules.map((r) => (
+                      <article key={r.id} className="as-m-rule-card as-m-rule-card--pro">
+                        <div className="as-m-rule-card__top">
+                          <div>
+                            <h3>{r.name}</h3>
+                            <p>
+                              {durationLabel(r.currentVersion?.durationMonths)} ·{" "}
+                              {r.currentVersion?.warrantyType || "store"} · priority {r.priority}
+                            </p>
+                          </div>
+                          <Badge tone={r.active ? "success" : undefined}>
+                            {r.active ? "Active" : "Off"}
+                          </Badge>
+                        </div>
+                        <div className="as-m-rule-card__tags">
+                          {r.assignments.map((a, i) => (
+                            <span key={`${a.targetType}-${i}`}>{a.targetType}</span>
+                          ))}
+                          <span>{(r.currentVersion?.serialMode || "NOT_REQUIRED").replaceAll("_", " ").toLowerCase()}</span>
+                        </div>
+                        <div className="as-m-rule-card__foot">
+                          <Button onClick={() => openEdit(r)}>Edit rule</Button>
+                        </div>
+                      </article>
+                    ))}
                   </div>
-                ))
-              )}
-            </BlockStack>
-            </div>
-          </Card>
-        </Layout.Section>
+                )}
+              </section>
+            ) : null}
 
-        <Layout.Section>
-          <Card>
-            <div data-tour="serials-panel">
-            <BlockStack gap="300">
-              <InlineStack align="space-between">
-                <Text as="h2" variant="headingMd">
-                  Serial lists
-                </Text>
-                <InlineStack gap="200">
-                  <Button onClick={() => setSerialOpen(true)} disabled={serialLists.length === 0}>
-                    Import serials
-                  </Button>
-                </InlineStack>
-              </InlineStack>
-              <FormLayout>
-                <TextField label="New list name" value={serialListName} onChange={setSerialListName} autoComplete="off" />
-                <Button onClick={createSerialList} loading={saving}>
-                  Create list
-                </Button>
-              </FormLayout>
-              {serialLists.map((l) => (
-                <Text as="p" key={l.id}>
-                  {l.name} — {l.entryCount} serials
-                  {l.ruleId ? ` · linked to rule ${rules.find((r) => r.id === l.ruleId)?.name ?? l.ruleId}` : ""}
-                </Text>
-              ))}
-            </BlockStack>
-            </div>
-          </Card>
-        </Layout.Section>
+            {tab === "products" ? (
+              <section className="as-m-studio__panel">
+                {products.length === 0 ? (
+                  <PageEmpty
+                    title="No products synced"
+                    body="Catalog products appear after Shopify sync. Check Settings if this stays empty."
+                  />
+                ) : (
+                  <div className="as-m-product-grid">
+                    {products.map((p) => {
+                      const uncovered = p.coverageLabel === "No coverage";
+                      return (
+                        <article
+                          key={p.id}
+                          className="as-m-product-tile"
+                          data-uncovered={uncovered ? "true" : "false"}
+                        >
+                          <div className="as-m-product-tile__mark" aria-hidden>
+                            {p.title.slice(0, 1).toUpperCase()}
+                          </div>
+                          <div>
+                            <strong>{p.title}</strong>
+                            <Badge tone={uncovered ? "attention" : "success"}>{p.coverageLabel}</Badge>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            ) : null}
 
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Product coverage
-              </Text>
-              {products.length === 0 ? (
-                <Text as="p" tone="subdued">
-                  Your catalog will show up here once products are imported from Shopify. Open the
-                  app again after a few minutes, or sync products from Settings if the list is empty.
-                </Text>
-              ) : (
-                products.map((p) => (
-                  <InlineStack key={p.id} align="space-between">
-                    <Text as="span">{p.title}</Text>
-                    <Badge tone={p.coverageLabel === "No coverage" ? "attention" : "success"}>
-                      {p.coverageLabel}
-                    </Badge>
+            {tab === "serials" ? (
+              <section className="as-m-studio__panel" data-tour="serials-panel">
+                <div className="as-m-serial-composer">
+                  <TextField
+                    label="New list name"
+                    value={serialListName}
+                    onChange={setSerialListName}
+                    autoComplete="off"
+                  />
+                  <InlineStack gap="200">
+                    <Button onClick={createSerialList} loading={saving} disabled={!serialListName.trim()}>
+                      Create list
+                    </Button>
+                    <Button onClick={() => setSerialOpen(true)} disabled={serialLists.length === 0}>
+                      Import serials
+                    </Button>
                   </InlineStack>
-                ))
-              )}
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-      </Layout>
+                </div>
+                {serialLists.length === 0 ? (
+                  <PageEmpty title="No serial lists" body="Create a list, then import serial numbers for validated registration." />
+                ) : (
+                  <div className="as-m-serial-grid">
+                    {serialLists.map((l) => (
+                      <article key={l.id} className="as-m-serial-card">
+                        <h3>{l.name}</h3>
+                        <p>
+                          <strong>{l.entryCount}</strong> serials
+                          {l.ruleId
+                            ? ` · ${rules.find((r) => r.id === l.ruleId)?.name ?? "linked rule"}`
+                            : " · not linked"}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ) : null}
+          </>
         )}
       </div>
+
+      <Modal open={helpOpen} onClose={() => setHelpOpen(false)} title="Coverage help" primaryAction={{ content: "Got it", onAction: () => setHelpOpen(false) }}>
+        <Modal.Section>
+          <BlockStack gap="300">
+            <Text as="p">Rules define duration, start date, serial checks, and which products they apply to. Lower priority numbers win first.</Text>
+            <Text as="p" tone="subdued">Products show live coverage labels from your rules. Serial lists are required when a rule uses “Validated against list”.</Text>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Create warranty rule" primaryAction={{ content: "Create", onAction: createRule, loading: saving }} secondaryActions={[{ content: "Cancel", onAction: () => setOpen(false) }]}>
         <Modal.Section>{formFields}</Modal.Section>
       </Modal>
 
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit rule" primaryAction={{ content: "Save & publish version", onAction: saveEdit, loading: saving }} secondaryActions={[{ content: "Cancel", onAction: () => setEditOpen(false) }]}>
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit rule" primaryAction={{ content: "Save & publish", onAction: saveEdit, loading: saving }} secondaryActions={[{ content: "Cancel", onAction: () => setEditOpen(false) }]}>
         <Modal.Section>
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
             <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
@@ -492,11 +545,10 @@ export function ProductsRulesPage() {
             <div style={{ marginTop: 12 }}>
               <Select
                 label="Serial list for this rule"
-                helpText="Registration checks serials only in the linked list."
                 options={
                   serialLists.length
                     ? serialLists.map((l) => ({ label: `${l.name} (${l.entryCount})`, value: l.id }))
-                    : [{ label: "Create a list below first", value: "" }]
+                    : [{ label: "Create a list first", value: "" }]
                 }
                 value={editSerialListId}
                 onChange={setEditSerialListId}

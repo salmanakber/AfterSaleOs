@@ -182,6 +182,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const [needsPlanSelection, setNeedsPlanSelection] = useState(false);
   const [plan, setPlan] = useState<PlanEntitlements | null>(null);
   const [isNavigating, startTransition] = useTransition();
+  const [reconnecting, setReconnecting] = useState(false);
   const bootstrapped = useRef(false);
 
   const navigate = useCallback(
@@ -237,33 +238,44 @@ export function AppProviders({ children }: { children: ReactNode }) {
         const sessionJson = await sessionRes.json();
 
         async function exchangeOfflineToken(): Promise<boolean> {
-          clearSessionTokenCache();
-          const idToken = await getSessionToken();
-          if (!idToken) return false;
-          const exchangeRes = await fetch("/api/auth/token-exchange", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${idToken}`,
-            },
-            body: JSON.stringify({ shop: shopParam }),
-          });
-          if (!exchangeRes.ok) {
+          // Fresh install / first Admin paint: App Bridge idToken and Shopify's
+          // token-exchange endpoint often need 1–2 retries before succeeding.
+          for (let attempt = 0; attempt < 4; attempt++) {
+            clearSessionTokenCache();
+            const idToken = await getSessionToken({ force: true });
+            if (!idToken) {
+              await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+              continue;
+            }
+            const exchangeRes = await fetch("/api/auth/token-exchange", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${idToken}`,
+              },
+              body: JSON.stringify({ shop: shopParam }),
+            });
+            if (exchangeRes.ok) {
+              const exchanged = (await exchangeRes.json()) as { needsPlanSelection?: boolean };
+              if (exchanged.needsPlanSelection) {
+                setNeedsPlanSelection(true);
+                if (!window.location.pathname.startsWith("/plans")) {
+                  router.replace(appHref("/plans?welcome=1"));
+                }
+              }
+              return true;
+            }
+            const retryHeader = exchangeRes.headers.get("X-Shopify-Retry-Invalid-Session-Request");
+            const bodyText = await exchangeRes.text().catch(() => "");
             console.warn(
               "[bootstrap] token exchange failed",
               exchangeRes.status,
-              await exchangeRes.text().catch(() => ""),
+              retryHeader ? "retryable" : "",
+              bodyText,
             );
-            return false;
+            await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
           }
-          const exchanged = (await exchangeRes.json()) as { needsPlanSelection?: boolean };
-          if (exchanged.needsPlanSelection) {
-            setNeedsPlanSelection(true);
-            if (!window.location.pathname.startsWith("/plans")) {
-              router.replace(appHref("/plans?welcome=1"));
-            }
-          }
-          return true;
+          return false;
         }
 
         if (sessionJson.needsAuth || sessionJson.needsTokenRefresh) {
@@ -416,18 +428,57 @@ export function AppProviders({ children }: { children: ReactNode }) {
                     <Banner tone="critical" title="Connection error" onDismiss={() => setError(null)}>
                       <p>{error}</p>
                       {shop ? (
-                        <p style={{ marginTop: 8 }}>
-                          <a
-                            href={`/api/auth?shop=${encodeURIComponent(shop)}${
-                              getRememberedHost()
-                                ? `&host=${encodeURIComponent(getRememberedHost()!)}`
-                                : ""
-                            }`}
-                            target="_top"
-                            rel="noreferrer"
+                        <p style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            disabled={reconnecting}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              color: "inherit",
+                              fontWeight: 600,
+                              textDecoration: "underline",
+                              cursor: reconnecting ? "wait" : "pointer",
+                            }}
+                            onClick={async () => {
+                              setReconnecting(true);
+                              setError(null);
+                              try {
+                                clearSessionTokenCache();
+                                let ok = false;
+                                for (let attempt = 0; attempt < 4 && !ok; attempt++) {
+                                  const idToken = await getSessionToken({ force: true });
+                                  if (!idToken) {
+                                    await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+                                    continue;
+                                  }
+                                  const exchangeRes = await fetch("/api/auth/token-exchange", {
+                                    method: "POST",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                      Authorization: `Bearer ${idToken}`,
+                                    },
+                                    body: JSON.stringify({ shop }),
+                                  });
+                                  if (exchangeRes.ok) {
+                                    ok = true;
+                                    window.location.reload();
+                                    return;
+                                  }
+                                  await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+                                }
+                                const host = getRememberedHost();
+                                const authQs = new URLSearchParams({ shop });
+                                if (host) authQs.set("host", host);
+                                window.open(`/api/auth?${authQs.toString()}`, "_top");
+                              } finally {
+                                setReconnecting(false);
+                              }
+                            }}
                           >
-                            Reconnect AfterSale OS
-                          </a>
+                            {reconnecting ? "Reconnecting…" : "Reconnect AfterSale OS"}
+                          </button>
                         </p>
                       ) : null}
                     </Banner>
